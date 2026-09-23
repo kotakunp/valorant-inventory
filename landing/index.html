@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VALORANT Collection Showcase — free inventory image generator</title>
+  <meta name="description" content="Free, unofficial web tool for VALORANT players: view the cosmetics on your own account and export a high-resolution 16:9 showcase image. Read-only, no stored data, no ads." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root { --bg:#0f1923; --panel:#131f2b; --accent:#ff4655; --text:#ece8e1; --muted:#8b97a0; --line:rgba(255,255,255,.08); }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:"Inter",system-ui,sans-serif; line-height:1.6; }
+    .wrap { max-width:960px; margin:0 auto; padding:64px 24px; }
+    h1,h2 { font-family:"Bebas Neue",sans-serif; font-weight:400; letter-spacing:.04em; margin:0 0 8px; }
+    h1 { font-size:clamp(40px,7vw,72px); line-height:1; }
+    h1 .accent { color:var(--accent); }
+    h2 { font-size:26px; color:var(--muted); margin-top:48px; }
+    .tag { color:var(--muted); font-size:14px; letter-spacing:.14em; text-transform:uppercase; margin-bottom:28px; }
+    .badge { display:inline-block; border:1px solid var(--accent); color:var(--accent); font-size:12px; letter-spacing:.16em; text-transform:uppercase; padding:4px 12px; border-radius:3px; margin-bottom:20px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin-top:20px; }
+    .card { background:var(--panel); border:1px solid var(--line); padding:20px;
+      clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px); }
+    .card h3 { font-family:"Bebas Neue",sans-serif; font-weight:400; font-size:20px; letter-spacing:.06em; margin:0 0 6px; color:var(--text); }
+    .card p { margin:0; color:var(--muted); font-size:14px; }
+    ol.steps { padding-left:20px; color:var(--muted); }
+    ol.steps li { margin-bottom:8px; }
+    ol.steps strong { color:var(--text); }
+    footer { border-top:1px solid var(--line); margin-top:64px; padding-top:24px; color:var(--muted); font-size:13px; }
+    a { color:var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="badge">Unofficial · Free · No ads</div>
+    <h1>VALORANT Collection <span class="accent">Showcase</span></h1>
+    <p class="tag">Your account&rsquo;s cosmetics, one shareable image</p>
+
+    <p style="max-width:680px; color:var(--muted);">
+      A free web tool that lets you view the cosmetics owned on <strong style="color:var(--text);">your own
+      VALORANT account</strong> — weapon skins and knives, player cards, player titles, and gun buddies —
+      together with your account level, current and peak rank, and wallet balances, then exports everything
+      as a single high-resolution 16:9 image (2560&times;1440) you can share with friends or post in
+      community spaces.
+    </p>
+
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li><strong>Sign in</strong> with your own Riot session (or paste your session tokens — processed in memory only, never stored).</li>
+      <li><strong>Pick what to show</strong> — premium skins are pre-selected; every item is a checkbox, you control the layout.</li>
+      <li><strong>Download the image</strong> — a 1440p PNG saved straight to your device. Nothing is hosted, no share links, no inventory leaves your browser except to render your own card.</li>
+    </ol>
+
+    <div class="grid">
+      <div class="card"><h3>Read-only by design</h3><p>The tool can only display your collection. It cannot modify your account, client, gameplay, matchmaking, or ranking — and it gives no gameplay advantage.</p></div>
+      <div class="card"><h3>Nothing stored</h3><p>No credentials, tokens, or inventory data are persisted on the server. The generated image contains no link — your showcase exists only as a file you downloaded.</p></div>
+      <div class="card"><h3>Free &amp; non-commercial</h3><p>Free tier for everyone, no ads, no monetization. Built as a community tool for showing off collections.</p></div>
+    </div>
+
+    <h2>Status</h2>
+    <p style="color:var(--muted);">In development — public launch coming soon.</p>
+
+    <footer>
+      <p><strong>Disclaimer:</strong> VALORANT Collection Showcase is an unofficial community tool. It is not
+      endorsed by Riot Games and does not reflect the views or statements of Riot Games. VALORANT and Riot Games
+      are trademarks or registered trademarks of Riot Games, Inc.</p>
+      <p>&copy; 2026 VALORANT Collection Showcase</p>
+    </footer>
+  </div>
+</body>
+</html>
