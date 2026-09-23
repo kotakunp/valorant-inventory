@@ -183,9 +183,11 @@ Safeguards:
 
 **Captcha phase (shipped, fixed 2026-09-23):** Riot returns bare `auth_failure` when captcha is missing (the word "captcha" never appears). The form mounts hCaptcha on `auth_failure`/`captchaRequired`/`sitekey`, fetches live `rqdata` + `captchaSessionId`, renders with Enterprise `data`, and sends `{captcha, captchaSessionId}`. Prior bugs: (1) widget only mounted on `/captcha/i`; (2) password was PUT to the **dead** `auth.riotgames.com/authorization` endpoint (always `auth_failure`); (3) captcha challenge cookies were not bound to the PUT — fixed via single-use `captchaSessionId`.
 
-**Known residual risk:** hCaptcha Enterprise tokens minted on `localhost:5173` may still be rejected if Riot host-locks verification to `authenticate.riotgames.com`. If that happens after a valid `login_token` path is confirmed, password mode needs a captcha-solving API or browser-assisted flow; cookie / AUTO LOGIN remain the reliable paths.
+**Known residual risk → confirmed host-lock (2026-09-24):** hCaptcha Enterprise tokens minted on `localhost:5173` **and** `valorant.muur.app` are rejected by Riot (`type:"auth", captcha.hcaptcha` re-challenge). Tokens must be minted for `https://authenticate.riotgames.com/api/v1/login`. Fixes shipped:
+1. **`CAPMONSTER_API_KEY`** — `server/captchaSolver.ts` solves HCaptchaTaskProxyless with `websiteURL=authenticate.riotgames.com/api/v1/login` + live `rqdata`; `startLogin` path B auto-solves when the key is set (single-request password login, no widget).
+2. **Remote browser AUTO LOGIN** — `server/remoteBrowser.ts` + `src/RemoteBrowser.tsx`: headless Chromium on the VPS (`CHROME_PATH=/usr/bin/chromium` via nixpacks), JPEG frame stream + mouse/keyboard input forwarding; user logs in on Riot's real page (captcha host OK); cookie poll → `loginWithCookies` → showcase. Routes: `POST /api/browser/start`, `GET /api/browser/status|frame|result`, `POST /api/browser/input|stop`. UI opens automatically when local `/api/login/auto` fails (hosted). Session TTL 5 min, rate-limited 3/min/IP.
 
-**Open risk:** hCaptcha sitekeys are typically host-allowlisted — if the widget refuses to render on our domain, or Riot's verify rejects our token on host mismatch, the fallbacks are: (a) one paid solving-service probe to determine whether Riot actually checks `host`, (b) hybrid token-paste as the shipped automated-adjacent path, (c) helper app.
+**Open risk:** without CapMonster and without using remote browser/cookie paste, password mode on the hosted site will keep re-challenging captcha.
 
 ## 14. Browser-cookie mode ("official flow, zero password") — recommended pure-web path
 

@@ -214,6 +214,23 @@ input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); }
 .captcha-box { display: flex; justify-content: center; margin: 4px 0 14px; }
 .captcha-box.captcha-hidden { display: none; }
 
+/* ===== remote browser (hosted AUTO LOGIN) ===== */
+.remote-browser {
+  border: 1px solid var(--line); border-radius: 6px; padding: 12px;
+  background: rgba(255, 255, 255, 0.02); margin-bottom: 12px;
+}
+.remote-browser:focus { outline: 1px solid var(--accent); }
+.remote-frame-wrap {
+  background: #000; border: 1px solid var(--line); border-radius: 4px;
+  overflow: auto; max-height: 520px; display: flex; justify-content: center;
+}
+.remote-frame { display: block; user-select: none; }
+.remote-placeholder {
+  color: var(--muted); padding: 48px 16px; font-size: 13px; text-align: center;
+}
+.remote-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+
+
 
 
 

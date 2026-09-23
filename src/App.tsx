@@ -7,6 +7,7 @@ import type { AnyItem } from "./logic";
 import { makeState, parseCallback, RSO_STATE_KEY, RSO_REGION_KEY } from "./rso";
 import { SITEKEY, loadHcaptcha, widgetToken, resetCaptcha, renderCaptcha, fetchCaptchaChallenge } from "./captcha";
 import { Showcase, CANVAS_W, CANVAS_H } from "./Showcase";
+import { RemoteBrowserPanel } from "./RemoteBrowser";
 
 const REGIONS: Region[] = ["na", "eu", "ap", "kr", "latam", "br"];
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -39,6 +40,7 @@ export default function App() {
     rqdata: null,
   });
   const [cookieInput, setCookieInput] = useState("");
+  const [remoteOpen, setRemoteOpen] = useState(false);
   const captchaDivRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
 
@@ -331,6 +333,7 @@ export default function App() {
     setError(null);
     setLoading(true);
     try {
+      // Prefer local Chrome harvest/window; on hosted VPS that fails → open remote browser.
       const res = await fetch("/api/login/auto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -338,12 +341,14 @@ export default function App() {
       });
       const json = (await res.json().catch(() => ({}))) as ShowcasePayload & { error?: string };
       if (!res.ok || json.error) {
-        setError(json.error ?? `Auto login failed (${res.status})`);
+        // Headless VPS / no Chrome → remote interactive browser on the server
+        setRemoteOpen(true);
+        setError(null);
         return;
       }
       applyShowcase(json);
     } catch {
-      setError("Network error during auto login.");
+      setRemoteOpen(true);
     } finally {
       setLoading(false);
     }
@@ -547,8 +552,20 @@ export default function App() {
             once for Keychain access (click <em>Always Allow</em>). Otherwise a window opens: log
             in there once (tick <em>Remember me</em>), and later clicks reuse the saved session
             with no copying. Riot&apos;s real page handles captcha and 2FA; your password never
-            touches this app.
+            touches this app. On the hosted site this falls back to a remote browser below.
           </p>
+          {remoteOpen && (
+            <>
+              <div className="or-divider">remote browser (hosted — log in on Riot&apos;s page here)</div>
+              <RemoteBrowserPanel
+                region={form.region}
+                onDone={(json) => {
+                  applyShowcase(json);
+                  setRemoteOpen(false);
+                }}
+              />
+            </>
+          )}
           <div className="or-divider">or connect with a browser cookie (manual paste)</div>
           <div className="form-row">
             <div className="form-col">

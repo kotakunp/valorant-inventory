@@ -6,6 +6,16 @@ import type { Region } from "../src/types";
 import { getRsoConfig, buildAuthorizeUrl, handleRsoExchange } from "./rso";
 import { startLogin, submitMfa, rateLimit, AuthFlowError, loginWithCookies, normalizeRegion, requestCaptchaChallenge } from "./riotAuth";
 import { autoLoginWithBrowser } from "./browserLogin";
+import {
+  startRemoteBrowser,
+  status as remoteStatus,
+  takeResult as remoteTakeResult,
+  latestFrame as remoteLatestFrame,
+  sendInput as remoteSendInput,
+  stopRemoteBrowser,
+  type RemoteInput,
+} from "./remoteBrowser";
+import { captchaSolverEnabled } from "./captchaSolver";
 
 try {
   (process as any).loadEnvFile?.();
@@ -120,10 +130,71 @@ function respondAuthError(res: import("express").Response, e: unknown): void {
 app.get("/api/login/captcha-challenge", async (_req, res) => {
   try {
     const challenge = await requestCaptchaChallenge();
-    res.json(challenge ?? { sitekey: "019f1553-3845-481c-a6f5-5a60ccf6d830", rqdata: null });
+    res.json({
+      ...(challenge ?? { sitekey: "019f1553-3845-481c-a6f5-5a60ccf6d830", rqdata: null }),
+      solver: captchaSolverEnabled(),
+    });
   } catch {
-    res.json({ sitekey: "019f1553-3845-481c-a6f5-5a60ccf6d830", rqdata: null });
+    res.json({ sitekey: "019f1553-3845-481c-a6f5-5a60ccf6d830", rqdata: null, solver: captchaSolverEnabled() });
   }
+});
+
+// ---- remote browser (hosted AUTO LOGIN) ----
+app.post("/api/browser/start", async (req, res) => {
+  const { region } = req.body ?? {};
+  if (!rateLimit(`browser:${req.ip}`, 3, 60_000)) {
+    res.status(429).json({ error: "Too many browser attempts — wait a minute." });
+    return;
+  }
+  try {
+    const st = await startRemoteBrowser(normalizeRegion(region) ?? "na");
+    res.json(st);
+  } catch (e) {
+    respondAuthError(res, e);
+  }
+});
+
+app.get("/api/browser/status", (_req, res) => {
+  res.json(remoteStatus());
+});
+
+app.get("/api/browser/frame", (_req, res) => {
+  const buf = remoteLatestFrame();
+  if (!buf) {
+    res.status(404).json({ error: "No frame yet." });
+    return;
+  }
+  res.setHeader("Content-Type", "image/jpeg");
+  res.setHeader("Cache-Control", "no-store");
+  res.send(buf);
+});
+
+app.post("/api/browser/input", async (req, res) => {
+  const input = req.body as RemoteInput | undefined;
+  if (!input || typeof input.type !== "string") {
+    res.status(400).json({ error: "Input payload required." });
+    return;
+  }
+  try {
+    await remoteSendInput(input);
+    res.json({ ok: true });
+  } catch (e) {
+    respondAuthError(res, e);
+  }
+});
+
+app.get("/api/browser/result", (_req, res) => {
+  const result = remoteTakeResult();
+  if (!result) {
+    res.status(404).json({ error: "Not ready." });
+    return;
+  }
+  res.json(result);
+});
+
+app.post("/api/browser/stop", async (_req, res) => {
+  await stopRemoteBrowser();
+  res.json({ ok: true });
 });
 
 app.post("/api/login", async (req, res) => {
@@ -193,6 +264,8 @@ app.post("/api/login/auto", async (req, res) => {
     return;
   }
   try {
+    // Prefer local Chrome harvest/window when a GUI browser exists (dev/desktop).
+    // On headless VPS, fall back is an explicit error — UI uses /api/browser/* instead.
     const out = await autoLoginWithBrowser();
     res.json(
       await buildShowcase({

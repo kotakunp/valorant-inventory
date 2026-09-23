@@ -62,6 +62,8 @@ export interface CaptchaChallenge {
   rqdata: string | null;
   /** Server-side session id — must be sent back with the solved token. */
   captchaSessionId?: string;
+  /** True when the server has CAPMONSTER and will solve password mode itself. */
+  solver?: boolean;
 }
 
 /** Fetch Riot's Enterprise sitekey + rqdata (best-effort; falls back to static sitekey). */

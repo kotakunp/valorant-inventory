@@ -20,6 +20,7 @@ const CLIENT_SEED_BODY = {
 };
 
 import { getClientBuild } from "./catalog";
+import { captchaSolverEnabled, solveCaptcha } from "./captchaSolver";
 import type { Region } from "../src/types";
 
 // Header sets modeled on working community tools (GamerNoTitle/VSC): the
@@ -637,6 +638,71 @@ async function putAuthenticateLogin(
   );
 }
 
+/** Shared success/error handling after a password PUT against a challenge jar. */
+async function afterAuthenticatePut(
+  jar: CookieJar,
+  build: string,
+  input: StartLoginInput,
+  put: AuthResponse,
+  cookieNamesHint: (j: CookieJar) => string
+): Promise<{ kind: "mfa"; sessionId: string; maskedEmail: string } | AuthResult> {
+  const mfaPrompt = classifyAuthResponse(put.body);
+  if (mfaPrompt.kind === "mfa") {
+    const sessionId = createSession({ jar, maskedEmail: mfaPrompt.maskedEmail, puuid: null, createdAt: Date.now() });
+    return { kind: "mfa", sessionId, maskedEmail: mfaPrompt.maskedEmail };
+  }
+
+  const loginToken = put.body?.success?.login_token;
+  if (typeof loginToken === "string" && loginToken) {
+    await exchangeLoginToken(jar, build, loginToken);
+    return finishLogin(await tokensFromAuthorization(jar, build), null);
+  }
+
+  const errBody = put.body ?? {};
+  const errCode = String(errBody.error ?? errBody.error_description ?? "").slice(0, 120);
+  const isCaptchaIssue =
+    put.status === 400 ||
+    /captcha|invalid_request/i.test(errCode) ||
+    (errBody.captcha != null && !loginToken);
+
+  const fresh = await beginChallenge(build);
+  const cookies = cookieNamesHint(jar);
+  if (isCaptchaIssue) {
+    throw new AuthFlowError(
+      "Riot rejected the captcha token (expired, already used, or wrong challenge). Solve the new captcha and try again." +
+        `\n\nRaw: ${JSON.stringify(errBody).slice(0, 300)} [session cookies: ${cookies}]`,
+      401,
+      {
+        captchaRequired: true,
+        sitekey: fresh.challenge.sitekey,
+        rqdata: fresh.challenge.rqdata,
+        captchaSessionId: fresh.challenge.captchaSessionId,
+        cookieNames: cookies,
+      }
+    );
+  }
+  if (mfaPrompt.kind === "error") {
+    throw new AuthFlowError(`${mfaPrompt.message} [session cookies: ${cookies}]`, 401, {
+      captchaRequired: true,
+      sitekey: fresh.challenge.sitekey,
+      rqdata: fresh.challenge.rqdata,
+      captchaSessionId: fresh.challenge.captchaSessionId,
+      cookieNames: cookies,
+    });
+  }
+  throw new AuthFlowError(
+    `Riot login failed (${errCode || put.status}). Try again or use cookie / AUTO LOGIN.\n\nRaw: ${JSON.stringify(errBody).slice(0, 300)}`,
+    401,
+    {
+      captchaRequired: true,
+      sitekey: fresh.challenge.sitekey,
+      rqdata: fresh.challenge.rqdata,
+      captchaSessionId: fresh.challenge.captchaSessionId,
+      cookieNames: cookies,
+    }
+  );
+}
+
 async function exchangeLoginToken(jar: CookieJar, build: string, loginToken: string): Promise<void> {
   await authRequest(
     API_LOGIN_TOKEN,
@@ -711,72 +777,37 @@ export async function startLogin(
     }
     const jar = sess.jar;
     deleteCaptchaSession(input.captchaSessionId);
-
     const put = await putAuthenticateLogin(jar, build, input);
+    return afterAuthenticatePut(jar, build, input, put, cookieNamesHint);
+  }
 
-    // MFA on the new authenticate endpoint
-    const mfaPrompt = classifyAuthResponse(put.body);
-    if (mfaPrompt.kind === "mfa") {
-      const sessionId = createSession({ jar, maskedEmail: mfaPrompt.maskedEmail, puuid: null, createdAt: Date.now() });
-      return { kind: "mfa", sessionId, maskedEmail: mfaPrompt.maskedEmail };
-    }
-
-    const loginToken = put.body?.success?.login_token;
-    if (typeof loginToken === "string" && loginToken) {
-      await exchangeLoginToken(jar, build, loginToken);
-      return finishLogin(await tokensFromAuthorization(jar, build), null);
-    }
-
-    // Captcha rejected / auth failure → re-issue challenge for the UI
-    const errBody = put.body ?? {};
-    const errCode = String(errBody.error ?? errBody.error_description ?? "").slice(0, 120);
-    const isCaptchaIssue =
-      put.status === 400 ||
-      /captcha|invalid_request/i.test(errCode) ||
-      (errBody.captcha != null && !loginToken);
-
-    const fresh = await beginChallenge(build);
-    const cookies = cookieNamesHint(jar);
-    if (isCaptchaIssue) {
-      throw new AuthFlowError(
-        "Riot rejected the captcha token (expired, already used, or wrong challenge). Solve the new captcha and try again." +
-          `\n\nRaw: ${JSON.stringify(errBody).slice(0, 300)} [session cookies: ${cookies}]`,
-        401,
-        {
-          captchaRequired: true,
-          sitekey: fresh.challenge.sitekey,
-          rqdata: fresh.challenge.rqdata,
-          captchaSessionId: fresh.challenge.captchaSessionId,
-          cookieNames: cookies,
-        }
-      );
-    }
-    if (mfaPrompt.kind === "error") {
-      throw new AuthFlowError(`${mfaPrompt.message} [session cookies: ${cookies}]`, 401, {
-        captchaRequired: true,
-        sitekey: fresh.challenge.sitekey,
-        rqdata: fresh.challenge.rqdata,
-        captchaSessionId: fresh.challenge.captchaSessionId,
-        cookieNames: cookies,
-      });
+  // ---- path B: first attempt ----
+  // Hosted sites cannot mint Riot-accepted hcaptcha tokens (host-locked to
+  // authenticate.riotgames.com). When CAPMONSTER_API_KEY is set, solve
+  // server-side for that origin and complete the password PUT in one request.
+  const fresh = await beginChallenge(build);
+  if (captchaSolverEnabled()) {
+    const token = await solveCaptcha(fresh.challenge.rqdata);
+    if (token) {
+      const put = await putAuthenticateLogin(fresh.jar, build, { ...input, captcha: token });
+      return afterAuthenticatePut(fresh.jar, build, input, put, cookieNamesHint);
     }
     throw new AuthFlowError(
-      `Riot login failed (${errCode || put.status}). Try again or use cookie / AUTO LOGIN.\n\nRaw: ${JSON.stringify(errBody).slice(0, 300)}`,
-      401,
+      "Captcha solver failed — try again, or use AUTO LOGIN / cookie paste.",
+      502,
       {
         captchaRequired: true,
         sitekey: fresh.challenge.sitekey,
         rqdata: fresh.challenge.rqdata,
         captchaSessionId: fresh.challenge.captchaSessionId,
-        cookieNames: cookies,
+        cookieNames: cookieNamesHint(fresh.jar),
       }
     );
   }
 
-  // ---- path B: first attempt (no captcha yet) → issue challenge, do NOT send password ----
-  const fresh = await beginChallenge(build);
   throw new AuthFlowError(
-    "Solve the captcha below, then sign in again with your email + password.",
+    "Solve the captcha below, then sign in again with your email + password." +
+      " On the hosted site the widget token may be rejected (host-lock) — use AUTO LOGIN or cookie paste, or set CAPMONSTER_API_KEY.",
     401,
     {
       captchaRequired: true,

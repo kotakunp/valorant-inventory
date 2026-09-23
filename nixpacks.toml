@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_20"]
+nixPkgs = ["nodejs_20", "chromium"]
 
 [phases.install]
 cmds = ["npm ci"]
@@ -9,3 +9,6 @@ cmds = ["npm run build"]
 
 [start]
 cmd = "npm start"
+
+[variables]
+CHROME_PATH = "/usr/bin/chromium"
