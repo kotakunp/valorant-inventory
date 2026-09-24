@@ -111,22 +111,25 @@ export function rarityColor(price: number | null): string {
   return "#7fa3c8";
 }
 
+/** Episode 5+ competitive tiers (Ascendant inserted): from = first tier index of that rank. */
 const BRACKETS: { name: string; from: number; color: string }[] = [
-  { name: "Radiant", from: 24, color: "#fff3c4" },
-  { name: "Immortal", from: 21, color: "#ff5c73" },
-  { name: "Ascendant", from: 18, color: "#2ee6a8" },
-  { name: "Diamond", from: 15, color: "#b49bff" },
-  { name: "Platinum", from: 12, color: "#5fd8e6" },
-  { name: "Gold", from: 9, color: "#e8c860" },
-  { name: "Silver", from: 6, color: "#c0c0c0" },
-  { name: "Bronze", from: 3, color: "#b87333" },
-  { name: "Iron", from: 0, color: "#8a8a8a" },
+  { name: "Radiant", from: 27, color: "#fff3c4" },
+  { name: "Immortal", from: 24, color: "#ff5c73" },
+  { name: "Ascendant", from: 21, color: "#2ee6a8" },
+  { name: "Diamond", from: 18, color: "#b49bff" },
+  { name: "Platinum", from: 15, color: "#5fd8e6" },
+  { name: "Gold", from: 12, color: "#e8c860" },
+  { name: "Silver", from: 9, color: "#c0c0c0" },
+  { name: "Bronze", from: 6, color: "#b87333" },
+  { name: "Iron", from: 3, color: "#8a8a8a" },
 ];
 
 export function tierInfo(tier: number | null): { name: string; color: string } {
-  if (tier == null || tier < 0) return { name: "UNRANKED", color: "#8B97A0" };
-  const b = BRACKETS.find((x) => tier >= x.from)!;
-  if (b.from === 24 || tier > 23) return { name: "RADIANT", color: b.color };
+  // 0 = UNRANKED; 1–2 are unused slots in the tier table.
+  if (tier == null || tier < 3) return { name: "UNRANKED", color: "#8B97A0" };
+  const b = BRACKETS.find((x) => tier >= x.from);
+  if (!b) return { name: "UNRANKED", color: "#8B97A0" };
+  if (b.name === "Radiant") return { name: "RADIANT", color: b.color };
   return { name: `${b.name.toUpperCase()} ${tier - b.from + 1}`, color: b.color };
 }
 

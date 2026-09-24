@@ -51,7 +51,7 @@ export interface ShowcasePayload {
   tagLine: string;
   region: Region;
   accountLevel: number | null;
-  ranks: { current: number | null; peak: number | null };
+  ranks: Ranks;
   wallet: { vp: number | null; rp: number | null };
   skins: SkinItem[];
   cards: CardItem[];
@@ -59,6 +59,21 @@ export interface ShowcasePayload {
   buddies: BuddyItem[];
   pricesAvailable: boolean;
   generatedAt: string;
+}
+
+/** Official competitive-tier badge (icon/color from valorant-api.com). */
+export interface RankBadge {
+  tier: number;
+  name: string;
+  icon: string | null;
+  color: string;
+}
+
+export interface Ranks {
+  current: number | null;
+  peak: number | null;
+  currentBadge?: RankBadge | null;
+  peakBadge?: RankBadge | null;
 }
 
 export type ItemKind = "skin" | "card" | "title" | "buddy";

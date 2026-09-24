@@ -1,4 +1,4 @@
-import type { ChromaSelection, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
+import type { ChromaSelection, RankBadge, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
 import { selKey } from "./types";
 import type { Pages } from "./logic";
 import { rarityColor, tierInfo, collectionValue, groupByGun } from "./logic";
@@ -50,20 +50,28 @@ function KnifeIcon() {
   );
 }
 
-function Medallion({ label, tier }: { label: string; tier: number | null }) {
+function Medallion({ label, tier, badge }: { label: string; tier: number | null; badge?: RankBadge | null }) {
   const info = tierInfo(tier);
+  const name = badge?.name ?? info.name;
+  const color = badge?.color ?? info.color;
+  const icon = badge?.icon ?? null;
   return (
     <div className="sc-rank-panel">
       <div className="sc-medal-label">
         <span className="sc-rank-caret" aria-hidden="true" />
         {label}
       </div>
-      <div className="sc-medal-diamond" style={{ background: info.color }}>
-        <div className="sc-medal-inner">
-          <span className="sc-medal-name" style={{ color: info.color }}>
-            {info.name}
+      <div className="sc-medal-badge" style={{ borderColor: color }}>
+        {icon ? (
+          <img className="sc-medal-icon" src={imgUrl(icon)!} alt={name} title={name} />
+        ) : (
+          <span className="sc-medal-fallback" style={{ color }}>
+            {name}
           </span>
-        </div>
+        )}
+      </div>
+      <div className="sc-medal-name" style={{ color }}>
+        {name}
       </div>
     </div>
   );
@@ -161,8 +169,8 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
 
       <div className="sc-body">
         <aside className="sc-left">
-          <Medallion label="PEAK RANK" tier={payload.ranks.peak} />
-          <Medallion label="CURRENT RANK" tier={payload.ranks.current} />
+          <Medallion label="PEAK RANK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
+          <Medallion label="CURRENT RANK" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
           {(payload.wallet.vp != null || payload.wallet.rp != null) && (
             <div className="sc-wallet">
               {payload.wallet.vp != null && <span className="sc-chip">◆ {fmt(payload.wallet.vp)} VP</span>}

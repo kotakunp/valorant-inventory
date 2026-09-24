@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseEntitlements, parseRanks, buildPriceMapFromStorefront } from "./valorant";
+import { parseEntitlements, parseRanks, rankBadge, buildPriceMapFromStorefront } from "./valorant";
 
 const CARDS = "3f296c07-64c3-494c-923b-fe692a4fa1bd";
 
@@ -97,5 +97,24 @@ describe("parseRanks", () => {
   });
   it("handles missing data", () => {
     expect(parseRanks({})).toEqual({ current: null, peak: null });
+  });
+});
+
+describe("rankBadge", () => {
+  const tiers = new Map<number, { name: string; icon: string | null; color: string }>([
+    [24, { name: "IMMORTAL 1", icon: "https://media.valorant-api.com/x/24/largeicon.png", color: "#ff5c73" }],
+    [27, { name: "RADIANT", icon: "https://media.valorant-api.com/x/27/largeicon.png", color: "#fff3c4" }],
+  ]);
+  it("returns official badge for a known tier", () => {
+    expect(rankBadge(24, tiers)).toEqual({
+      tier: 24,
+      name: "IMMORTAL 1",
+      icon: "https://media.valorant-api.com/x/24/largeicon.png",
+      color: "#ff5c73",
+    });
+  });
+  it("null tier or unknown tier → null", () => {
+    expect(rankBadge(null, tiers)).toBeNull();
+    expect(rankBadge(99, tiers)).toBeNull();
   });
 });

@@ -96,10 +96,13 @@ describe("groupByGun", () => {
 });
 
 describe("presentation helpers", () => {
-  it("tier names and colors", () => {
-    expect(tierInfo(22).name).toBe("IMMORTAL 2");
-    expect(tierInfo(24).name).toBe("RADIANT");
+  it("tier names and colors (Episode 5+ numbering)", () => {
+    expect(tierInfo(22).name).toBe("ASCENDANT 2");
+    expect(tierInfo(24).name).toBe("IMMORTAL 1");
+    expect(tierInfo(27).name).toBe("RADIANT");
+    expect(tierInfo(19).name).toBe("DIAMOND 2");
     expect(tierInfo(null).name).toBe("UNRANKED");
+    expect(tierInfo(0).name).toBe("UNRANKED");
   });
   it("rarity colors by price", () => {
     expect(rarityColor(null)).toBe("#4a5560");

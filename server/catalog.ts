@@ -9,12 +9,20 @@ export interface SkinIndexEntry {
   skin: any;
 }
 
+export interface RankTierInfo {
+  name: string;
+  icon: string | null;
+  color: string;
+}
+
 export interface Catalog {
   skins: Map<string, SkinIndexEntry>;
   chromaToSkin: Map<string, string>;
   cards: Map<string, { name: string; icon: string | null }>;
   titles: Map<string, { name: string; text: string }>;
   buddies: Map<string, { name: string; icon: string | null }>;
+  /** tier index → official badge (latest competitivetiers table). */
+  rankTiers: Map<number, RankTierInfo>;
 }
 
 let cache: { at: number; data: Catalog } | null = null;
@@ -26,17 +34,43 @@ async function getJson(url: string): Promise<any> {
   return res.json();
 }
 
+/** RGBA hex from the API (`rrggbbaa`) → CSS `#rrggbb`. */
+function cssHex(rgba: string | null | undefined): string {
+  if (typeof rgba !== "string" || rgba.length < 6) return "#8b97a0";
+  return `#${rgba.slice(0, 6).toLowerCase()}`;
+}
+
+function indexRankTiers(raw: any): Map<number, RankTierInfo> {
+  const out = new Map<number, RankTierInfo>();
+  const tables: any[] = Array.isArray(raw?.data) ? raw.data : [];
+  // Last table = current episode (Episode 5+ includes Ascendant; 0=UNRANKED, 1–2 unused).
+  const latest = tables[tables.length - 1];
+  for (const t of latest?.tiers ?? []) {
+    if (typeof t?.tier !== "number") continue;
+    const name = typeof t.tierName === "string" ? t.tierName : "";
+    if (!name || name.startsWith("Unused")) continue;
+    out.set(t.tier, {
+      name: name.toUpperCase(),
+      icon: t.largeIcon ?? t.smallIcon ?? null,
+      color: cssHex(t.color),
+    });
+  }
+  return out;
+}
+
 export async function getCatalog(): Promise<Catalog> {
   if (cache && Date.now() - cache.at < CATALOG_TTL_MS) return cache.data;
-  const [weapons, cards, titles, buddies] = await Promise.all([
+  const [weapons, cards, titles, buddies, ranks] = await Promise.all([
     getJson("https://valorant-api.com/v1/weapons"),
     getJson("https://valorant-api.com/v1/playercards"),
     getJson("https://valorant-api.com/v1/playertitles"),
     getJson("https://valorant-api.com/v1/buddies"),
+    getJson("https://valorant-api.com/v1/competitivetiers").catch(() => null),
   ]);
   const data: Catalog = {
     skins: new Map(), chromaToSkin: new Map(),
     cards: new Map(), titles: new Map(), buddies: new Map(),
+    rankTiers: indexRankTiers(ranks),
   };
   const lc = (s: unknown) => (typeof s === "string" ? s.toLowerCase() : "");
   for (const w of weapons.data ?? []) {

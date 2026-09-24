@@ -1,4 +1,4 @@
-import type { ChromaOption, Region, ShowcasePayload, SkinItem, CardItem, TitleItem, BuddyItem } from "../src/types";
+import type { ChromaOption, RankBadge, Region, ShowcasePayload, SkinItem, CardItem, TitleItem, BuddyItem } from "../src/types";
 import { getCatalog, getClientVersion } from "./catalog";
 
 export class UpstreamError extends Error {
@@ -122,6 +122,17 @@ export function parseRanks(body: any): { current: number | null; peak: number | 
   let current: number | null = body?.LatestCompetitiveUpdate?.TierAfterUpdate ?? null;
   if (typeof current !== "number") current = tiers.length ? tiers[tiers.length - 1] : null;
   return { current, peak };
+}
+
+/** Attach official rank badge (icon/name/color) for a tier number. */
+export function rankBadge(
+  tier: number | null,
+  rankTiers: Map<number, { name: string; icon: string | null; color: string }>
+): RankBadge | null {
+  if (tier == null) return null;
+  const info = rankTiers.get(tier);
+  if (!info) return null;
+  return { tier, name: info.name, icon: info.icon, color: info.color };
 }
 
 export interface AccountInput {
@@ -315,6 +326,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     : null;
 
   const name0 = Array.isArray(nameBody) ? nameBody[0] : null;
+  const parsedRanks = parseRanks(mmrBody);
 
   return {
     puuid,
@@ -322,7 +334,11 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     tagLine: name0?.TagLine ?? userinfo?.tagLine ?? "",
     region: input.region,
     accountLevel,
-    ranks: parseRanks(mmrBody),
+    ranks: {
+      ...parsedRanks,
+      currentBadge: rankBadge(parsedRanks.current, catalog.rankTiers),
+      peakBadge: rankBadge(parsedRanks.peak, catalog.rankTiers),
+    },
     wallet: { vp, rp },
     skins, cards, titles, buddies,
     pricesAvailable,
