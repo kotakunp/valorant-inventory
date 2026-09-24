@@ -40,6 +40,9 @@ describe("defaultChecked", () => {
 });
 
 describe("loadout categories", () => {
+  const allSectionGuns = (cat: (typeof WEAPON_CATEGORIES)[number]) =>
+    cat.sections.flatMap((s) => [...s.guns]);
+
   it("official loadout order = sidearms → … → heavies (no melee)", () => {
     expect(LOADOUT_GUNS).toEqual([
       "Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff",
@@ -50,10 +53,10 @@ describe("loadout categories", () => {
       "Ares", "Odin",
     ]);
     expect(LOADOUT_GUNS).toHaveLength(WEAPON_ORDER.length);
-    const flat = WEAPON_CATEGORIES.flatMap((c) => c.guns);
+    const flat = WEAPON_CATEGORIES.flatMap(allSectionGuns);
     expect([...flat]).toEqual([...LOADOUT_GUNS]);
   });
-  it("showcase uses exactly 4 columns (smg+shot, sniper+heavy merged)", () => {
+  it("showcase uses exactly 4 columns with mid-column section titles", () => {
     expect(WEAPON_CATEGORIES).toHaveLength(4);
     expect(WEAPON_CATEGORIES.map((c) => c.id)).toEqual([
       "sidearms",
@@ -61,8 +64,14 @@ describe("loadout categories", () => {
       "rifles",
       "snipers-heavies",
     ]);
-    expect(WEAPON_CATEGORIES[1].guns).toEqual(["Stinger", "Spectre", "Bucky", "Judge"]);
-    expect(WEAPON_CATEGORIES[3].guns).toEqual(["Marshal", "Outlaw", "Operator", "Ares", "Odin"]);
+    const smgShot = WEAPON_CATEGORIES[1].sections;
+    expect(smgShot.map((s) => s.label)).toEqual(["SMGS", "SHOTGUNS"]);
+    expect(smgShot[0].guns).toEqual(["Stinger", "Spectre"]);
+    expect(smgShot[1].guns).toEqual(["Bucky", "Judge"]);
+    const snipHeavy = WEAPON_CATEGORIES[3].sections;
+    expect(snipHeavy.map((s) => s.label)).toEqual(["SNIPERS", "HEAVIES"]);
+    expect(snipHeavy[0].guns).toEqual(["Marshal", "Outlaw", "Operator"]);
+    expect(snipHeavy[1].guns).toEqual(["Ares", "Odin"]);
   });
 });
 

@@ -908,7 +908,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
 }
 /* sidearms (col 1): full vertical height including the melee band */
 .sc-cat-col:nth-child(1) {
@@ -931,6 +931,25 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   grid-column: 5;
   grid-row: 1;
 }
+.sc-cat-sec {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sc-cat-col > .sc-cat-sec {
+  flex: 1;
+}
+.sc-cat-sec-guns {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sc-cat-sec + .sc-cat-sec {
+  margin-top: 6px;
+}
 .sc-empty--loadout {
   grid-column: 1 / -1;
   grid-row: 1;
@@ -943,6 +962,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   flex-shrink: 0;
   min-width: 0;
 }
+.sc-cat-col-head--mid {
+  margin-bottom: 3px;
+  margin-top: 1px;
+}
 .sc-cat-col-label {
   font-family: var(--font-display);
   font-size: 13px;
@@ -950,13 +973,18 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   color: #fff;
   white-space: nowrap;
 }
+.sc-cat-col-head--mid .sc-cat-col-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
 .sc-cat-col-rule {
   flex: 1;
   height: 2px;
   min-width: 8px;
   background: linear-gradient(90deg, var(--accent), rgba(255, 70, 85, 0.08));
 }
-.sc-cat-col .sc-cat {
+.sc-cat-col .sc-cat-sec-guns .sc-cat {
   flex: 1 1 0;
   min-height: 0;
 }
@@ -1091,14 +1119,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-knife-strip {
   display: flex;
   gap: 6px;
-  height: 52px;
+  height: 68px;
   min-width: 0;
 }
 .sc-knife-row .sc-cat-head--sm {
   margin-bottom: 3px;
 }
 .sc-knife-row .sc-cat-name {
-  font-size: 11px;
+  font-size: 12px;
 }
 .sc-knife-cell {
   position: relative;
@@ -1128,7 +1156,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   z-index: 40 !important;
 }
 .sc-knife-cell .sc-stack-art {
-  height: 72%;
+  height: 76%;
   max-width: 92%;
 }
 

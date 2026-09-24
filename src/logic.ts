@@ -44,14 +44,36 @@ export const WEAPON_ORDER = [
 
 /**
  * Showcase column groups (exactly 4 + optional OTHER).
+ * Combined columns use section labels mid-column (SMGS then SHOTGUNS, etc.).
  * Flat gun list still follows official loadout order.
  */
 export const WEAPON_CATEGORIES = [
-  { id: "sidearms", label: "SIDEARMS", guns: ["Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff"] },
-  { id: "smgs-shotguns", label: "SMGS · SHOTGUNS", guns: ["Stinger", "Spectre", "Bucky", "Judge"] },
-  { id: "rifles", label: "RIFLES", guns: ["Bulldog", "Guardian", "Phantom", "Vandal"] },
-  { id: "snipers-heavies", label: "SNIPERS · HEAVIES", guns: ["Marshal", "Outlaw", "Operator", "Ares", "Odin"] },
+  {
+    id: "sidearms",
+    sections: [{ label: "SIDEARMS", guns: ["Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff"] }],
+  },
+  {
+    id: "smgs-shotguns",
+    sections: [
+      { label: "SMGS", guns: ["Stinger", "Spectre"] },
+      { label: "SHOTGUNS", guns: ["Bucky", "Judge"] },
+    ],
+  },
+  {
+    id: "rifles",
+    sections: [{ label: "RIFLES", guns: ["Bulldog", "Guardian", "Phantom", "Vandal"] }],
+  },
+  {
+    id: "snipers-heavies",
+    sections: [
+      { label: "SNIPERS", guns: ["Marshal", "Outlaw", "Operator"] },
+      { label: "HEAVIES", guns: ["Ares", "Odin"] },
+    ],
+  },
 ] as const;
+
+export type WeaponCategory = (typeof WEAPON_CATEGORIES)[number];
+export type WeaponSection = WeaponCategory["sections"][number];
 
 /** Flat gun list in official loadout category order (excludes melee). */
 export const LOADOUT_GUNS: readonly string[] = WEAPON_ORDER;

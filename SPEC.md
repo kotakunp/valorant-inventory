@@ -76,7 +76,7 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 ## 7. Image output spec
 
 - **Base canvas: 1280 × 720** CSS px, exported with `pixelRatio: 2` → **2560 × 1440 PNG (1440p, 16:9)**.
-- **Pagination:** center zone is **exactly 4 category columns** — SIDEARMS | SMGS · SHOTGUNS | RIFLES | SNIPERS · HEAVIES (guns stack top→bottom in official order within each column; unknown guns → OTHER). Always every official gun (19); knives on the full-width bottom row (not paginated). Removing the last skin of a gun keeps an **empty slot**. Density only applies if unknown guns overflow (fewest pages 1 → 2 → 3, then dense):
+- **Pagination:** center zone is **exactly 4 category columns** — SIDEARMS | SMGS·SHOTGUNS | RIFLES | SNIPERS·HEAVIES. Combined columns use **section titles mid-column** (SMGS on top of SMGs then SHOTGUNS above shotguns; SNIPERS then HEAVIES) — not a single combined title. Guns stack top→bottom in official order; unknown guns → OTHER. Always every official gun (19); knives on the full-width bottom row (not paginated). Removing the last skin of a gun keeps an **empty slot**. Density only applies if unknown guns overflow (fewest pages 1 → 2 → 3, then dense):
 
   | Density | Fallback chunk (flat slots) | Capacity/page |
   |---|---|---|
@@ -98,11 +98,11 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 │ HEADER   [RIOT ID #TAG]   LV.207   ·   NA   ·  <equipped title>    │
 ├─────────────────────────────────────────────┬───────────────────────┤
 │ COLLECTION COLUMNS                         │ PLAYER CARD           │
-│ SIDEARMS│SMGS·SHOTS│RIFLES│SNIPERS·HEAVIES │ tall art panel        │
+│ SIDEARMS│SMGS│SHOTGUNS │RIFLES│SNIPERS│HEAVIES │ tall art panel       │
 │ col1 spans full height (incl. melee band)  │ PEAK / CURRENT RANK   │
-│ guns stack down each column (overlap deck) │ VP / RP               │
+│ section titles sit on their own groups     │ VP / RP               │
 │ click skin → menu (chroma/front/remove)    │ PREM:n  KNIFE:n       │
-│ ── MELEE (cols 2–4, compact) ──            │ buddies +N            │
+│ ── MELEE (cols 2–4, ~68px) ──              │ buddies +N            │
 ├────────────────────────────────────────────┴───────────────────────┤
 │ (no footer)                                                        │
 └────────────────────────────────────────────────────────────────────┘

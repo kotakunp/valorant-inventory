@@ -125,25 +125,34 @@ export function Showcase({
   const slots = pages.gridPages[page] ?? [];
   const knifeItems = pages.knifeItems ?? [];
 
-  /** Exactly 4 category columns (+ OTHER for unknown guns). */
-  const catColumns: { id: string; label: string; guns: GunGroup[] }[] = (() => {
+  /** Exactly 4 category columns (+ OTHER for unknown guns); section titles mid-column when merged. */
+  const catColumns: {
+    id: string;
+    sections: { label: string; guns: GunGroup[] }[];
+  }[] = (() => {
     const official = new Set(LOADOUT_GUNS.map((w) => w.toUpperCase()));
     const used = new Set<string>();
-    const cols: { id: string; label: string; guns: GunGroup[] }[] = WEAPON_CATEGORIES.map((cat) => {
-      const ids = cat.guns.map((w) => w.toUpperCase());
-      const guns = slots.filter((g) => {
-        if (used.has(g.id) || !ids.includes(g.id)) return false;
-        used.add(g.id);
-        return true;
-      });
-      return { id: cat.id, label: cat.label, guns };
-    });
+    const cols: {
+      id: string;
+      sections: { label: string; guns: GunGroup[] }[];
+    }[] = WEAPON_CATEGORIES.map((cat) => ({
+      id: cat.id,
+      sections: cat.sections.map((sec) => {
+        const ids = sec.guns.map((w) => w.toUpperCase());
+        const guns = slots.filter((g) => {
+          if (used.has(g.id) || !ids.includes(g.id)) return false;
+          used.add(g.id);
+          return true;
+        });
+        return { label: sec.label as string, guns };
+      }),
+    }));
     const other = slots.filter((g) => {
       if (used.has(g.id) || official.has(g.id)) return false;
       used.add(g.id);
       return true;
     });
-    if (other.length) cols.push({ id: "other", label: "OTHER", guns: other });
+    if (other.length) cols.push({ id: "other", sections: [{ label: "OTHER", guns: other }] });
     return cols;
   })();
 
@@ -286,11 +295,15 @@ export function Showcase({
           <div className="sc-loadout">
             {catColumns.map((col) => (
               <div className="sc-cat-col" key={col.id}>
-                <div className="sc-cat-col-head">
-                  <span className="sc-cat-col-label">{col.label}</span>
-                  <span className="sc-cat-col-rule" aria-hidden="true" />
-                </div>
-                {col.guns.map(gunSection)}
+                {col.sections.map((sec, si) => (
+                  <div className="sc-cat-sec" key={sec.label}>
+                    <div className={`sc-cat-col-head${si > 0 ? " sc-cat-col-head--mid" : ""}`}>
+                      <span className="sc-cat-col-label">{sec.label}</span>
+                      <span className="sc-cat-col-rule" aria-hidden="true" />
+                    </div>
+                    <div className="sc-cat-sec-guns">{sec.guns.map(gunSection)}</div>
+                  </div>
+                ))}
               </div>
             ))}
             {catColumns.length === 0 && (
