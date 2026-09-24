@@ -855,13 +855,22 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-wallet { display: flex; flex-direction: column; gap: 5px; margin-top: 0; flex-shrink: 0; }
 .sc-chip {
-  font-size: 11px;
-  letter-spacing: 0.06em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   color: #d7dee4;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 3px 7px;
+  padding: 4px 8px;
   border-radius: 2px;
+}
+.sc-wallet-icon {
+  flex-shrink: 0;
+  display: block;
 }
 
 /* center: weapon-category groups */

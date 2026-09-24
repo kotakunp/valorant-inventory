@@ -49,6 +49,26 @@ function KnifeIcon() {
   );
 }
 
+/** Valorant Points — blue hex currency mark */
+function VpIcon() {
+  return (
+    <svg className="sc-wallet-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path d="M8 1 L14.5 4.5 L14.5 11.5 L8 15 L1.5 11.5 L1.5 4.5 Z" fill="none" stroke="#1ce8d2" strokeWidth="1.6" />
+      <path d="M8 4.2 L11.5 6.2 L11.5 9.8 L8 11.8 L4.5 9.8 L4.5 6.2 Z" fill="#1ce8d2" />
+    </svg>
+  );
+}
+
+/** Radianite Points — gold/yellow diamond currency mark */
+function RpIcon() {
+  return (
+    <svg className="sc-wallet-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path d="M8 1.5 L14.5 8 L8 14.5 L1.5 8 Z" fill="none" stroke="#f5c542" strokeWidth="1.6" />
+      <path d="M8 4.5 L11.5 8 L8 11.5 L4.5 8 Z" fill="#f5c542" />
+    </svg>
+  );
+}
+
 function Medallion({ label, tier, badge }: { label: string; tier: number | null; badge?: RankBadge | null }) {
   const info = tierInfo(tier);
   const name = badge?.name ?? info.name;
@@ -177,8 +197,6 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, onTo
         <span className="sc-header-div" aria-hidden="true" />
         <div className="sc-title">COLLECTION</div>
         <div className="sc-header-rule" aria-hidden="true" />
-        {payload.accountLevel != null && <span className="sc-badge">LV. {payload.accountLevel}</span>}
-        <span className="sc-badge sc-badge--region">{payload.region.toUpperCase()}</span>
       </header>
 
       <div className="sc-body">
@@ -238,8 +256,18 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, onTo
             </div>
             {(payload.wallet.vp != null || payload.wallet.rp != null) && (
               <div className="sc-wallet">
-                {payload.wallet.vp != null && <span className="sc-chip">◆ {fmt(payload.wallet.vp)} VP</span>}
-                {payload.wallet.rp != null && <span className="sc-chip">✦ {fmt(payload.wallet.rp)} RP</span>}
+                {payload.wallet.vp != null && (
+                  <span className="sc-chip">
+                    <VpIcon />
+                    {fmt(payload.wallet.vp)}
+                  </span>
+                )}
+                {payload.wallet.rp != null && (
+                  <span className="sc-chip">
+                    <RpIcon />
+                    {fmt(payload.wallet.rp)}
+                  </span>
+                )}
               </div>
             )}
             <div className="sc-stats">
