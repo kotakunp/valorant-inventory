@@ -129,7 +129,7 @@ export function Showcase({
   const catColumns: { id: string; label: string; guns: GunGroup[] }[] = (() => {
     const official = new Set(LOADOUT_GUNS.map((w) => w.toUpperCase()));
     const used = new Set<string>();
-    const cols = WEAPON_CATEGORIES.map((cat) => {
+    const cols: { id: string; label: string; guns: GunGroup[] }[] = WEAPON_CATEGORIES.map((cat) => {
       const ids = cat.guns.map((w) => w.toUpperCase());
       const guns = slots.filter((g) => {
         if (used.has(g.id) || !ids.includes(g.id)) return false;
