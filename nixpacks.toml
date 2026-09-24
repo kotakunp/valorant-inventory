@@ -1,12 +1,5 @@
 [phases.setup]
 nixPkgs = ["nodejs_20", "chromium"]
-# Chromium runtime libs (nix chromium is mostly self-contained; these cover common gaps)
-nixLibs = [
-  "nss", "nspr", "at-spi2-core", "libdrm", "libxkbcommon",
-  "libX11", "libXcomposite", "libXdamage", "libXext", "libXfixes",
-  "libXrandr", "gbm", "pango", "cairo", "alsa-lib", "atk", "atk-atspi",
-  "libcups", "dbus", "expat", "libxshmfence", "mesa", "libglvnd"
-]
 
 [phases.install]
 cmds = ["npm ci"]
@@ -16,6 +9,3 @@ cmds = ["npm run build"]
 
 [start]
 cmd = "npm start"
-
-# Do NOT set CHROME_PATH=/usr/bin/chromium — nixpacks puts `chromium` on PATH,
-# not under /usr/bin. Runtime discovers it via PATH.
