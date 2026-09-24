@@ -24,7 +24,10 @@ export interface SkinItem {
 export interface CardItem {
   id: string;
   name: string;
+  /** Official largeArt portrait (268×640) — showcase display. */
   icon: string | null;
+  /** Square avatar (128×128 displayIcon) — compact UI chips. */
+  avatar?: string | null;
   price: number | null;
   equipped: boolean;
 }

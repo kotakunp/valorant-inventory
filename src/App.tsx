@@ -615,7 +615,12 @@ export default function App() {
           <div className="chips">
             {visible.map((i) => {
               const on = !!selection[selKey(kind, i.id)];
-              const icon = "icon" in i ? i.icon : null;
+              const icon =
+                kind === "card" && "avatar" in i && i.avatar
+                  ? i.avatar
+                  : "icon" in i
+                    ? i.icon
+                    : null;
               return (
                 <label
                   key={i.id}

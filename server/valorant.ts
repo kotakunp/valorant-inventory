@@ -290,7 +290,16 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
 
   const cards: CardItem[] = uniq(parseEntitlements(entCards, ITEM_TYPE.cards)).flatMap((id) => {
     const c = catalog.cards.get(id);
-    return c ? [{ id, name: c.name, icon: c.icon, price: pricesAvailable ? priceMap!.get(id) ?? null : null, equipped: id === equippedCardId }] : [];
+    return c
+      ? [{
+          id,
+          name: c.name,
+          icon: c.icon,
+          avatar: c.avatar,
+          price: pricesAvailable ? priceMap!.get(id) ?? null : null,
+          equipped: id === equippedCardId,
+        }]
+      : [];
   });
   cards.sort((a, b) => (b.price ?? -1) - (a.price ?? -1) || a.name.localeCompare(b.name));
 

@@ -559,7 +559,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .chip.on { border-color: var(--rarity, var(--accent)); background: rgba(255, 255, 255, 0.03); }
 .chip .price { color: var(--faint); font-size: 10px; font-weight: 600; }
-.chip img { display: block; border-radius: 2px; }
+.chip img { display: block; border-radius: 2px; object-fit: contain; width: 16px; height: 16px; }
 
 /* chroma strip */
 .chroma-panel {
@@ -1044,14 +1044,23 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-chroma span { font-size: 8px; color: var(--text); }
 .sc-chroma.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 
-/* right rail: player card */
-.sc-right { width: 200px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+/* right rail: player card — official largeArt aspect 268×640 (≈0.419) */
+.sc-right {
+  width: 184px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  align-items: stretch;
+}
 .sc-card-panel {
   position: relative;
   border: 2px solid rgba(255, 70, 85, 0.55);
   overflow: hidden;
-  flex: 1;
-  min-height: 0;
+  width: 100%;
+  /* Do not stretch — lock to official card art ratio so art is not cropped/squashed. */
+  aspect-ratio: 268 / 640;
+  flex: 0 0 auto;
   background: #0c141d;
   clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
   box-shadow: 0 0 20px -6px rgba(255, 70, 85, 0.35);
@@ -1068,7 +1077,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-card-panel::before { top: 4px; left: 4px; border-right: none; border-bottom: none; }
 .sc-card-panel::after { bottom: 4px; right: 4px; border-left: none; border-top: none; }
-.sc-card-panel img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Container matches 268:640 — cover ≈ exact fit (tiny 639-px rounding safe). */
+.sc-card-panel img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
 .sc-card-label {
   position: absolute;
   bottom: 0;

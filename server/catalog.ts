@@ -18,7 +18,7 @@ export interface RankTierInfo {
 export interface Catalog {
   skins: Map<string, SkinIndexEntry>;
   chromaToSkin: Map<string, string>;
-  cards: Map<string, { name: string; icon: string | null }>;
+  cards: Map<string, { name: string; icon: string | null; avatar: string | null }>;
   titles: Map<string, { name: string; text: string }>;
   buddies: Map<string, { name: string; icon: string | null }>;
   /** tier index → official badge (latest competitivetiers table). */
@@ -99,7 +99,14 @@ export async function getCatalog(): Promise<Catalog> {
   }
   for (const c of cards.data ?? []) {
     const id = lc(c.uuid);
-    if (id) data.cards.set(id, { name: c.displayName, icon: c.displayIcon ?? c.largeArt ?? null });
+    if (id) {
+      data.cards.set(id, {
+        name: c.displayName,
+        // largeArt = official card portrait 268×640 (Collection slot); displayIcon = 128×128 avatar.
+        icon: c.largeArt ?? c.displayIcon ?? null,
+        avatar: c.displayIcon ?? c.largeArt ?? null,
+      });
+    }
   }
   for (const t of titles.data ?? []) {
     const id = lc(t.uuid);
