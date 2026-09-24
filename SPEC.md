@@ -76,15 +76,15 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 ## 7. Image output spec
 
 - **Base canvas: 1280 × 720** CSS px, exported with `pixelRatio: 2` → **2560 × 1440 PNG (1440p, 16:9)**.
-- **Pagination:** loadout **slots** = every official gun (19, VALORANT category order: sidearms → SMGs → shotguns → rifles → snipers → heavies) + any unknown guns with selected skins; knives always on the full-width bottom row (not paginated). Removing the last skin of a gun keeps an **empty slot** (dashed rectangle + gun name). Density picks fewest pages (1 → 2 → 3), then dense:
+- **Pagination:** center zone is **category columns** (SIDEARMS | SMGS | SHOTGUNS | RIFLES | SNIPERS | HEAVIES, each a vertical stack of gun slots in official order; unknown guns → OTHER). Always every official gun (19); knives on the full-width bottom row (not paginated). Removing the last skin of a gun keeps an **empty slot**. Density only applies if unknown guns overflow (fewest pages 1 → 2 → 3, then dense):
 
-  | Density | Grid (center zone) | Capacity/page (gun cells) |
+  | Density | Fallback chunk (flat slots) | Capacity/page |
   |---|---|---|
-  | Comfort | 4 cols × 4 rows | 16 |
-  | Standard | 5 cols × 4 rows | 20 |
-  | Dense | 8 cols × 4 rows | 32 |
+  | Comfort | 4×4 | 16 |
+  | Standard | 5×4 | 20 |
+  | Dense | 8×4 | 32 |
 
-  - 19 official slots → Standard (1 page). Unknown guns can push to Comfort multi-page or Dense.
+  - 19 official slots → Standard (1 page). Unknowns go to an OTHER column (split across pages if > 20).
   - \> 96 slots → Dense 3 pages, note `showing … / N`.
 - One layout template for all pages; only the gun-cell chunk differs (header/ranks/card rail/footer/knife row repeat). Filenames `showcase-<riotid>-p1.png`…
 - Export after `document.fonts.ready` + all `<img>` decoded; images served same-origin via `/img` proxy (no canvas tainting). No inventory data in any URL.
@@ -97,17 +97,18 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 ┌────────────────────────────────────────────────────────────────────┐
 │ HEADER   [RIOT ID #TAG]   LV.207   ·   NA   ·  <equipped title>    │
 ├─────────────────────────────────────────────┬───────────────────────┤
-│ COLLECTION GRID                            │ PLAYER CARD           │
-│ one cell per official gun (loadout order)  │ tall art panel        │
-│ — stacked skins, empty = blank slot        │ PEAK / CURRENT RANK   │
-│ click skin → menu (chroma/front/remove)    │ VP / RP               │
-│ ── MELEE bottom row (always) ──            │ PREM:n  KNIFE:n       │
-│                                            │ buddies +N            │
+│ COLLECTION COLUMNS                         │ PLAYER CARD           │
+│ SIDEARMS│SMGS│SHOTGUNS│RIFLES│…│HEAVIES    │ tall art panel        │
+│ guns stack down each category column       │ PEAK / CURRENT RANK   │
+│ — stacked skins, empty = blank slot        │ VP / RP               │
+│ click skin → menu (chroma/front/remove)    │ PREM:n  KNIFE:n       │
+│ ── MELEE bottom row (always) ──            │ buddies +N            │
 ├────────────────────────────────────────────┴───────────────────────┤
 │ (no footer)                                                        │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
+- **Category columns:** one column per VAL category (guns fill top→bottom in each column), not row-major grid fill.
 - **Empty slots always rendered** for official guns (and empty MELEE strip) — matches VALORANT loadout.
 - **Rank medallions (MVP):** styled circular badge, tier name + tier color (real tier icons = phase 2).
 - **Right rail only:** card + ranks + wallet + PREM/KNIFE + buddies under the player card; skins grid takes full remaining width (no left rail). No footer bar.

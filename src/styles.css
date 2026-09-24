@@ -887,23 +887,44 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-cats {
   flex: 1;
-  display: grid;
-  gap: 8px 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
   min-height: 0;
   overflow: hidden;
 }
-.density-comfort .sc-cats {
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(4, 1fr);
+/* one column per weapon category — guns stack down the column (loadout order) */
+.sc-cat-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.density-standard .sc-cats {
-  grid-template-columns: repeat(5, 1fr);
-  grid-template-rows: repeat(4, 1fr);
+.sc-cat-col-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
 }
-.density-dense .sc-cats {
-  grid-template-columns: repeat(8, 1fr);
-  grid-template-rows: repeat(4, 1fr);
-  gap: 6px 8px;
+.sc-cat-col-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: #fff;
+  white-space: nowrap;
+}
+.sc-cat-col-rule {
+  flex: 1;
+  height: 2px;
+  min-width: 8px;
+  background: linear-gradient(90deg, var(--accent), rgba(255, 70, 85, 0.08));
+}
+.sc-cat-col .sc-cat {
+  flex: 1 1 0;
+  min-height: 0;
 }
 .sc-cat {
   min-width: 0;
@@ -1391,10 +1412,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-stat svg { width: 14px; height: 12px; }
 
-/* density: fit more gun cells in fixed canvas */
-.density-dense .sc-cat-name { font-size: 11px; }
-.density-dense .sc-cat-head { margin-bottom: 4px; }
-.density-comfort .sc-cat-name { font-size: 13px; }
+/* column loadout: sidearms has 6 rows — keep gun labels compact */
+.sc-cat-col .sc-cat-name { font-size: 12px; }
+.sc-cat-col .sc-cat-head { margin-bottom: 4px; }
+.sc-cat-col .sc-cat { padding: 5px 6px 6px; }
+.sc-cat-col .sc-cat-head .sc-cat-rule { display: none; }
+.sc-cat-col .sc-cat-icon { display: none; }
 
 /* ===== password login + MFA ===== */
 .mfa-box {

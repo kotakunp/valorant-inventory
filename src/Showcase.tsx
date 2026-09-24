@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ChromaSelection, RankBadge, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
 import { selKey } from "./types";
 import type { GunGroup, Pages } from "./logic";
-import { rarityColor, tierInfo, isPremiumSkin } from "./logic";
+import { WEAPON_CATEGORIES, LOADOUT_GUNS, rarityColor, tierInfo, isPremiumSkin } from "./logic";
 
 export const CANVAS_W = 1280;
 export const CANVAS_H = 720;
@@ -124,6 +124,28 @@ export function Showcase({
   const pageCount = pages.gridPages.length;
   const slots = pages.gridPages[page] ?? [];
   const knifeItems = pages.knifeItems ?? [];
+
+  /** Category columns: SIDEARMS | SMGS | … | HEAVIES | OTHER (unknown guns). */
+  const catColumns: { id: string; label: string; guns: GunGroup[] }[] = (() => {
+    const official = new Set(LOADOUT_GUNS.map((w) => w.toUpperCase()));
+    const used = new Set<string>();
+    const cols = WEAPON_CATEGORIES.map((cat) => {
+      const ids = cat.guns.map((w) => w.toUpperCase());
+      const guns = slots.filter((g) => {
+        if (used.has(g.id) || !ids.includes(g.id)) return false;
+        used.add(g.id);
+        return true;
+      });
+      return { id: cat.id, label: cat.label, guns };
+    });
+    const other = slots.filter((g) => {
+      if (used.has(g.id) || official.has(g.id)) return false;
+      used.add(g.id);
+      return true;
+    });
+    if (other.length) cols.push({ id: "other", label: "OTHER", guns: other });
+    return cols;
+  })();
 
   const activeChroma = (s: SkinItem) => {
     const id = chromaSel[s.id] ?? s.defaultChromaId ?? s.chromas[0]?.id;
@@ -258,8 +280,16 @@ export function Showcase({
       <div className="sc-body">
         <main className={`sc-center density-${pages.density.name}`}>
           <div className="sc-cats">
-            {slots.map(gunSection)}
-            {slots.length === 0 && (
+            {catColumns.map((col) => (
+              <div className="sc-cat-col" key={col.id}>
+                <div className="sc-cat-col-head">
+                  <span className="sc-cat-col-label">{col.label}</span>
+                  <span className="sc-cat-col-rule" aria-hidden="true" />
+                </div>
+                {col.guns.map(gunSection)}
+              </div>
+            ))}
+            {catColumns.length === 0 && (
               <div className="sc-empty">
                 {pages.totalSelected === 0 ? "NO SKINS SELECTED" : pageCount > 1 ? "SEE PAGE 1" : "NO SKINS"}
               </div>
