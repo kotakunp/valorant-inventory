@@ -1,7 +1,7 @@
 import type { ChromaSelection, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
 import { selKey } from "./types";
 import type { Pages } from "./logic";
-import { rarityColor, tierInfo, collectionValue } from "./logic";
+import { rarityColor, tierInfo, collectionValue, groupByGun } from "./logic";
 
 export const CANVAS_W = 1280;
 export const CANVAS_H = 720;
@@ -18,43 +18,6 @@ interface Props {
   footer: { fm: boolean; fmText: string; proof: boolean; proofText: string };
   onToggleSkin?: (id: string) => void;
   onPickChroma?: (skinId: string, chromaId: string) => void;
-}
-
-/** Client collection categories (weaponName → group), order = display order. */
-export const WEAPON_CATEGORIES = [
-  { id: "sidearm", label: "SIDEARMS", weapons: ["Classic", "Shorty", "Frenzy", "Ghost", "Sheriff"] },
-  { id: "smg", label: "SMGS", weapons: ["Stinger", "Spectre"] },
-  { id: "shotgun", label: "SHOTGUNS", weapons: ["Bucky", "Judge"] },
-  { id: "rifle", label: "RIFLES", weapons: ["Bulldog", "Guardian", "Phantom", "Vandal"] },
-  { id: "sniper", label: "SNIPER RIFLES", weapons: ["Marshal", "Operator"] },
-  { id: "mg", label: "MACHINE GUNS", weapons: ["Ares", "Odin"] },
-] as const;
-
-export function categoryFor(weaponName: string): { id: string; label: string } {
-  const w = weaponName.trim();
-  for (const c of WEAPON_CATEGORIES) {
-    if (c.weapons.some((x) => x.toLowerCase() === w.toLowerCase())) {
-      return { id: c.id, label: c.label };
-    }
-  }
-  // Loose contains for catalog variants ("Sheriff..." etc.)
-  for (const c of WEAPON_CATEGORIES) {
-    if (c.weapons.some((x) => w.toLowerCase().includes(x.toLowerCase()))) {
-      return { id: c.id, label: c.label };
-    }
-  }
-  return { id: "other", label: "OTHER" };
-}
-
-export function groupByCategory(items: SkinItem[]): { id: string; label: string; items: SkinItem[] }[] {
-  const order = [...WEAPON_CATEGORIES.map((c) => ({ id: c.id as string, label: c.label as string })), { id: "other", label: "OTHER" }];
-  const buckets = new Map<string, SkinItem[]>();
-  for (const s of items) {
-    const cat = categoryFor(s.weaponName);
-    if (!buckets.has(cat.id)) buckets.set(cat.id, []);
-    buckets.get(cat.id)!.push(s);
-  }
-  return order.filter((c) => buckets.get(c.id)?.length).map((c) => ({ ...c, items: buckets.get(c.id)! }));
 }
 
 function VLogo() {
@@ -120,7 +83,7 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
   const pageCount = pages.gridPages.length;
   const gridItems = pages.gridPages[page] ?? [];
   const date = payload.generatedAt.slice(0, 10);
-  const cats = groupByCategory(gridItems);
+  const guns = groupByGun(gridItems);
 
   const activeChroma = (s: SkinItem) => {
     const id = chromaSel[s.id] ?? s.defaultChromaId ?? s.chromas[0]?.id;
@@ -210,33 +173,22 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
 
         <main className={`sc-center density-${pages.density.name}`}>
           <div className="sc-cats">
-            {cats.map((cat) => (
-              <section className="sc-cat" key={cat.id}>
+            {guns.map((gun) => (
+              <section className="sc-cat" key={gun.id}>
                 <div className="sc-cat-head">
                   <CatMark />
-                  <span className="sc-cat-name">{cat.label}</span>
+                  <span className="sc-cat-name">{gun.label}</span>
                   <span className="sc-cat-rule" aria-hidden="true" />
                 </div>
-                <div className="sc-cat-tiles">{cat.items.map(tile)}</div>
+                <div className="sc-cat-tiles">{gun.items.map(tile)}</div>
               </section>
             ))}
-            {cats.length === 0 && gridItems.length === 0 && (
+            {guns.length === 0 && gridItems.length === 0 && (
               <div className="sc-empty">
                 {pages.totalSelected === 0 ? "NO SKINS SELECTED" : pageCount > 1 ? "SEE PAGE 1" : "NO SKINS"}
               </div>
             )}
           </div>
-
-          {page === 0 && pages.knifeRow.length > 0 && (
-            <div className="sc-knives">
-              <div className="sc-cat-head">
-                <CatMark />
-                <span className="sc-cat-name">KNIVES</span>
-                <span className="sc-cat-rule" aria-hidden="true" />
-              </div>
-              <div className="sc-knife-row">{pages.knifeRow.map(tile)}</div>
-            </div>
-          )}
         </main>
 
         <aside className="sc-right">

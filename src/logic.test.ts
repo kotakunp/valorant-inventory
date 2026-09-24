@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSelection, collectionValue, defaultChecked, paginate, rarityColor, tierInfo } from "./logic";
+import { buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, paginate, rarityColor, tierInfo } from "./logic";
 import type { CardItem, ShowcasePayload, SkinItem } from "./types";
 
 const skin = (over: Partial<SkinItem> = {}): SkinItem => ({
@@ -54,19 +54,44 @@ describe("paginate", () => {
     expect(p.gridPages.length).toBe(3);
     expect(p.truncated).toBe(10);
   });
-  it("knives: first 8 in row, overflow into grid", () => {
+  it("knives land in MELEE groups (no separate knife row)", () => {
     const p = paginate([...n(10, true)]);
-    expect(p.knifeRow.length).toBe(8);
-    expect(p.gridPages[0].length).toBe(2);
+    expect(p.gridPages.flat()).toHaveLength(10);
+    expect(gunLabel({ weaponName: "Knife", isKnife: true })).toBe("MELEE");
+    const groups = groupByGun(p.gridPages.flat());
+    expect(groups.map((g) => g.label)).toEqual(["MELEE"]);
+    expect(groups[0].items).toHaveLength(10);
   });
   it("knives-only still yields one page", () => {
     const p = paginate(n(3, true));
-    expect(p.knifeRow.length).toBe(3);
     expect(p.gridPages.length).toBe(1);
-    expect(p.gridPages[0].length).toBe(0);
+    expect(p.gridPages[0].length).toBe(3);
   });
   it("empty selection yields one empty page", () => {
     expect(paginate([]).gridPages).toHaveLength(1);
+  });
+});
+
+describe("groupByGun", () => {
+  const s = (id: string, weaponName: string, isKnife = false) =>
+    skin({ id, weaponName, isKnife });
+  it("orders by official loadout (Classic → … → Odin → MELEE)", () => {
+    const groups = groupByGun([
+      s("1", "Vandal"),
+      s("2", "Classic"),
+      s("3", "Knife", true),
+      s("4", "Odin"),
+      s("5", "Sheriff"),
+    ]);
+    expect(groups.map((g) => g.label)).toEqual(["CLASSIC", "SHERIFF", "VANDAL", "ODIN", "MELEE"]);
+  });
+  it("matches weapon names case-insensitively", () => {
+    expect(gunLabel({ weaponName: "vandal", isKnife: false })).toBe("VANDAL");
+    expect(gunLabel({ weaponName: "Sheriff", isKnife: false })).toBe("SHERIFF");
+  });
+  it("keeps unknown weapons after known order", () => {
+    const groups = groupByGun([s("1", "Vandal"), s("2", "Mystery Gun"), s("3", "Classic")]);
+    expect(groups.map((g) => g.label)).toEqual(["CLASSIC", "VANDAL", "MYSTERY GUN"]);
   });
 });
 

@@ -504,6 +504,24 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   line-height: 1.5;
 }
 
+.skin-gun-label {
+  grid-column: 1 / -1;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  padding: 7px 0 3px;
+  margin-top: 4px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, var(--panel) 85%, transparent);
+  z-index: 1;
+}
+.skin-gun-label:first-child,
+.skin-grid > .skin-gun-label:not(:first-child) { margin-top: 0; }
+.skin-cell + .skin-gun-label { margin-top: 8px; }
+
 /* compact chips — cards / titles / buddies */
 .chips {
   display: flex;
@@ -1020,14 +1038,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-chroma span { font-size: 8px; color: var(--text); }
 .sc-chroma.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-
-.sc-knives { display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
-.sc-knife-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
-  gap: 7px;
-}
-.sc-knife-row .sc-tile { border-color: #e8c860; }
 
 /* right rail: player card */
 .sc-right { width: 200px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }

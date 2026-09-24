@@ -1,8 +1,8 @@
 import { useMemo, useState, useEffect, useRef, type FormEvent, type CSSProperties } from "react";
 import { toPng } from "html-to-image";
-import type { ChromaSelection, ItemKind, Region, Selection, ShowcasePayload } from "./types";
+import type { ChromaSelection, ItemKind, Region, Selection, ShowcasePayload, SkinItem } from "./types";
 import { selKey } from "./types";
-import { buildSelection, paginate, rarityColor } from "./logic";
+import { buildSelection, groupByGun, paginate, rarityColor } from "./logic";
 import type { AnyItem } from "./logic";
 import { makeState, parseCallback, RSO_STATE_KEY, RSO_REGION_KEY } from "./rso";
 import { SITEKEY, loadHcaptcha, widgetToken, resetCaptcha, renderCaptcha, fetchCaptchaChallenge } from "./captcha";
@@ -575,30 +575,41 @@ export default function App() {
                 {!query && " Try NEW ACCOUNT and connect again (or switch region — inventory is shard-specific)."}
               </div>
             )}
-            {visible.map((raw) => {
-              const i = raw as import("./types").SkinItem;
-              const on = !!selection[selKey(kind, i.id)];
-              const activeChromaId = chromaSel[i.id];
-              const ch = i.chromas.find((c) => c.id === (activeChromaId ?? i.defaultChromaId)) ?? i.chromas[0];
-              const icon = ch?.icon ?? i.icon;
-              return (
-                <button
-                  key={i.id}
-                  type="button"
-                  className={`skin-cell${on ? " on" : ""}${i.equipped ? " eq" : ""}`}
-                  style={{ "--rarity": rarityColor(i.price) } as CSSProperties}
-                  onClick={() => toggle(kind, i.id)}
-                  title={`${i.name} · ${i.weaponName}${i.price != null ? ` · ${fmt(i.price)} VP` : ""}${i.equipped ? " · equipped" : ""}`}
-                  aria-pressed={on}
-                >
-                  {i.price != null && <span className="vp">{i.price}</span>}
-                  <span className="skin-cell-art">
-                    {icon ? <img src={img(icon)} alt="" /> : null}
-                  </span>
-                  <span className="skin-cell-name">{i.name}</span>
-                </button>
-              );
-            })}
+            {(query
+              ? [{ id: "__all", label: "", items: visible as SkinItem[] }]
+              : groupByGun(visible as SkinItem[])
+            ).flatMap((g) => [
+              ...(!query && g.items.length
+                ? [
+                    <div className="skin-gun-label" key={`h-${g.id}`}>
+                      {g.label}
+                    </div>,
+                  ]
+                : []),
+              ...g.items.map((i) => {
+                const on = !!selection[selKey(kind, i.id)];
+                const activeChromaId = chromaSel[i.id];
+                const ch = i.chromas.find((c) => c.id === (activeChromaId ?? i.defaultChromaId)) ?? i.chromas[0];
+                const icon = ch?.icon ?? i.icon;
+                return (
+                  <button
+                    key={i.id}
+                    type="button"
+                    className={`skin-cell${on ? " on" : ""}${i.equipped ? " eq" : ""}`}
+                    style={{ "--rarity": rarityColor(i.price) } as CSSProperties}
+                    onClick={() => toggle(kind, i.id)}
+                    title={`${i.name} · ${i.weaponName}${i.price != null ? ` · ${fmt(i.price)} VP` : ""}${i.equipped ? " · equipped" : ""}`}
+                    aria-pressed={on}
+                  >
+                    {i.price != null && <span className="vp">{i.price}</span>}
+                    <span className="skin-cell-art">
+                      {icon ? <img src={img(icon)} alt="" /> : null}
+                    </span>
+                    <span className="skin-cell-name">{i.name}</span>
+                  </button>
+                );
+              }),
+            ])}
           </div>
         ) : (
           <div className="chips">
