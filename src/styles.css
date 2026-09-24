@@ -922,7 +922,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: transparent;
   border: none;
   overflow: hidden;
-  container-type: size;
 }
 .sc-stack-item {
   position: absolute;
@@ -932,13 +931,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   justify-content: center;
   cursor: default;
   transition: transform 0.12s ease;
-  /* hit target is the card frame only */
   pointer-events: none;
-  /* deck fan: each card peeks so its edge is hoverable */
-  transform: translate(
-    calc((var(--i, 2) - 2) * 11%),
-    calc((var(--i, 2) - 2) * 9%)
-  );
+  /* Horizontal deck fan — cells are wide/short, so peel left/right */
+  transform: translateX(calc((var(--i, 2) - 2) * 13%));
 }
 .sc-stack-item.clickable { cursor: pointer; }
 .sc-stack-item:nth-child(1) { --i: 0; }
@@ -950,22 +945,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-stack-item:nth-child(7) { --i: 6; }
 .sc-stack-item:nth-child(8) { --i: 7; }
 .sc-stack-item:nth-child(n + 9) { --i: 8; }
-/* Deep decks: tighter step so the fan still fits the cell */
 .sc-stack:has(> .sc-stack-item:nth-child(n + 6)) .sc-stack-item {
-  transform: translate(
-    calc((var(--i, 2) - 2) * 6%),
-    calc((var(--i, 2) - 2) * 5%)
-  );
+  transform: translateX(calc((var(--i, 2) - 2) * 7%));
 }
-/* Raise the hovered card only — cell background stays still */
 .sc-stack-item:hover { z-index: 40 !important; }
 
-/* Card: small enough that stacked skins read as a deck, not a pile */
+/* Card: ~half cell wide, most of cell tall — readable deck, not a pile */
 .sc-stack-frame {
-  width: min(42cqw, 52cqh);
-  height: min(42cqw, 52cqh);
-  max-width: 48%;
-  max-height: 58%;
+  width: 50%;
+  height: 78%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -990,7 +978,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   max-height: none;
   object-fit: contain;
   pointer-events: auto;
-  /* thin light outline so transparent PNGs read against dark bg */
   filter: drop-shadow(1px 0 0 rgba(232, 236, 240, 0.55))
     drop-shadow(-1px 0 0 rgba(232, 236, 240, 0.55))
     drop-shadow(0 1px 0 rgba(232, 236, 240, 0.55))
@@ -1006,10 +993,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-stack-item .sc-fallback {
   pointer-events: auto;
-  width: min(42cqw, 52cqh);
-  height: min(42cqw, 52cqh);
-  max-width: 48%;
-  max-height: 58%;
+  width: 50%;
+  height: 78%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1066,7 +1051,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: transparent;
   border: none;
   overflow: hidden;
-  container-type: size;
 }
 .sc-knife-cell .sc-stack-item {
   transform: none;
@@ -1075,10 +1059,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   z-index: 40 !important;
 }
 .sc-knife-cell .sc-stack-frame {
-  width: min(55cqw, 62cqh);
-  height: min(55cqw, 62cqh);
-  max-width: 70%;
-  max-height: 74%;
+  width: 70%;
+  height: 80%;
 }
 .sc-knife-cell .sc-stack-name {
   opacity: 1;
