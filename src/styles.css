@@ -883,6 +883,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* bg on the full grid cell so every slot aligns (header + stack share one panel) */
+  background: linear-gradient(165deg, #15202b 0%, #0c141d 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  padding: 6px 8px 8px;
+  overflow: hidden;
 }
 .sc-cat-head {
   display: flex;
@@ -890,6 +896,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   gap: 8px;
   margin-bottom: 6px;
   min-width: 0;
+  flex-shrink: 0;
 }
 .sc-cat-head--sm { margin-bottom: 5px; min-width: 0; }
 .sc-cat-icon { color: #fff; flex-shrink: 0; opacity: 0.9; }
@@ -914,14 +921,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   flex-shrink: 0;
 }
 
-/* one cell per gun — static slot bg; skins are transparent art stacked inside */
+/* one cell per gun — skins transparent, stacked inside the shared slot bg */
 .sc-stack {
   position: relative;
   flex: 1;
   min-height: 0;
-  background: linear-gradient(165deg, #15202b 0%, #0c141d 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  background: transparent;
+  border: none;
+  clip-path: none;
   overflow: hidden;
 }
 .sc-stack-item {
