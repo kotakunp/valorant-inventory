@@ -914,7 +914,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   flex-shrink: 0;
 }
 
-/* one cell per gun — skins stacked/layered; hover raises z-index */
+/* one cell per gun — skins as a deck of hoverable cards */
 .sc-stack {
   position: relative;
   flex: 1;
@@ -931,13 +931,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   align-items: center;
   justify-content: center;
   cursor: default;
-  transition: transform 0.12s ease, filter 0.12s ease;
-  /* Only the frame/art is a hit target — exposed edges of lower layers stay hoverable. */
+  transition: transform 0.12s ease;
+  /* hit target is the card frame only */
   pointer-events: none;
-  /* Diagonal fan centered on i=2 so layers peek without leaving the cell */
+  /* deck fan: each card peeks so its edge is hoverable */
   transform: translate(
-    calc((var(--i, 2) - 2) * 6%),
-    calc((var(--i, 2) - 2) * 7%)
+    calc((var(--i, 2) - 2) * 11%),
+    calc((var(--i, 2) - 2) * 9%)
   );
 }
 .sc-stack-item.clickable { cursor: pointer; }
@@ -950,30 +950,38 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-stack-item:nth-child(7) { --i: 6; }
 .sc-stack-item:nth-child(8) { --i: 7; }
 .sc-stack-item:nth-child(n + 9) { --i: 8; }
-/* Deep stacks: tighter step so the fan still fits the cell */
+/* Deep decks: tighter step so the fan still fits the cell */
 .sc-stack:has(> .sc-stack-item:nth-child(n + 6)) .sc-stack-item {
   transform: translate(
-    calc((var(--i, 2) - 2) * 3.5%),
-    calc((var(--i, 2) - 2) * 4.5%)
+    calc((var(--i, 2) - 2) * 6%),
+    calc((var(--i, 2) - 2) * 5%)
   );
 }
-/* Raise the layer only — no transform/filter on the full-cell item (that reads as bg hover) */
+/* Raise the hovered card only — cell background stays still */
 .sc-stack-item:hover { z-index: 40 !important; }
 
-/* Image frame — slight inset so fan transform doesn't clip art edges */
+/* Card: smaller than the cell so stacked skins don't fully cover each other */
 .sc-stack-frame {
-  width: 92%;
-  height: 92%;
+  width: min(62cqw, 70cqh);
+  height: min(62cqw, 70cqh);
+  max-width: 72%;
+  max-height: 78%;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: auto;
   flex-shrink: 0;
-  transition: transform 0.12s ease, filter 0.12s ease;
+  padding: 4px;
+  background: linear-gradient(165deg, rgba(21, 32, 43, 0.96) 0%, rgba(12, 20, 29, 0.96) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  transition: transform 0.12s ease, filter 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .sc-stack-item:hover .sc-stack-frame {
-  transform: scale(1.06);
+  transform: scale(1.1);
   filter: brightness(1.12);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
 }
 .sc-stack-art {
   width: 100%;
@@ -998,11 +1006,19 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-stack-item .sc-fallback {
   pointer-events: auto;
-  width: 92%;
-  height: 92%;
+  width: min(62cqw, 70cqh);
+  height: min(62cqw, 70cqh);
+  max-width: 72%;
+  max-height: 78%;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 10px;
+  text-align: center;
+  padding: 4px;
+  background: linear-gradient(165deg, rgba(21, 32, 43, 0.96), rgba(12, 20, 29, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
 }
 .sc-stack-name {
   position: absolute;
@@ -1059,8 +1075,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   z-index: 40 !important;
 }
 .sc-knife-cell .sc-stack-frame {
-  width: 92%;
-  height: 92%;
+  width: min(72cqw, 78cqh);
+  height: min(72cqw, 78cqh);
+  max-width: 88%;
+  max-height: 88%;
 }
 .sc-knife-cell .sc-stack-name {
   opacity: 1;
