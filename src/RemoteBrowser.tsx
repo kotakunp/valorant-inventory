@@ -12,6 +12,10 @@ interface Status {
   width: number;
   height: number;
   error?: string;
+  url?: string;
+  frames?: number;
+  frameAgeMs?: number;
+  captureErr?: string;
 }
 
 interface Props {
@@ -252,6 +256,9 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
         </button>
         <span className="note" style={{ margin: 0 }}>
           Status: {status?.phase ?? "…"}
+        {typeof status?.frames === "number" && ` · frames:${status.frames}`}
+        {typeof status?.frameAgeMs === "number" && status.frameAgeMs > 5000 && ` · stale:${Math.round(status.frameAgeMs / 1000)}s`}
+        {status?.captureErr ? ` · ${status.captureErr}` : ""}
         </span>
       </div>
       {err && <div className="error" style={{ marginTop: 8 }}>{err}</div>}

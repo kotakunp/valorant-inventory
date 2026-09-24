@@ -26,7 +26,23 @@ const LAUNCH_ARGS = [
   "--disable-dev-shm-usage",
   "--disable-gpu",
   "--disable-blink-features=AutomationControlled",
+  "--disable-background-timer-throttling",
+  "--disable-renderer-backgrounding",
+  "--disable-backgrounding-occluded-windows",
 ];
+
+/** Hide automation fingerprints before any page script runs. */
+const STEALTH_INIT = `
+  Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+  if (!window.chrome) window.chrome = { runtime: {} };
+  Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
+  Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en"] });
+  const originalQuery = window.navigator.permissions.query.bind(window.navigator.permissions);
+  window.navigator.permissions.query = (parameters) =>
+    parameters && parameters.name === "notifications"
+      ? Promise.resolve({ state: Notification.permission })
+      : originalQuery(parameters);
+`;
 
 export type BrowserPhase = "starting" | "login" | "harvesting" | "done" | "error" | "expired";
 
@@ -39,6 +55,7 @@ export interface BrowserStatus {
   url?: string;
   frames?: number;
   frameAgeMs?: number;
+  captureErr?: string;
 }
 
 interface RemoteSession {
@@ -55,6 +72,7 @@ interface RemoteSession {
   lastFrame: Buffer | null;
   lastFrameAt: number;
   frameCount: number;
+  captureErr?: string;
   width: number;
   height: number;
   stopping: boolean;
@@ -155,28 +173,30 @@ function errText(e: unknown): string {
 async function launchSession(): Promise<{ browser: Browser; ctx: BrowserContext }> {
   const errors: string[] = [];
   const execs = candidateExecutables();
+  // Prefer headed when DISPLAY is set (xvfb-run) — avoids headless bot walls + screenshot freezes.
+  const headless = !process.env.DISPLAY;
 
-  // Non-persistent launch first — avoids profile locks from crashed runs.
+  const tryLaunch = async (opts: { executablePath?: string; channel?: "chrome" }) => {
+    const browser = await chromium.launch({ ...opts, headless, args: LAUNCH_ARGS });
+    const ctx = await browser.newContext({ viewport: VIEWPORT, userAgent: UA });
+    await ctx.addInitScript(STEALTH_INIT);
+    return { browser, ctx };
+  };
+
   for (const executablePath of execs) {
     try {
-      const browser = await chromium.launch({ headless: true, executablePath, args: LAUNCH_ARGS });
-      const ctx = await browser.newContext({ viewport: VIEWPORT, userAgent: UA });
-      return { browser, ctx };
+      return await tryLaunch({ executablePath });
     } catch (e) {
       errors.push(`${path.basename(executablePath)}: ${errText(e)}`);
     }
   }
 
-  // Channel fallbacks (dev machines with Google Chrome only — not msedge on VPS).
   try {
-    const browser = await chromium.launch({ headless: true, channel: "chrome", args: LAUNCH_ARGS });
-    const ctx = await browser.newContext({ viewport: VIEWPORT, userAgent: UA });
-    return { browser, ctx };
+    return await tryLaunch({ channel: "chrome" });
   } catch (e) {
     errors.push(`chrome-channel: ${errText(e)}`);
   }
 
-  // Last resort: persistent context with a wiped profile (some distros only work this way).
   if (execs.length > 0) {
     try {
       fs.rmSync(profileDir(), { recursive: true, force: true });
@@ -185,12 +205,13 @@ async function launchSession(): Promise<{ browser: Browser; ctx: BrowserContext 
     }
     try {
       const ctx = await chromium.launchPersistentContext(profileDir(), {
-        headless: true,
+        headless,
         viewport: VIEWPORT,
         userAgent: UA,
         executablePath: execs[0],
         args: LAUNCH_ARGS,
       });
+      await ctx.addInitScript(STEALTH_INIT);
       const browser = ctx.browser();
       if (!browser) {
         await ctx.close();
@@ -216,74 +237,100 @@ function profileDir(): string {
 }
 
 /**
- * Continuous frame capture — always on.
- * Screencast alone freezes after the first frame on nix chromium.
- * Every tick: try CDP captureScreenshot, then Playwright screenshot; never trust screencast alone.
+ * Continuous frame capture with self-healing.
+ * If screenshots fail repeatedly, drop/recreate the CDP session and keep trying —
+ * never let the loop exit (a dead loop = frozen UI).
  */
 async function startCaptureLoop(s: RemoteSession): Promise<void> {
-  try {
-    const cdp = await s.page.context().newCDPSession(s.page);
-    s.cdp = cdp;
-    cdp.on("Page.screencastFrame", (params: { data: string; sessionId: number }) => {
-      if (s.stopping || session !== s) return;
-      // Screencast is a bonus; only accept it if we haven't had a forced shot recently.
-      if (Date.now() - s.lastFrameAt < 400) {
+  let fails = 0;
+  const attachCdp = async () => {
+    try {
+      if (s.cdp) {
+        try {
+          await s.cdp.send("Page.stopScreencast").catch(() => {});
+        } catch {
+          /* ignore */
+        }
+        s.cdp = null;
+      }
+      const cdp = await s.page.context().newCDPSession(s.page);
+      s.cdp = cdp;
+      cdp.on("Page.screencastFrame", (params: { data: string; sessionId: number }) => {
+        if (s.stopping || session !== s) return;
+        try {
+          s.lastFrame = Buffer.from(params.data, "base64");
+          s.lastFrameAt = Date.now();
+          s.frameCount += 1;
+          s.captureErr = undefined;
+          fails = 0;
+        } catch {
+          /* bad frame */
+        }
         void cdp.send("Page.screencastFrameAck", { sessionId: params.sessionId }).catch(() => {});
-        return;
-      }
-      try {
-        s.lastFrame = Buffer.from(params.data, "base64");
-        s.lastFrameAt = Date.now();
-        s.frameCount += 1;
-      } catch {
-        /* bad frame */
-      }
-      void cdp.send("Page.screencastFrameAck", { sessionId: params.sessionId }).catch(() => {});
-    });
-    await cdp.send("Page.enable");
-    await cdp.send("Page.startScreencast", {
-      format: "jpeg",
-      quality: FRAME_JPEG_QUALITY,
-      maxWidth: VIEWPORT.width,
-      maxHeight: VIEWPORT.height,
-      everyNthFrame: 1,
-    });
-  } catch {
-    s.cdp = null;
-  }
+      });
+      cdp.on("close", () => {
+        if (session === s) s.cdp = null;
+      });
+      await cdp.send("Page.enable");
+      await cdp.send("Page.startScreencast", {
+        format: "jpeg",
+        quality: FRAME_JPEG_QUALITY,
+        maxWidth: VIEWPORT.width,
+        maxHeight: VIEWPORT.height,
+        everyNthFrame: 1,
+      });
+    } catch (e) {
+      s.cdp = null;
+      s.captureErr = `cdp: ${errText(e)}`;
+    }
+  };
+
+  await attachCdp();
 
   while (!s.stopping && session === s) {
     let got: Buffer | null = null;
-    // Prefer CDP captureScreenshot — more reliable than page.screenshot during busy SPA.
+    let lastFail = "";
+
     if (s.cdp) {
       try {
         const shot = (await Promise.race([
           s.cdp.send("Page.captureScreenshot", { format: "jpeg", quality: FRAME_JPEG_QUALITY }),
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("cdp shot timeout")), 2000)),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("cdp timeout")), 2500)),
         ])) as { data: string };
         got = Buffer.from(shot.data, "base64");
-      } catch {
-        /* fall through */
+      } catch (e) {
+        lastFail = `cdp: ${errText(e)}`;
       }
     }
     if (!got) {
       try {
-        got = Buffer.from(
-          await Promise.race([
-            s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 2000 }),
-            new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("shot timeout")), 2500)),
-          ])
-        );
-      } catch {
-        /* navigating */
+        const buf = await Promise.race([
+          s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 2500 }),
+          new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("pw timeout")), 3000)),
+        ]);
+        if (buf && buf.length > 0) got = Buffer.from(buf);
+        else lastFail = "pw: empty";
+      } catch (e) {
+        lastFail = `pw: ${errText(e)}`;
       }
     }
+
     if (got) {
       s.lastFrame = got;
       s.lastFrameAt = Date.now();
       s.frameCount += 1;
+      s.captureErr = undefined;
+      fails = 0;
+    } else {
+      fails += 1;
+      s.captureErr = lastFail || "no frame";
+      // After 4 consecutive failures, rebuild CDP (connection often dies across navigations).
+      if (fails >= 4) {
+        fails = 0;
+        await attachCdp();
+      }
     }
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, got ? 300 : 500));
   }
 }
 
@@ -378,28 +425,34 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
 
     // Continuous capture: screencast + timed screenshot fallback so frames never freeze.
     s.frameLoop = startCaptureLoop(s);
+    s.frameLoop.catch((e) => {
+      s.captureErr = `loop crashed: ${errText(e)}`;
+      console.error("[remote-browser] capture loop crashed:", e);
+    });
     startPoller(s);
 
     void (async () => {
       try {
         await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
-        // Give the SPA a moment; if still spinning, reload once (flaky edge caches).
-        await new Promise((r) => setTimeout(r, 6000));
-        if (s.stopping || session !== s) return;
-        try {
-          const ready = await page.evaluate(() => document.readyState);
-          const hasForm = await page.evaluate(
-            () => !!document.querySelector('input[type="email"], input[type="text"], input[name*="login"], form')
-          );
-          if (ready !== "complete" || !hasForm) {
-            console.warn(`[remote-browser] login SPA thin (ready=${ready}, form=${hasForm}) — reloading`);
-            await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
+        // Wait for the login form (not just shell). Soft-reload once if SPA never mounts.
+        let hasForm = false;
+        for (let i = 0; i < 20 && !s.stopping && session === s; i++) {
+          await new Promise((r) => setTimeout(r, 1000));
+          try {
+            hasForm = await page.evaluate(
+              () => !!document.querySelector('input[type="email"], input[type="text"], input[name*="login"], form')
+            );
+            if (hasForm) break;
+          } catch {
+            /* navigating */
           }
-        } catch {
-          /* evaluate/page busy */
+        }
+        if (!hasForm && !s.stopping && session === s) {
+          console.warn("[remote-browser] login form never mounted — reloading once");
+          await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 }).catch(() => {});
         }
       } catch {
-        /* SPA/network slow — frames still stream; user can retry Close */
+        /* SPA/network slow — frames still stream */
       }
     })();
     // region is consumed when harvest finishes via auth.region fallback; keep param for API symmetry
@@ -426,6 +479,7 @@ export function status(): BrowserStatus {
     height: session.height,
     frames: session.frameCount,
     frameAgeMs: Date.now() - session.lastFrameAt,
+    ...(session.captureErr ? { captureErr: session.captureErr } : {}),
     ...(session.error ? { error: session.error } : {}),
     ...(url ? { url } : {}),
   };
