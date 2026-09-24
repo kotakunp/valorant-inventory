@@ -67,7 +67,10 @@ async function requestJson(url: string, opts: { critical?: boolean; label?: stri
 
 export function parseEntitlements(body: any, typeId: string): string[] {
   const mapIds = (list: any[]): string[] =>
-    list.map((e: any) => e?.ItemID ?? e?.itemId).filter((x: any): x is string => typeof x === "string");
+    list
+      .map((e: any) => e?.ItemID ?? e?.itemId)
+      .filter((x: any): x is string => typeof x === "string")
+      .map((x) => x.toLowerCase());
   const sections = body?.EntitlementsByTypes;
   if (Array.isArray(sections)) {
     for (const s of sections) {
@@ -92,7 +95,7 @@ export function buildPriceMapFromStorefront(sf: any): Map<string, number> {
       typeof basePriceOverride === "number" ? basePriceOverride : vpFromCost(offer.Cost);
     if (vp == null) return;
     for (const r of offer.Rewards ?? []) {
-      if (typeof r?.ItemID === "string") map.set(r.ItemID, vp);
+      if (typeof r?.ItemID === "string") map.set(r.ItemID.toLowerCase(), vp);
     }
   };
   // Daily rotational store (standard VP prices)
@@ -101,7 +104,7 @@ export function buildPriceMapFromStorefront(sf: any): Map<string, number> {
   for (const b of [...(sf?.FeaturedBundle?.Bundles ?? []), ...(sf?.FeaturedBundle?.Bundle ? [sf.FeaturedBundle.Bundle] : [])]) {
     for (const it of b?.Items ?? []) {
       const id = it?.Item?.ItemID;
-      if (typeof id === "string" && typeof it.BasePrice === "number") map.set(id, it.BasePrice);
+      if (typeof id === "string" && typeof it.BasePrice === "number") map.set(id.toLowerCase(), it.BasePrice);
     }
     for (const oo of b?.ItemOffers ?? []) addOffer(oo?.Offer);
   }
@@ -181,9 +184,12 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
   const priceMap = storefrontBody ? buildPriceMapFromStorefront(storefrontBody) : null;
   const pricesAvailable = !!priceMap && priceMap.size > 0;
 
-  const uniq = (ids: string[]) => [...new Set(ids)];
+  const uniq = (ids: string[]) => [...new Set(ids.map((x) => x.toLowerCase()))];
   const equippedSkins = new Set<string>(
-    (loadoutBody?.Guns ?? []).map((g: any) => g?.SkinID).filter((x: any): x is string => typeof x === "string")
+    (loadoutBody?.Guns ?? [])
+      .map((g: any) => g?.SkinID)
+      .filter((x: any): x is string => typeof x === "string")
+      .map((x: string) => x.toLowerCase())
   );
 
   const variantsPerSkin = new Map<string, number>();
@@ -192,10 +198,16 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     if (skinId) variantsPerSkin.set(skinId, (variantsPerSkin.get(skinId) ?? 0) + 1);
   }
 
+  const rawSkinIds = uniq(parseEntitlements(entSkins, ITEM_TYPE.skins));
   const skins: SkinItem[] = [];
-  for (const id of uniq(parseEntitlements(entSkins, ITEM_TYPE.skins))) {
+  let catalogMissed = 0;
+  for (const id of rawSkinIds) {
     const entry = catalog.skins.get(id);
-    if (!entry || entry.skin.uuid === entry.defaultSkinUuid) continue;
+    if (!entry) {
+      catalogMissed++;
+      continue;
+    }
+    if (entry.skin.uuid === entry.defaultSkinUuid) continue;
     const levels: any[] = entry.skin.levels ?? [];
     const icon = (levels.length ? levels[levels.length - 1]?.displayIcon : null) ?? entry.skin.displayIcon ?? null;
     const isKnife =
@@ -213,9 +225,13 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     });
   }
   skins.sort((a, b) => (b.price ?? -1) - (a.price ?? -1) || a.name.localeCompare(b.name));
+  // Counts only — no tokens/puuid — to diagnose empty joins after cookie login.
+  console.log(
+    `[showcase] shard=${shard} region=${input.region} entSkins=${rawSkinIds.length} joined=${skins.length} catalogMiss=${catalogMissed} prices=${priceMap?.size ?? 0} pricesAvailable=${pricesAvailable}`
+  );
 
-  const equippedCardId: string | null = loadoutBody?.Identity?.PlayerCardID ?? null;
-  const equippedTitleId: string | null = loadoutBody?.Identity?.PlayerTitleID ?? null;
+  const equippedCardId: string | null = loadoutBody?.Identity?.PlayerCardID?.toLowerCase?.() ?? null;
+  const equippedTitleId: string | null = loadoutBody?.Identity?.PlayerTitleID?.toLowerCase?.() ?? null;
 
   const cards: CardItem[] = uniq(parseEntitlements(entCards, ITEM_TYPE.cards)).flatMap((id) => {
     const c = catalog.cards.get(id);

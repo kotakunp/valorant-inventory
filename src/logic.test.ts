@@ -14,12 +14,14 @@ describe("defaultChecked", () => {
     expect(defaultChecked("skin", skin({ price: 1775 }), true)).toBe(true);
     expect(defaultChecked("skin", skin({ price: 2475 }), true)).toBe(true);
   });
-  it("unchecks cheap and battlepass skins when prices exist", () => {
+  it("unchecks cheap skins when prices exist", () => {
     expect(defaultChecked("skin", skin({ price: 875 }), true)).toBe(false);
-    expect(defaultChecked("skin", skin({ price: null }), true)).toBe(false);
+    expect(defaultChecked("card", card({ price: null }), true)).toBe(false);
   });
-  it("uses level fallback when prices unavailable", () => {
+  it("uses level fallback whenever a skin has no price (storefront map is partial)", () => {
+    expect(defaultChecked("skin", skin({ price: null, levelCount: 5 }), true)).toBe(true);
     expect(defaultChecked("skin", skin({ price: null, levelCount: 5 }), false)).toBe(true);
+    expect(defaultChecked("skin", skin({ price: null, levelCount: 4 }), true)).toBe(false);
     expect(defaultChecked("skin", skin({ price: null, levelCount: 4 }), false)).toBe(false);
   });
   it("always checks equipped items and priced non-skins", () => {

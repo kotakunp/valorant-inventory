@@ -8,9 +8,10 @@ export const MAX_GRID_ITEMS = 120;
 export type AnyItem = SkinItem | CardItem | TitleItem | BuddyItem;
 
 export function defaultChecked(kind: ItemKind, item: AnyItem, pricesAvailable: boolean): boolean {
+  void pricesAvailable; // price-map coverage is partial; null price always uses the level heuristic for skins
   if (item.equipped) return true;
   if (item.price != null) return kind === "skin" ? item.price >= PREMIUM_PRICE : true;
-  if (kind === "skin" && !pricesAvailable) return (item as SkinItem).levelCount >= 5;
+  if (kind === "skin") return (item as SkinItem).levelCount >= 5;
   return false;
 }
 

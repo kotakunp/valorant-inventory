@@ -27,6 +27,14 @@ describe("parseEntitlements", () => {
     expect(parseEntitlements(body, CARDS)).toEqual(["c1", "c2"]);
   });
 
+  it("lowercases ItemIDs so catalog joins are case-insensitive", () => {
+    const body = {
+      ItemTypeID: CARDS,
+      Entitlements: [{ ItemID: "AAAA-BBBB" }, { itemId: "CCCC" }],
+    };
+    expect(parseEntitlements(body, CARDS)).toEqual(["aaaa-bbbb", "cccc"]);
+  });
+
   it("returns [] for garbage", () => {
     expect(parseEntitlements(null, CARDS)).toEqual([]);
     expect(parseEntitlements({}, CARDS)).toEqual([]);

@@ -534,7 +534,13 @@ export default function App() {
           );
         })}
       </div>
-      {items.length === 0 && <p className="note">No items in this category.</p>}
+      {items.length === 0 && (
+        <p className="note">
+          No items in this category.{" "}
+          {kind === "skin" &&
+            "If you own skins, try NEW ACCOUNT and connect again (or switch region — inventory is shard-specific)."}
+        </p>
+      )}
     </div>
   );
 
