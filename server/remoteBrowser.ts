@@ -70,22 +70,49 @@ function candidateExecutables(): string[] {
   const out: string[] = [];
   const env = process.env.CHROME_PATH?.trim();
   if (env) out.push(env);
-  // Linux / nixpacks
+
+  // PATH lookup first — nixpacks/nix put `chromium` on PATH, not /usr/bin/chromium.
+  const names = [
+    "chromium",
+    "chromium-browser",
+    "google-chrome",
+    "google-chrome-stable",
+    "chrome",
+    "microsoft-edge",
+    "microsoft-edge-stable",
+  ];
+  const pathDirs = (process.env.PATH ?? "")
+    .split(path.delimiter)
+    .map((d) => d.trim())
+    .filter(Boolean);
+  for (const name of names) {
+    for (const dir of pathDirs) {
+      const full = path.join(dir, name);
+      try {
+        if (fs.existsSync(full)) out.push(full);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  // Absolute fallbacks (apt / macOS)
   out.push(
     "/usr/bin/chromium",
     "/usr/bin/chromium-browser",
     "/usr/bin/google-chrome",
     "/usr/bin/google-chrome-stable",
     "/usr/bin/microsoft-edge",
-    "/usr/bin/microsoft-edge-stable"
-  );
-  // macOS
-  out.push(
+    "/usr/bin/microsoft-edge-stable",
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
     "/Applications/Chromium.app/Contents/MacOS/Chromium"
   );
+
+  const seen = new Set<string>();
   return out.filter((p) => {
+    if (!p || seen.has(p)) return false;
+    seen.add(p);
     try {
       return fs.existsSync(p);
     } catch {
@@ -101,6 +128,7 @@ async function launchContext(): Promise<BrowserContext> {
     args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
   };
   const execs = candidateExecutables();
+  let lastErr: unknown = null;
   if (execs.length > 0) {
     for (const executablePath of execs) {
       try {
@@ -108,7 +136,8 @@ async function launchContext(): Promise<BrowserContext> {
           ...base,
           executablePath,
         });
-      } catch {
+      } catch (e) {
+        lastErr = e;
         /* try next */
       }
     }
@@ -116,16 +145,20 @@ async function launchContext(): Promise<BrowserContext> {
   // Fall back to system channel names (works on dev machines with Chrome/Edge).
   try {
     return await chromium.launchPersistentContext(profileDir(), { ...base, channel: "chrome" });
-  } catch {
-    /* fall through */
+  } catch (e) {
+    lastErr = e;
   }
   try {
     return await chromium.launchPersistentContext(profileDir(), { ...base, channel: "msedge" });
-  } catch {
-    /* fall through */
+  } catch (e) {
+    lastErr = e;
   }
+  const checked = execs.length ? execs.join(", ") : "(none on PATH)";
+  const reason = lastErr instanceof Error ? lastErr.message.slice(0, 200) : "unknown";
   throw new AuthFlowError(
-    "Remote browser unavailable — no Chromium/Chrome found on the server. Set CHROME_PATH or paste the ssid cookie.",
+    "Remote browser unavailable — Chromium failed to launch on the server. " +
+      `Checked: ${checked}. Last error: ${reason}. ` +
+      "Ensure nixpacks installs chromium (nixPkgs) or set CHROME_PATH, or paste the ssid cookie.",
     503
   );
 }

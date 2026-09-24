@@ -31,10 +31,12 @@ export default function App() {
   });
   const [captchaStatus, setCaptchaStatus] = useState<"loading" | "ready" | "error">("loading");
   const [captchaNeeded, setCaptchaNeeded] = useState(false);
+  const [captchaSolver, setCaptchaSolver] = useState(false);
   const [captchaChallenge, setCaptchaChallenge] = useState<{
     sitekey: string;
     rqdata: string | null;
     captchaSessionId?: string;
+    solver?: boolean;
   }>({
     sitekey: SITEKEY,
     rqdata: null,
@@ -80,6 +82,16 @@ export default function App() {
         if (dead) return;
         challenge = fetched;
         setCaptchaChallenge(fetched);
+        setCaptchaSolver(!!fetched.solver);
+      }
+      // Without a server-side solver, widget tokens are host-rejected — don't render a doomed captcha.
+      if (!challenge.solver && !captchaSolver) {
+        setCaptchaStatus("error");
+        setError(
+          "Riot rejects captcha solved on this site (host-lock). Use AUTO LOGIN (remote browser) or paste the ssid cookie. " +
+            "To enable password mode, set CAPMONSTER_API_KEY in the server env."
+        );
+        return;
       }
       try {
         await loadHcaptcha();
@@ -96,7 +108,7 @@ export default function App() {
     return () => {
       dead = true;
     };
-  }, [data, captchaNeeded, captchaChallenge.captchaSessionId, captchaChallenge.rqdata, captchaChallenge.sitekey]);
+  }, [data, captchaNeeded, captchaSolver, captchaChallenge.captchaSessionId, captchaChallenge.rqdata, captchaChallenge.sitekey]);
 
   async function fetchAccount(e: FormEvent) {
     e.preventDefault();
@@ -247,9 +259,16 @@ export default function App() {
       return;
     }
     const token = widgetToken(widgetIdRef.current);
-    if (captchaNeeded && !token) {
-      setError("Please complete the captcha to continue.");
+    if (captchaNeeded && !captchaSolver) {
+      setError(
+        "Password mode needs a server-side captcha solver on the hosted site (set CAPMONSTER_API_KEY), " +
+          "or use AUTO LOGIN (remote browser) / cookie paste."
+      );
       return;
+    }
+    if (captchaNeeded && captchaSolver && !token && captchaStatus === "ready") {
+      // solver path B does not need a widget token; only block if widget rendered without solve
+      // (server auto-solves when no captcha is sent — so allow empty token)
     }
     setError(null);
     setLoading(true);
@@ -278,6 +297,7 @@ export default function App() {
         // Riot signals captcha need via auth_failure + captchaRequired/sitekey — never via the word "captcha".
         if (json?.captchaRequired || json?.sitekey || /captcha/i.test(msg) || /auth_failure/i.test(msg)) {
           setCaptchaNeeded(true);
+          if (typeof json?.solver === "boolean") setCaptchaSolver(json.solver);
           if (typeof json?.sitekey === "string" && json.sitekey) {
             setCaptchaChallenge({
               sitekey: json.sitekey,
@@ -480,8 +500,9 @@ export default function App() {
             ref={captchaDivRef}
           >
             {captchaStatus === "error" && (
-              <span className="note">
-                Captcha failed to load (adblock/network?) — solve it in a new attempt or use token-paste.
+              <span className="note" style={{ color: "#ffb3ba" }}>
+                Hosted captcha is rejected by Riot (host-lock). Use AUTO LOGIN (remote browser) or
+                paste the ssid cookie. Set <code>CAPMONSTER_API_KEY</code> to enable password mode.
               </span>
             )}
           </div>
@@ -489,7 +510,7 @@ export default function App() {
             <button
               className="btn"
               type="submit"
-              disabled={loading || (captchaNeeded && captchaStatus !== "ready" && captchaStatus !== "error")}
+              disabled={loading || (captchaNeeded && !captchaSolver && captchaStatus !== "ready" && captchaStatus !== "error")}
             >
               {loading ? "SIGNING IN…" : "SIGN IN & FETCH COLLECTION"}
             </button>

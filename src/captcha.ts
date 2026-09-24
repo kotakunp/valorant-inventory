@@ -77,11 +77,12 @@ export async function fetchCaptchaChallenge(): Promise<CaptchaChallenge> {
           sitekey: j.sitekey,
           rqdata: typeof j.rqdata === "string" ? j.rqdata : null,
           captchaSessionId: typeof j.captchaSessionId === "string" ? j.captchaSessionId : undefined,
+          solver: !!j.solver,
         };
       }
     }
   } catch {
     /* offline / server down */
   }
-  return { sitekey: SITEKEY, rqdata: null };
+  return { sitekey: SITEKEY, rqdata: null, solver: false };
 }

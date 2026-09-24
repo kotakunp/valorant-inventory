@@ -26,6 +26,8 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
   const [busy, setBusy] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const startedRef = useRef(false);
+  const startFailedRef = useRef(false);
+  const pollEnabledRef = useRef(false);
   const regionRef = useRef(region);
   regionRef.current = region;
 
@@ -54,14 +56,22 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
       });
       const json = (await res.json().catch(() => ({}))) as Status & { error?: string };
       if (!res.ok || json.error) {
-        setErr(json.error ?? `Could not start remote browser (${res.status})`);
+        const msg = json.error ?? `Could not start remote browser (${res.status})`;
+        setErr(msg);
+        setStatus({ active: false, phase: "error", width: 0, height: 0, error: msg });
         startedRef.current = false;
+        startFailedRef.current = true;
         return;
       }
+      startFailedRef.current = false;
       setStatus(json);
+      pollEnabledRef.current = true;
     } catch {
-      setErr("Network error starting remote browser.");
+      const msg = "Network error starting remote browser.";
+      setErr(msg);
+      setStatus({ active: false, phase: "error", width: 0, height: 0, error: msg });
       startedRef.current = false;
+      startFailedRef.current = true;
     } finally {
       setBusy(false);
     }
@@ -71,12 +81,12 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
     void start();
   }, [start]);
 
-  // Frame + status poll loop
+  // Frame + status poll loop (only after a successful start)
   useEffect(() => {
     let dead = false;
     let frameSeq = 0;
     const tick = async () => {
-      if (dead) return;
+      if (dead || startFailedRef.current || !pollEnabledRef.current) return;
       try {
         const stRes = await fetch("/api/browser/status");
         const st = (await stRes.json()) as Status;
@@ -92,7 +102,9 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
           return;
         }
         if (st.phase === "error" || st.phase === "expired") {
-          setErr(st.error ?? "Remote browser session ended.");
+          // Prefer server-provided error; do not clobber a start failure we already showed.
+          setErr((prev) => st.error || prev || "Remote browser session ended.");
+          pollEnabledRef.current = false;
           return;
         }
 
@@ -171,18 +183,34 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
   // parent clears remoteOpen via onDone; stop without done → local hide
   const setRemoteClosed = () => {
     startedRef.current = false;
+    startFailedRef.current = false;
+    pollEnabledRef.current = false;
     setStatus({ active: false, phase: "expired", width: 0, height: 0 });
     setFrameSrc(null);
     setErr("Remote browser closed.");
   };
 
-  if (err && status?.phase !== "login" && status?.phase !== "starting" && status?.phase !== "harvesting") {
+  if (err && (startFailedRef.current || status?.phase !== "login") && status?.phase !== "starting" && status?.phase !== "harvesting") {
     return (
       <div className="remote-browser">
-        <p className="note" style={{ marginTop: 0 }}>{err}</p>
-        <button className="btn ghost" type="button" onClick={() => { setErr(null); startedRef.current = false; void start(); }}>
+        <p className="note" style={{ marginTop: 0, whiteSpace: "pre-wrap" }}>{err}</p>
+        <button
+          className="btn ghost"
+          type="button"
+          onClick={() => {
+            setErr(null);
+            startedRef.current = false;
+            startFailedRef.current = false;
+            pollEnabledRef.current = false;
+            void start();
+          }}
+        >
           Retry
         </button>
+        <p className="note">
+          If Chromium is missing on the server, redeploy after nixpacks installs it, or paste the
+          ssid cookie instead.
+        </p>
       </div>
     );
   }
