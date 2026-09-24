@@ -671,6 +671,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: var(--bg);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
 }
+.preview-frame:has(.menu-open) {
+  overflow: visible;
+}
 .preview-scale { transform-origin: top left; }
 .export-note { font-size: 12px; color: var(--muted); margin-left: auto; }
 .hidden-export { position: fixed; left: -10000px; top: 0; z-index: -1; }
@@ -686,6 +689,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   display: flex;
   flex-direction: column;
   font-family: var(--font-ui);
+}
+.sc-root:has(.menu-open) {
+  overflow: visible;
 }
 .sc-root::before {
   content: "";
@@ -876,31 +882,59 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   display: block;
 }
 
-/* center: weapon-category groups */
+/* center: loadout grid — sidearms column spans full height (incl. melee band) */
 .sc-center {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   min-height: 0;
 }
-.sc-cats {
+.sc-loadout {
   flex: 1;
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  gap: 8px;
   min-height: 0;
-  overflow: hidden;
-}
-/* one column per weapon category — guns stack down the column (loadout order) */
-.sc-cat-col {
-  flex: 1 1 0;
   min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+/* 5th column when unknown guns (OTHER) are present */
+.sc-loadout:has(.sc-cat-col:nth-child(5)) {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.sc-cat-col {
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+/* sidearms (col 1): full vertical height including the melee band */
+.sc-cat-col:nth-child(1) {
+  grid-column: 1;
+  grid-row: 1 / 3;
+}
+.sc-cat-col:nth-child(2) {
+  grid-column: 2;
+  grid-row: 1;
+}
+.sc-cat-col:nth-child(3) {
+  grid-column: 3;
+  grid-row: 1;
+}
+.sc-cat-col:nth-child(4) {
+  grid-column: 4;
+  grid-row: 1;
+}
+.sc-cat-col:nth-child(5) {
+  grid-column: 5;
+  grid-row: 1;
+}
+.sc-empty--loadout {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-height: 0;
 }
 .sc-cat-col-head {
   display: flex;
@@ -988,21 +1022,16 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   cursor: default;
   transition: transform 0.12s ease;
   pointer-events: none;
-  /* Fan centered on stack size: middle item sits at 0, singles don't shift */
-  transform: translateY(calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * 14%));
+  /* Vertical fan; step shrinks as n grows so many skins stay in-cell and overlap */
+  transform: translateY(
+    calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * min(14%, calc(52% / var(--n, 1))))
+  );
 }
 .sc-stack-item.clickable { cursor: pointer; }
-.sc-stack-item:nth-child(1) { --i: 0; }
-.sc-stack-item:nth-child(2) { --i: 1; }
-.sc-stack-item:nth-child(3) { --i: 2; }
-.sc-stack-item:nth-child(4) { --i: 3; }
-.sc-stack-item:nth-child(5) { --i: 4; }
-.sc-stack-item:nth-child(6) { --i: 5; }
-.sc-stack-item:nth-child(7) { --i: 6; }
-.sc-stack-item:nth-child(8) { --i: 7; }
-.sc-stack-item:nth-child(n + 9) { --i: 8; }
 .sc-stack.is-stacked .sc-stack-item {
-  transform: translateY(calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * 9%));
+  transform: translateY(
+    calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * min(10%, calc(44% / var(--n, 1))))
+  );
 }
 .sc-stack-item:hover { z-index: 40 !important; }
 
@@ -1050,9 +1079,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-stack-item .sc-fallback { pointer-events: auto; }
 
-/* knives: one cell each, side-by-side — no overlap */
+/* knives: compact strip under cols 2–4 only (sidearms spans beside it) */
 .sc-knife-row {
-  flex: 0 0 auto;
+  grid-column: 2 / -1;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -1060,9 +1090,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-knife-strip {
   display: flex;
-  gap: 8px;
-  height: 78px;
+  gap: 6px;
+  height: 52px;
   min-width: 0;
+}
+.sc-knife-row .sc-cat-head--sm {
+  margin-bottom: 3px;
+}
+.sc-knife-row .sc-cat-name {
+  font-size: 11px;
 }
 .sc-knife-cell {
   position: relative;
@@ -1092,7 +1128,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   z-index: 40 !important;
 }
 .sc-knife-cell .sc-stack-art {
-  height: 78%;
+  height: 72%;
   max-width: 92%;
 }
 
@@ -1199,23 +1235,40 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   height: 56%;
 }
 
-/* Skin context menu (click skin — never toggles selection) */
+/* Skin context menu — release ancestor clips so choices are visible */
+.sc-stack:has(.menu-open),
+.sc-cat:has(.menu-open),
+.sc-cat-col:has(.menu-open),
+.sc-knife-cell:has(.menu-open),
+.sc-loadout:has(.menu-open),
+.sc-center:has(.menu-open) {
+  overflow: visible;
+}
+.sc-cat:has(.menu-open) {
+  clip-path: none;
+  z-index: 60;
+}
+.sc-knife-cell:has(.menu-open) {
+  clip-path: none;
+  overflow: visible;
+  z-index: 60;
+}
 .sc-skin-menu {
   position: absolute;
   left: 50%;
-  top: 46%;
+  top: 50%;
   transform: translate(-50%, -50%);
-  z-index: 90;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 112px;
-  max-width: min(160px, 96%);
+  min-width: 118px;
+  max-width: min(168px, 140%);
   padding: 6px;
-  background: rgba(8, 12, 16, 0.96);
-  border: 1px solid rgba(255, 70, 85, 0.55);
+  background: rgba(8, 12, 16, 0.98);
+  border: 1px solid rgba(255, 70, 85, 0.65);
   clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.7);
   pointer-events: auto;
 }
 .sc-skin-menu-btn {
@@ -1254,11 +1307,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   pointer-events: auto;
 }
 .sc-stack-item.menu-open {
-  z-index: 80 !important;
+  z-index: 100 !important;
 }
 .sc-stack-item.menu-open .sc-stack-art {
   filter: brightness(1.12)
     drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 2px rgba(0, 0, 0, 0.85));
+}
+/* When menu is open, keep the open item un-fanned so the menu sits on the cell */
+.sc-stack-item.menu-open {
+  transform: none !important;
 }
 
 /* right rail: player card + ranks/stats under it — official largeArt aspect 268×640 */

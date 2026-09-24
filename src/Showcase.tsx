@@ -163,7 +163,11 @@ export function Showcase({
       <div
         key={s.id}
         className={`sc-stack-item${s.equipped ? " equipped" : ""}${interactive ? " clickable" : ""}${menuOpen ? " menu-open" : ""}`}
-        style={{ zIndex: menuOpen ? 80 : index + 1, ["--rarity" as string]: rarity }}
+        style={{
+          zIndex: menuOpen ? 80 : index + 1,
+          ["--i" as string]: index,
+          ["--rarity" as string]: rarity,
+        }}
         onClick={
           interactive
             ? (e) => {
@@ -279,7 +283,7 @@ export function Showcase({
 
       <div className="sc-body">
         <main className={`sc-center density-${pages.density.name}`}>
-          <div className="sc-cats">
+          <div className="sc-loadout">
             {catColumns.map((col) => (
               <div className="sc-cat-col" key={col.id}>
                 <div className="sc-cat-col-head">
@@ -290,34 +294,34 @@ export function Showcase({
               </div>
             ))}
             {catColumns.length === 0 && (
-              <div className="sc-empty">
+              <div className="sc-empty sc-empty--loadout">
                 {pages.totalSelected === 0 ? "NO SKINS SELECTED" : pageCount > 1 ? "SEE PAGE 1" : "NO SKINS"}
               </div>
             )}
-          </div>
-          <div className="sc-knife-row">
-            <div className="sc-cat-head sc-cat-head--sm">
-              <KnifeIcon />
-              <span className="sc-cat-name">MELEE</span>
-              <span className="sc-cat-rule" aria-hidden="true" />
-              {knifeItems.length > 0 && <span className="sc-stack-count">{knifeItems.length}</span>}
-            </div>
-            <div className="sc-knife-strip">
-              {knifeItems.length > 0 ? (
-                knifeItems.map((s) => (
-                  <div className="sc-knife-cell" key={s.id}>
-                    <div className="sc-stack" style={{ ["--n" as string]: 1 }}>
-                      {stackItem(s, 0, "MELEE")}
+            <div className="sc-knife-row">
+              <div className="sc-cat-head sc-cat-head--sm">
+                <KnifeIcon />
+                <span className="sc-cat-name">MELEE</span>
+                <span className="sc-cat-rule" aria-hidden="true" />
+                {knifeItems.length > 0 && <span className="sc-stack-count">{knifeItems.length}</span>}
+              </div>
+              <div className="sc-knife-strip">
+                {knifeItems.length > 0 ? (
+                  knifeItems.map((s) => (
+                    <div className="sc-knife-cell" key={s.id}>
+                      <div className="sc-stack" style={{ ["--n" as string]: 1 }}>
+                        {stackItem(s, 0, "MELEE")}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="sc-knife-cell sc-knife-cell--empty">
+                    <div className="sc-stack sc-stack--empty">
+                      <div className="sc-empty-gun" aria-hidden="true" />
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="sc-knife-cell sc-knife-cell--empty">
-                  <div className="sc-stack sc-stack--empty">
-                    <div className="sc-empty-gun" aria-hidden="true" />
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </main>

@@ -99,16 +99,19 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 ├─────────────────────────────────────────────┬───────────────────────┤
 │ COLLECTION COLUMNS                         │ PLAYER CARD           │
 │ SIDEARMS│SMGS·SHOTS│RIFLES│SNIPERS·HEAVIES │ tall art panel        │
-│ guns stack down each column                │ PEAK / CURRENT RANK   │
-│ — stacked skins, empty = blank slot        │ VP / RP               │
+│ col1 spans full height (incl. melee band)  │ PEAK / CURRENT RANK   │
+│ guns stack down each column (overlap deck) │ VP / RP               │
 │ click skin → menu (chroma/front/remove)    │ PREM:n  KNIFE:n       │
-│ ── MELEE bottom row (always) ──            │ buddies +N            │
+│ ── MELEE (cols 2–4, compact) ──            │ buddies +N            │
 ├────────────────────────────────────────────┴───────────────────────┤
 │ (no footer)                                                        │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Category columns:** exactly 4 columns (SMGs+shotguns merged; snipers+heavies merged) — guns fill top→bottom, not row-major grid fill.
+- **Sidearms column** spans full center height including the melee band; melee strip sits only under columns 2–4 and is compact (~52px).
+- **Stack fan:** vertical step shrinks as stack size grows so many skins overlap in-cell (no escape).
+- **Context menu:** ancestor `overflow`/`clip-path` released while open so choices are visible.
 - **Empty slots always rendered** for official guns (and empty MELEE strip) — matches VALORANT loadout.
 - **Rank medallions (MVP):** styled circular badge, tier name + tier color (real tier icons = phase 2).
 - **Right rail only:** card + ranks + wallet + PREM/KNIFE + buddies under the player card; skins grid takes full remaining width (no left rail). No footer bar.
