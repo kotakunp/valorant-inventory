@@ -21,9 +21,11 @@ interface Status {
 interface Props {
   region: Region;
   onDone: (payload: ShowcasePayload) => void;
+  /** Optional Riot email/password from our form — sent once to start, then dropped. */
+  credentials?: { username: string; password: string };
 }
 
-export function RemoteBrowserPanel({ region, onDone }: Props) {
+export function RemoteBrowserPanel({ region, onDone, credentials }: Props) {
   const [status, setStatus] = useState<Status | null>(null);
   const [frameSrc, setFrameSrc] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -35,6 +37,8 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
   const pollEnabledRef = useRef(false);
   const regionRef = useRef(region);
   regionRef.current = region;
+  const credsRef = useRef(credentials);
+  credsRef.current = credentials;
 
   const sendInput = useCallback(async (body: unknown) => {
     try {
@@ -54,10 +58,18 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
     setBusy(true);
     setErr(null);
     try {
+      const c = credsRef.current;
+      const body: Record<string, unknown> = { region: regionRef.current };
+      if (c?.username && c?.password) {
+        body.username = c.username;
+        body.password = c.password;
+        // One-shot — don't resend on retry.
+        credsRef.current = undefined;
+      }
       const res = await fetch("/api/browser/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ region: regionRef.current }),
+        body: JSON.stringify(body),
       });
       const json = (await res.json().catch(() => ({}))) as Status & { error?: string };
       if (!res.ok || json.error) {

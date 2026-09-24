@@ -81,6 +81,8 @@ interface RemoteSession {
   crashed?: boolean;
   relaunching?: boolean;
   relaunchCount: number;
+  /** One-shot form credentials — request memory only, never logged, cleared after fill. */
+  pendingCreds?: { username: string; password: string };
 }
 
 let session: RemoteSession | null = null;
@@ -464,6 +466,105 @@ async function maybeRelaunch(s: RemoteSession): Promise<void> {
   }
 }
 
+/**
+ * Fill Riot's login form from our own email/password UI.
+ * Captcha still runs on Riot's page (host-locked) — user only solves that (and 2FA).
+ * Credentials are used once then dropped from the session; never logged.
+ */
+async function prefillRiotForm(s: RemoteSession): Promise<void> {
+  const creds = s.pendingCreds;
+  if (!creds) return;
+  s.pendingCreds = undefined;
+  if (s.stopping || session !== s) return;
+
+  const { username, password } = creds;
+  const page = s.page;
+  const fillAny = async (selectors: string[], value: string): Promise<boolean> => {
+    for (const sel of selectors) {
+      try {
+        const loc = page.locator(sel).first();
+        if ((await loc.count()) > 0 && (await loc.isVisible().catch(() => false))) {
+          await loc.fill(value, { timeout: 4000 });
+          return true;
+        }
+      } catch {
+        /* try next */
+      }
+    }
+    return false;
+  };
+
+  try {
+    // Username / email step
+    const userSel = [
+      'input[type="email"]',
+      'input[name="username"]',
+      'input[name="login"]',
+      'input[autocomplete="username"]',
+      'input[id*="username" i]',
+      'input[id*="email" i]',
+      'input[type="text"]',
+    ];
+    let filledUser = await fillAny(userSel, username);
+    if (!filledUser) {
+      // Form not up yet — wait briefly
+      for (let i = 0; i < 15 && !filledUser && !s.stopping && session === s; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        filledUser = await fillAny(userSel, username);
+      }
+    }
+    if (!filledUser || s.stopping || session !== s) return;
+
+    // Advance past username if password isn't visible yet
+    let filledPass = await fillAny(
+      ['input[type="password"]', 'input[autocomplete="current-password"]'],
+      password
+    );
+    if (!filledPass) {
+      const nextBtn = page.locator(
+        'button[type="submit"], button:has-text("Sign In"), button:has-text("Next"), button:has-text("Continue")'
+      ).first();
+      try {
+        if ((await nextBtn.count()) > 0 && (await nextBtn.isVisible().catch(() => false))) {
+          await nextBtn.click({ timeout: 3000 });
+        }
+      } catch {
+        /* ignore */
+      }
+      for (let i = 0; i < 10 && !filledPass && !s.stopping && session === s; i++) {
+        await new Promise((r) => setTimeout(r, 800));
+        filledPass = await fillAny(
+          ['input[type="password"]', 'input[autocomplete="current-password"]'],
+          password
+        );
+      }
+    }
+    if (!filledPass || s.stopping || session !== s) return;
+
+    // Auto-submit only if no captcha challenge is on-screen (host-locked captcha needs the user).
+    try {
+      const captchaVisible = await page.evaluate(() => {
+        const iframes = Array.from(document.querySelectorAll("iframe"));
+        return iframes.some((f) => {
+          const src = (f.getAttribute("src") || "").toLowerCase();
+          return src.includes("hcaptcha") || src.includes("captcha");
+        });
+      });
+      if (!captchaVisible) {
+        const submit = page.locator('button[type="submit"]').first();
+        if ((await submit.count()) > 0 && (await submit.isVisible().catch(() => false))) {
+          await submit.click({ timeout: 3000 }).catch(() => {});
+        }
+      }
+    } catch {
+      /* leave form filled for the user */
+    }
+    console.warn("[remote-browser] prefilled Riot form (creds dropped)");
+  } catch (e) {
+    console.warn("[remote-browser] prefill failed:", errText(e));
+  }
+}
+
 async function harvestAndFinish(s: RemoteSession): Promise<void> {
   if (s.phase !== "login") return;
   // Don't touch a browser that's crashed/relaunching — cookies() throws "closed".
@@ -521,7 +622,10 @@ function startPoller(s: RemoteSession): void {
   }, 1500);
 }
 
-export async function startRemoteBrowser(region: Region): Promise<BrowserStatus> {
+export async function startRemoteBrowser(
+  region: Region,
+  creds?: { username?: string; password?: string }
+): Promise<BrowserStatus> {
   const run = async (): Promise<BrowserStatus> => {
     pruneIfStale();
     if (session && session.phase !== "done" && session.phase !== "error" && session.phase !== "expired") {
@@ -540,6 +644,8 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
 
     const page = launched.ctx.pages()[0] ?? (await launched.ctx.newPage());
     const now = Date.now();
+    const username = typeof creds?.username === "string" ? creds.username.trim() : "";
+    const password = typeof creds?.password === "string" ? creds.password : "";
     const s: RemoteSession = {
       id: crypto.randomUUID(),
       browser: launched.browser,
@@ -557,6 +663,7 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
       height: VIEWPORT.height,
       stopping: false,
       relaunchCount: 0,
+      ...(username && password ? { pendingCreds: { username, password } } : {}),
     };
     session = s;
 
@@ -590,6 +697,11 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
         if (!hasForm && !s.stopping && session === s) {
           console.warn("[remote-browser] login form never mounted — reloading once");
           await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 }).catch(() => {});
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+        // Inject credentials from our own login UI (request memory only).
+        if (!s.stopping && session === s) {
+          await prefillRiotForm(s);
         }
       } catch {
         /* SPA/network slow — frames still stream */

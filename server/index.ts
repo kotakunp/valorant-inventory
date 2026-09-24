@@ -141,7 +141,7 @@ app.get("/api/login/captcha-challenge", async (_req, res) => {
 
 // ---- remote browser (hosted AUTO LOGIN) ----
 app.post("/api/browser/start", async (req, res) => {
-  const { region } = req.body ?? {};
+  const { region, username, password } = req.body ?? {};
   // Reattaching to a live session must not burn the rate limit (page reload / retry).
   const existing = remoteStatus();
   if (!existing.active) {
@@ -151,7 +151,11 @@ app.post("/api/browser/start", async (req, res) => {
     }
   }
   try {
-    const st = await startRemoteBrowser(normalizeRegion(region) ?? "na");
+    const st = await startRemoteBrowser(normalizeRegion(region) ?? "na", {
+      // Request memory only — filled into Riot's form, then dropped. Never logged.
+      username: typeof username === "string" ? username : undefined,
+      password: typeof password === "string" ? password : undefined,
+    });
     res.json(st);
   } catch (e) {
     respondAuthError(res, e);

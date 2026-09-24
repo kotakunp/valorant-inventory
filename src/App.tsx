@@ -15,6 +15,33 @@ const fmt = (n: number) => n.toLocaleString("en-US");
 const qs = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
 const IS_REMOTE_POPUP = qs.get("remote") === "1";
 const POPUP_REGION = ((qs.get("region") as Region) || "na") satisfies Region;
+const REMOTE_CREDS_KEY = "valorant-remote-creds";
+
+/** Stash email/password for the remote popup (sessionStorage — same-origin tab copy only). */
+function stashRemoteCreds(email: string, password: string): void {
+  if (!email || !password || typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.setItem(REMOTE_CREDS_KEY, JSON.stringify({ username: email, password }));
+  } catch {
+    /* private mode */
+  }
+}
+
+function takeRemoteCreds(): { username: string; password: string } | undefined {
+  if (typeof sessionStorage === "undefined") return undefined;
+  try {
+    const raw = sessionStorage.getItem(REMOTE_CREDS_KEY);
+    if (!raw) return undefined;
+    sessionStorage.removeItem(REMOTE_CREDS_KEY);
+    const parsed = JSON.parse(raw) as { username?: string; password?: string };
+    if (parsed.username && parsed.password) {
+      return { username: parsed.username, password: parsed.password };
+    }
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
 
 export default function App() {
   const [form, setForm] = useState({ region: "na" as Region, accessToken: "", entitlementsToken: "", puuid: "" });
@@ -47,6 +74,9 @@ export default function App() {
   });
   const [cookieInput, setCookieInput] = useState("");
   const [remoteOpen, setRemoteOpen] = useState(false);
+  const [remoteCreds, setRemoteCreds] = useState<{ username: string; password: string } | undefined>(() =>
+    IS_REMOTE_POPUP ? takeRemoteCreds() : undefined
+  );
   const remoteWinRef = useRef<Window | null>(null);
   const captchaDivRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -277,6 +307,13 @@ export default function App() {
     }
     const token = widgetToken(widgetIdRef.current);
     if (captchaNeeded && !captchaSolver) {
+      // Host-locked captcha — open remote browser with our form's email/password pre-filled.
+      // User only solves captcha/2FA on Riot's real page; no typing into the stream.
+      if (creds.email && creds.password) {
+        stashRemoteCreds(creds.email, creds.password);
+        openRemotePopup();
+        return;
+      }
       setError(
         "Password mode needs a server-side captcha solver on the hosted site (set CAPMONSTER_API_KEY), " +
           "or use AUTO LOGIN (remote browser) / cookie paste."
@@ -366,20 +403,25 @@ export default function App() {
   async function submitAuto() {
     setError(null);
     setLoading(true);
+    // Prefill path: if email+password are on our form, skip local Chrome and go remote with fill.
+    const canPrefill = !!creds.email && !!creds.password;
     try {
-      // Prefer local Chrome harvest/window; on hosted VPS that fails → open remote browser popup.
-      const res = await fetch("/api/login/auto", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ region: form.region }),
-      });
-      const json = (await res.json().catch(() => ({}))) as ShowcasePayload & { error?: string };
-      if (!res.ok || json.error) {
-        openRemotePopup();
-        return;
+      if (!canPrefill) {
+        const res = await fetch("/api/login/auto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ region: form.region }),
+        });
+        const json = (await res.json().catch(() => ({}))) as ShowcasePayload & { error?: string };
+        if (res.ok && !json.error) {
+          applyShowcase(json as ShowcasePayload);
+          return;
+        }
       }
-      applyShowcase(json);
+      if (canPrefill) stashRemoteCreds(creds.email, creds.password);
+      openRemotePopup();
     } catch {
+      if (canPrefill) stashRemoteCreds(creds.email, creds.password);
       openRemotePopup();
     } finally {
       setLoading(false);
@@ -388,6 +430,8 @@ export default function App() {
 
   function openRemotePopup() {
     setError(null);
+    // Ensure popup child can pick up stashed credentials (openRemotePopup may be called alone).
+    if (creds.email && creds.password) stashRemoteCreds(creds.email, creds.password);
     const url = `${window.location.origin}/?remote=1&region=${form.region}`;
     const win = window.open(
       url,
@@ -397,8 +441,12 @@ export default function App() {
     if (win) {
       remoteWinRef.current = win;
       setRemoteOpen(false);
-      setError("Remote login popup opened — finish signing in there; this page will update automatically.");
+      setError("Remote login popup opened — email/password (if entered) are pre-filled; finish captcha/2FA there.");
       return;
+    }
+    // Popup blocked → inline panel with the same credentials.
+    if (creds.email && creds.password) {
+      setRemoteCreds({ username: creds.email, password: creds.password });
     }
     setRemoteOpen(true);
   }
@@ -475,6 +523,7 @@ export default function App() {
         </div>
         <RemoteBrowserPanel
           region={POPUP_REGION}
+          credentials={remoteCreds}
           onDone={(json) => {
             if (window.opener && !window.opener.closed) {
               window.opener.postMessage({ type: "valorant-showcase", payload: json }, window.location.origin);
@@ -629,12 +678,14 @@ export default function App() {
           </p>
           {remoteOpen && !IS_REMOTE_POPUP && (
             <>
-              <div className="or-divider">remote browser (hosted — log in on Riot&apos;s page here)</div>
+              <div className="or-divider">remote browser (hosted — captcha/2FA on Riot&apos;s page)</div>
               <RemoteBrowserPanel
                 region={form.region}
+                credentials={remoteCreds}
                 onDone={(json) => {
                   applyShowcase(json);
                   setRemoteOpen(false);
+                  setRemoteCreds(undefined);
                 }}
               />
             </>
