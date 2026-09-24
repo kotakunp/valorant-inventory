@@ -29,6 +29,8 @@ const LAUNCH_ARGS = [
   "--disable-background-timer-throttling",
   "--disable-renderer-backgrounding",
   "--disable-backgrounding-occluded-windows",
+  "--disable-features=IsolateOrigins,site-per-process",
+  "--js-flags=--max-old-space-size=256",
 ];
 
 /** Hide automation fingerprints before any page script runs. */
@@ -76,10 +78,15 @@ interface RemoteSession {
   width: number;
   height: number;
   stopping: boolean;
+  crashed?: boolean;
+  relaunching?: boolean;
+  relaunchCount: number;
 }
 
 let session: RemoteSession | null = null;
 let startLock: Promise<unknown> = Promise.resolve();
+
+const MAX_RELAUNCHES = 2;
 
 function pruneIfStale(): void {
   if (!session) return;
@@ -245,6 +252,7 @@ async function startCaptureLoop(s: RemoteSession): Promise<void> {
   let fails = 0;
   const attachCdp = async () => {
     try {
+      if (s.page.isClosed()) return;
       if (s.cdp) {
         try {
           await s.cdp.send("Page.stopScreencast").catch(() => {});
@@ -287,7 +295,8 @@ async function startCaptureLoop(s: RemoteSession): Promise<void> {
 
   await attachCdp();
 
-  while (!s.stopping && session === s) {
+  while (!s.stopping && session === s && !s.crashed) {
+    if (s.page.isClosed()) break;
     let got: Buffer | null = null;
     let lastFail = "";
 
@@ -305,7 +314,7 @@ async function startCaptureLoop(s: RemoteSession): Promise<void> {
     if (!got) {
       try {
         const buf = await Promise.race([
-          s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 2500 }),
+          s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 2500, caret: "initial" }),
           new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("pw timeout")), 3000)),
         ]);
         if (buf && buf.length > 0) got = Buffer.from(buf);
@@ -324,13 +333,77 @@ async function startCaptureLoop(s: RemoteSession): Promise<void> {
     } else {
       fails += 1;
       s.captureErr = lastFail || "no frame";
-      // After 4 consecutive failures, rebuild CDP (connection often dies across navigations).
+      if (/Target crashed|Target closed|browser has been closed/i.test(s.captureErr)) {
+        s.crashed = true;
+        break;
+      }
       if (fails >= 4) {
         fails = 0;
         await attachCdp();
       }
     }
     await new Promise((r) => setTimeout(r, got ? 300 : 500));
+  }
+}
+
+function wirePage(s: RemoteSession, page: Page): void {
+  page.on("console", (msg) => {
+    if (msg.type() === "error") console.warn(`[remote-browser] console: ${msg.text().slice(0, 200)}`);
+  });
+  page.on("pageerror", (err) => {
+    console.warn(`[remote-browser] pageerror: ${String(err).slice(0, 200)}`);
+  });
+  page.on("crash", () => {
+    if (session !== s || s.stopping) return;
+    console.warn("[remote-browser] page crashed — scheduling relaunch");
+    s.crashed = true;
+    void maybeRelaunch(s);
+  });
+}
+
+/** Tear down a crashed browser and launch a fresh one (capped attempts). */
+async function maybeRelaunch(s: RemoteSession): Promise<void> {
+  if (s.stopping || session !== s) return;
+  if (s.relaunching) return;
+  if (s.relaunchCount >= MAX_RELAUNCHES) {
+    s.phase = "error";
+    s.error = "Chromium crashed repeatedly on this server. Close and try again, or paste the ssid cookie.";
+    return;
+  }
+  s.relaunching = true;
+  s.relaunchCount += 1;
+  try {
+    try {
+      await s.ctx.close().catch(() => {});
+      await s.browser.close().catch(() => {});
+    } catch {
+      /* already dead */
+    }
+    if (s.stopping || session !== s) return;
+
+    const launched = await launchSession();
+    const page = launched.ctx.pages()[0] ?? (await launched.ctx.newPage());
+    s.browser = launched.browser;
+    s.ctx = launched.ctx;
+    s.page = page;
+    s.cdp = null;
+    s.crashed = false;
+    s.captureErr = undefined;
+    s.lastFrameAt = Date.now();
+    s.phase = "login";
+    wirePage(s, page);
+    s.frameLoop = startCaptureLoop(s);
+    s.frameLoop.catch((e) => {
+      s.captureErr = `loop crashed: ${errText(e)}`;
+      console.error("[remote-browser] capture loop crashed:", e);
+    });
+    await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 }).catch(() => {});
+    console.warn(`[remote-browser] relaunched (#${s.relaunchCount})`);
+  } catch (e) {
+    s.phase = "error";
+    s.error = `Chromium crashed and could not restart: ${errText(e)}`;
+  } finally {
+    s.relaunching = false;
   }
 }
 
@@ -413,21 +486,18 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
       width: VIEWPORT.width,
       height: VIEWPORT.height,
       stopping: false,
+      relaunchCount: 0,
     };
     session = s;
 
-    page.on("console", (msg) => {
-      if (msg.type() === "error") console.warn(`[remote-browser] console: ${msg.text().slice(0, 200)}`);
-    });
-    page.on("pageerror", (err) => {
-      console.warn(`[remote-browser] pageerror: ${String(err).slice(0, 200)}`);
-    });
+    wirePage(s, page);
 
     // Continuous capture: screencast + timed screenshot fallback so frames never freeze.
     s.frameLoop = startCaptureLoop(s);
     s.frameLoop.catch((e) => {
       s.captureErr = `loop crashed: ${errText(e)}`;
       console.error("[remote-browser] capture loop crashed:", e);
+      if (!s.stopping && session === s) void maybeRelaunch(s);
     });
     startPoller(s);
 
@@ -471,7 +541,12 @@ export function status(): BrowserStatus {
   if (!session) {
     return { active: false, phase: "expired", width: VIEWPORT.width, height: VIEWPORT.height };
   }
-  const url = session.page.url();
+  let url = "";
+  try {
+    url = session.page.isClosed() ? "" : session.page.url();
+  } catch {
+    url = "";
+  }
   return {
     active: true,
     phase: session.phase,
