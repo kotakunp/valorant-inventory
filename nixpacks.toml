@@ -1,8 +1,10 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "chromium", "xorg.xvfb"]
+nixPkgs = ["nodejs_20", "chromium", "xorg.xvfb", "fontconfig", "dejavu_fonts"]
 
 [phases.install]
-cmds = ["npm ci"]
+# Playwright-managed Chromium matches playwright-core's browsers.json (153.x).
+# System nix chromium is 132 — CDP mismatch → random Target crashed.
+cmds = ["npm ci", "npx playwright-core install chromium"]
 
 [phases.build]
 cmds = ["npm run build"]

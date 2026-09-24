@@ -189,7 +189,7 @@ function errText(e: unknown): string {
 async function launchSession(): Promise<{ browser: Browser; ctx: BrowserContext }> {
   const errors: string[] = [];
   const execs = candidateExecutables();
-  // Prefer headed when DISPLAY is set (xvfb-run) — avoids headless bot walls + screenshot freezes.
+  // Prefer headed when DISPLAY is set (xvfb) — avoids headless bot walls.
   const headless = !process.env.DISPLAY;
 
   const tryLaunch = async (opts: { executablePath?: string; channel?: "chrome" }) => {
@@ -199,6 +199,14 @@ async function launchSession(): Promise<{ browser: Browser; ctx: BrowserContext 
     return { browser, ctx };
   };
 
+  // 1) Playwright-managed Chromium (matches browsers.json — avoids CDP version skew).
+  try {
+    return await tryLaunch({});
+  } catch (e) {
+    errors.push(`playwright-chromium: ${errText(e)}`);
+  }
+
+  // 2) System executables (dev machines / fallback).
   for (const executablePath of execs) {
     try {
       return await tryLaunch({ executablePath });
@@ -243,7 +251,7 @@ async function launchSession(): Promise<{ browser: Browser; ctx: BrowserContext 
   throw new AuthFlowError(
     "Remote browser unavailable — Chromium failed to launch on the server. " +
       `Checked: ${checked}. Attempts: ${errors.join(" | ")}. ` +
-      "Ensure nixpacks installs chromium (nixPkgs) or set CHROME_PATH, or paste the ssid cookie.",
+      "Ensure nixpacks runs `npx playwright-core install chromium`, or paste the ssid cookie.",
     503
   );
 }
@@ -309,7 +317,11 @@ async function startCaptureLoop(s: RemoteSession): Promise<void> {
     let got: Buffer | null = null;
     let lastFail = "";
 
-    if (s.cdp) {
+    // Screencast frames (if any) already updated lastFrameAt — only force a
+    // screenshot when the stream has been quiet. Hammering captureScreenshot
+    // on a mismatched Chromium was crashing the renderer.
+    const screencastFresh = Date.now() - s.lastFrameAt < 800;
+    if (s.cdp && !screencastFresh) {
       try {
         const shot = (await Promise.race([
           s.cdp.send("Page.captureScreenshot", { format: "jpeg", quality: FRAME_JPEG_QUALITY }),
@@ -320,7 +332,7 @@ async function startCaptureLoop(s: RemoteSession): Promise<void> {
         lastFail = `cdp: ${errText(e)}`;
       }
     }
-    if (!got) {
+    if (!got && !screencastFresh) {
       try {
         const buf = await Promise.race([
           s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 2500, caret: "initial" }),
@@ -339,7 +351,7 @@ async function startCaptureLoop(s: RemoteSession): Promise<void> {
       s.frameCount += 1;
       s.captureErr = undefined;
       fails = 0;
-    } else {
+    } else if (!screencastFresh) {
       fails += 1;
       s.captureErr = lastFail || "no frame";
       if (/Target crashed|Target closed|browser has been closed/i.test(s.captureErr)) {
@@ -351,7 +363,7 @@ async function startCaptureLoop(s: RemoteSession): Promise<void> {
         await attachCdp();
       }
     }
-    await new Promise((r) => setTimeout(r, got ? 300 : 500));
+    await new Promise((r) => setTimeout(r, got ? 400 : 600));
   }
 }
 
@@ -454,6 +466,13 @@ async function maybeRelaunch(s: RemoteSession): Promise<void> {
 
 async function harvestAndFinish(s: RemoteSession): Promise<void> {
   if (s.phase !== "login") return;
+  // Don't touch a browser that's crashed/relaunching — cookies() throws "closed".
+  if (s.stopping || s.crashed || s.relaunching) return;
+  try {
+    if (s.page.isClosed() || !s.browser.isConnected()) return;
+  } catch {
+    return;
+  }
   s.phase = "harvesting";
   try {
     const header = riotCookieHeader(await s.ctx.cookies());
@@ -473,13 +492,19 @@ async function harvestAndFinish(s: RemoteSession): Promise<void> {
     // Keep the browser briefly so the UI can pull the result, then close.
     setTimeout(() => void closeSession("done"), 30_000);
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "Remote login failed.";
+    // Closed browser mid-harvest → stay in login (or wait for relaunch), don't error out.
+    if (/closed|crashed|Target page/i.test(msg)) {
+      s.phase = "login";
+      return;
+    }
     // Partial cookies (mid-login) → stay in login and retry.
     if (e instanceof AuthFlowError && e.status === 401 && s.phase === "harvesting") {
       s.phase = "login";
       return;
     }
     s.phase = "error";
-    s.error = e instanceof Error ? e.message : "Remote login failed.";
+    s.error = msg;
   }
 }
 
