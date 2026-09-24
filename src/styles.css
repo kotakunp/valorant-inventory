@@ -930,8 +930,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   justify-content: center;
   cursor: default;
   transition: transform 0.12s ease, filter 0.12s ease;
-  /* default fan offset so layers read as a stack */
-  transform: translate(calc((var(--i, 0) - 1) * 4%), calc((var(--i, 0) - 1) * 3%));
+  /* Layer hit-testing: only the art receives pointer events, so exposed
+     edges of lower layers stay hoverable. Events bubble to this node. */
+  pointer-events: none;
+  /* Vertical fan — each layer peeks above/below the one on top */
+  transform: translate(
+    calc((var(--i, 0) - 2) * 3%),
+    calc((var(--i, 0) - 2) * 11%)
+  );
 }
 .sc-stack-item.clickable { cursor: pointer; }
 .sc-stack-item:nth-child(1) { --i: 0; }
@@ -940,17 +946,19 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-stack-item:nth-child(4) { --i: 3; }
 .sc-stack-item:nth-child(5) { --i: 4; }
 .sc-stack-item:nth-child(6) { --i: 5; }
-.sc-stack-item:nth-child(n + 7) { --i: 5; }
+.sc-stack-item:nth-child(7) { --i: 6; }
+.sc-stack-item:nth-child(8) { --i: 7; }
+.sc-stack-item:nth-child(n + 9) { --i: 8; }
 .sc-stack-item:hover {
   z-index: 40 !important;
-  transform: translate(0, -4%) scale(1.06);
+  transform: translate(0, -6%) scale(1.05);
   filter: brightness(1.15);
 }
 .sc-stack-art {
   max-width: 88%;
-  max-height: 78%;
+  max-height: 72%;
   object-fit: contain;
-  pointer-events: none;
+  pointer-events: auto;
   /* thin light outline so transparent PNGs read against dark bg */
   filter: drop-shadow(1px 0 0 rgba(232, 236, 240, 0.55))
     drop-shadow(-1px 0 0 rgba(232, 236, 240, 0.55))
@@ -988,16 +996,45 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-stack-item:hover .sc-stack-name,
 .sc-stack-item.equipped .sc-stack-name { opacity: 1; }
-.sc-stack--knife {
-  flex: 0 0 auto;
-  height: 72px;
-}
-.sc-stack--knife .sc-stack-art { max-height: 90%; }
+.sc-stack-item .sc-fallback { pointer-events: auto; }
+
+/* knives: one cell each, side-by-side — no overlap */
 .sc-knife-row {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-width: 0;
+}
+.sc-knife-strip {
+  display: flex;
+  gap: 8px;
+  height: 78px;
+  min-width: 0;
+}
+.sc-knife-cell {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  background: linear-gradient(165deg, #15202b 0%, #0c141d 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  overflow: hidden;
+}
+.sc-knife-cell .sc-stack-item {
+  transform: none;
+}
+.sc-knife-cell .sc-stack-item:hover {
+  transform: scale(1.06);
+}
+.sc-knife-cell .sc-stack-art {
+  max-height: 68%;
+  max-width: 92%;
+}
+.sc-knife-cell .sc-stack-name {
+  opacity: 1;
+  font-size: 9px;
+  padding: 10px 4px 4px;
 }
 
 .sc-tile-gem {
@@ -1048,7 +1085,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   z-index: 30;
 }
 .sc-stack-item:hover .sc-chromas,
-.sc-stack-item:focus-within .sc-chromas { opacity: 1; pointer-events: auto; }
+.sc-stack-item:focus-within .sc-chromas { opacity: 1; }
+.sc-chromas .sc-chroma { pointer-events: auto; }
 .sc-chroma {
   width: 18px;
   height: 18px;

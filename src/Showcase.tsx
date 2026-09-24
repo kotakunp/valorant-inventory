@@ -205,8 +205,12 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
                 <span className="sc-cat-rule" aria-hidden="true" />
                 <span className="sc-stack-count">{knifeItems.length}</span>
               </div>
-              <div className="sc-stack sc-stack--knife">
-                {knives.flatMap((g) => g.items).map((s, i) => stackItem(s, i))}
+              <div className="sc-knife-strip">
+                {knives.flatMap((g) => g.items).map((s) => (
+                  <div className="sc-knife-cell" key={s.id}>
+                    {stackItem(s, 0)}
+                  </div>
+                ))}
               </div>
             </div>
           )}
