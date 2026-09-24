@@ -314,8 +314,41 @@ async function requestEntitlements(accessToken: string): Promise<string> {
   return token;
 }
 
+/** Play-valorant web OAuth seed: establishes the authorization request (asid)
+ *  for client play-valorant-web-prod before the GET /authorize reauth.
+ *  Without this, /authorize often 303s to the login page even with a fresh ssid. */
+const PLAY_AUTH_COOKIES_BODY = {
+  client_id: "play-valorant-web-prod",
+  nonce: "1",
+  redirect_uri: "https://playvalorant.com/opt_in",
+  response_type: "token id_token",
+  scope: "account openid",
+};
+
 async function reauthForTokens(jar: CookieJar): Promise<{ accessToken: string; idToken: string }> {
   if (!jar.has("ssid")) throw new AuthFlowError("Login session cookie missing — please sign in again.", 401);
+
+  // Seed step (Auth Cookies): POST /api/v1/authorization with the pasted jar so
+  // Riot binds asid/tdid to play-valorant-web-prod, then absorb any refreshed cookies.
+  try {
+    const seed = await fetch(API_AUTHZ, {
+      method: "POST",
+      headers: {
+        ...WEB_HEADERS,
+        "Content-Type": "application/json",
+        Cookie: jar.header(),
+      },
+      body: JSON.stringify(PLAY_AUTH_COOKIES_BODY),
+      redirect: "manual",
+      signal: AbortSignal.timeout(15000),
+    });
+    jar.absorb(seed.headers);
+    // Response body (if any) is JSON status — safe to ignore; we only need Set-Cookie.
+    await seed.text().catch(() => "");
+  } catch {
+    // Seed is best-effort — some sessions still reauth without it.
+  }
+
   let res: Response;
   try {
     res = await fetch(REAUTH_URL, {
@@ -325,6 +358,12 @@ async function reauthForTokens(jar: CookieJar): Promise<{ accessToken: string; i
         // is required (Accept: application/json → HTTP406, no redirect at all).
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        // Browser-like navigation headers — missing Sec-Fetch-* can trip WAFs.
+        "Sec-Fetch-Site": "same-site",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
         Cookie: jar.header(),
       },
       redirect: "manual",

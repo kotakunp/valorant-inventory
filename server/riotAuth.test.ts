@@ -204,6 +204,13 @@ describe("loginWithCookies (browser-cookie mode)", () => {
   function mockRiotFetch(opts: { location?: string; geoLive?: string } = {}) {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes("auth.riotgames.com/api/v1/authorization") && init?.method === "POST") {
+        // Seed step (Auth Cookies) — may Set-Cookie asid; no Location needed.
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
       if (url.includes("auth.riotgames.com/authorize")) {
         const headers: Record<string, string> = {};
         if (opts.location !== undefined) headers.Location = opts.location;
@@ -234,9 +241,17 @@ describe("loginWithCookies (browser-cookie mode)", () => {
   }
 
   function reauthHeaders(fetchMock: ReturnType<typeof mockRiotFetch>): Record<string, string> {
-    const call = fetchMock.mock.calls.find(([u]) => String(u).includes("auth.riotgames.com/authorize"));
+    const call = fetchMock.mock.calls.find(
+      ([u, init]) => String(u).includes("auth.riotgames.com/authorize") && !init?.method
+    );
     expect(call, "reauth request missing").toBeTruthy();
     return (call![1]?.headers ?? {}) as Record<string, string>;
+  }
+
+  function seedCall(fetchMock: ReturnType<typeof mockRiotFetch>) {
+    return fetchMock.mock.calls.find(
+      ([u, init]) => String(u).includes("auth.riotgames.com/api/v1/authorization") && init?.method === "POST"
+    );
   }
 
   const successLocation = `https://playvalorant.com/opt_in#access_token=AT.test&scope=openid&token_type=Bearer&id_token=${ID_TOKEN}&expires_in=3600`;
@@ -254,6 +269,18 @@ describe("loginWithCookies (browser-cookie mode)", () => {
     expect(out.puuid).toBe("puuid-abc-123");
     expect(out.region).toBe("eu");
     expect(reauthHeaders(fetchMock).Cookie).toBe("ssid=abc123ssid");
+    // Seed POST must run before GET /authorize and carry the pasted cookies.
+    const seed = seedCall(fetchMock);
+    expect(seed, "seed POST missing").toBeTruthy();
+    const authorizeIdx = fetchMock.mock.calls.findIndex(
+      ([u, init]) => String(u).includes("auth.riotgames.com/authorize") && !init?.method
+    );
+    const seedIdx = fetchMock.mock.calls.indexOf(seed!);
+    expect(seedIdx).toBeGreaterThanOrEqual(0);
+    expect(seedIdx).toBeLessThan(authorizeIdx);
+    expect((seed![1]?.headers as Record<string, string>).Cookie).toBe("ssid=abc123ssid");
+    expect((seed![1]?.body as string)).toContain("play-valorant-web-prod");
+    expect(reauthHeaders(fetchMock)["Sec-Fetch-Mode"]).toBe("navigate");
   });
 
   it("passes a full multi-cookie string through to the reauth request", async () => {
@@ -261,6 +288,36 @@ describe("loginWithCookies (browser-cookie mode)", () => {
     const out = await loginWithCookies("ssid=a; asid=b; tdid=c");
     expect(out.accessToken).toBe("AT.test");
     expect(reauthHeaders(fetchMock).Cookie).toBe("ssid=a; asid=b; tdid=c");
+  });
+
+  it("absorbs Set-Cookie from the seed step into the authorize Cookie header", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("auth.riotgames.com/api/v1/authorization") && init?.method === "POST") {
+        const h = new Headers();
+        h.append("set-cookie", "asid=seeded-asid; Path=/");
+        return new Response(JSON.stringify({}), { status: 200, headers: h });
+      }
+      if (url.includes("auth.riotgames.com/authorize")) {
+        return new Response(null, { status: 302, headers: { Location: successLocation } });
+      }
+      if (url.includes("entitlements.auth.riotgames.com")) {
+        return new Response(JSON.stringify({ entitlements_token: "ENT.test" }), { status: 200 });
+      }
+      if (url.includes("riot-geo")) {
+        return new Response(JSON.stringify({ affinities: { live: "na" } }), { status: 200 });
+      }
+      if (url.includes("valorant-api.com/v1/version")) {
+        return new Response(JSON.stringify({ data: { riotClientBuild: "b.1", riotClientVersion: "r" } }), {
+          status: 200,
+        });
+      }
+      throw new Error(`unexpected: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await loginWithCookies("ssid=user-ssid");
+    expect(out.accessToken).toBe("AT.test");
+    expect(reauthHeaders(fetchMock).Cookie).toBe("ssid=user-ssid; asid=seeded-asid");
   });
 
   it("rejects pastes without an ssid cookie before hitting Riot", async () => {
