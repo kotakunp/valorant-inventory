@@ -1,7 +1,7 @@
 // Remote interactive browser for hosted AUTO LOGIN.
 // Streams server-side Chromium frames; forwards mouse/keyboard; polls until done.
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import type { Region, ShowcasePayload } from "./types";
 
 type Phase = "idle" | "starting" | "login" | "harvesting" | "done" | "error" | "expired";
@@ -39,17 +39,22 @@ export function RemoteBrowserPanel({ region, onDone, credentials }: Props) {
   regionRef.current = region;
   const credsRef = useRef(credentials);
   credsRef.current = credentials;
+  const draggingRef = useRef(false);
 
-  const sendInput = useCallback(async (body: unknown) => {
-    try {
-      await fetch("/api/browser/input", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-    } catch {
-      /* session closed */
-    }
+  // Serialize input so mousedown → move* → mouseup never reorder across parallel fetches.
+  const inputQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const sendInput = useCallback((body: unknown) => {
+    inputQueueRef.current = inputQueueRef.current.then(async () => {
+      try {
+        await fetch("/api/browser/input", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } catch {
+        /* session closed */
+      }
+    });
   }, []);
 
   const start = useCallback(async () => {
@@ -152,7 +157,7 @@ export function RemoteBrowserPanel({ region, onDone, credentials }: Props) {
     };
   }, [onDone, pollEpoch]);
 
-  const toPageXY = (e: MouseEvent<HTMLImageElement> | WheelEvent<HTMLImageElement>) => {
+  const toPageXY = (e: { clientX: number; clientY: number }) => {
     const img = imgRef.current;
     if (!img || !status) return null;
     const rect = img.getBoundingClientRect();
@@ -164,34 +169,68 @@ export function RemoteBrowserPanel({ region, onDone, credentials }: Props) {
     };
   };
 
-  const onClick = (e: MouseEvent<HTMLImageElement>) => {
+  const onPointerDown = (e: PointerEvent<HTMLImageElement>) => {
     const p = toPageXY(e);
-    if (p) void sendInput({ type: "click", ...p });
+    if (!p) return;
+    e.preventDefault();
+    // Capture so mouseup outside the frame still ends the drag (puzzle pieces).
+    e.currentTarget.setPointerCapture(e.pointerId);
+    draggingRef.current = true;
+    sendInput({ type: "mousedown", ...p, button: "left" });
   };
 
-  const onMove = (e: MouseEvent<HTMLImageElement>) => {
+  const onPointerMove = (e: PointerEvent<HTMLImageElement>) => {
     const p = toPageXY(e);
-    if (p) void sendInput({ type: "mousemove", ...p });
+    if (p) sendInput({ type: "mousemove", ...p });
+  };
+
+  const onPointerUp = (e: PointerEvent<HTMLImageElement>) => {
+    const p = toPageXY(e);
+    if (!draggingRef.current && !p) return;
+    draggingRef.current = false;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    if (p) sendInput({ type: "mouseup", ...p, button: "left" });
   };
 
   const onWheel = (e: WheelEvent<HTMLImageElement>) => {
     const p = toPageXY(e);
     if (p) {
       e.preventDefault();
-      void sendInput({ type: "wheel", ...p, deltaX: 0, deltaY: e.deltaY });
+      sendInput({ type: "wheel", ...p, deltaX: 0, deltaY: e.deltaY });
     }
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     // Forward keys to the remote page when the panel has focus.
-    if (e.key === "Tab" || e.key === "Enter" || e.key === "Escape" || e.key === "Backspace" || e.key === "Delete") {
+    const special = [
+      "Tab",
+      "Enter",
+      "Escape",
+      "Backspace",
+      "Delete",
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      "Home",
+      "End",
+      "PageUp",
+      "PageDown",
+      " ",
+    ];
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (special.includes(e.key)) {
       e.preventDefault();
-      void sendInput({ type: "press", key: e.key });
+      sendInput({ type: "press", key: e.key === " " ? "Space" : e.key });
       return;
     }
-    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    if (e.key.length === 1) {
       e.preventDefault();
-      void sendInput({ type: "type", text: e.key });
+      sendInput({ type: "type", text: e.key });
     }
   };
 
@@ -257,10 +296,12 @@ export function RemoteBrowserPanel({ region, onDone, credentials }: Props) {
             src={frameSrc}
             alt="Remote Riot login"
             className="remote-frame"
-            style={{ maxWidth: "100%", cursor: "crosshair" }}
+            style={{ maxWidth: "100%", cursor: "crosshair", touchAction: "none" }}
             draggable={false}
-            onClick={onClick}
-            onMouseMove={onMove}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
             onWheel={onWheel}
           />
         ) : (
