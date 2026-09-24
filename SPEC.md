@@ -100,17 +100,18 @@ Every item is a **checkbox** (selection panels; skin tiles also toggle on click 
 │ RANK / STATS │  COLLECTION GRID                    │ PLAYER CARD   │
 │ ◎ PEAK       │  one cell per gun — skins stacked   │ tall art      │
 │   Diamond 2  │  as layered art (hover → front),    │ panel         │
-│ ◎ CURRENT    │  thin outline on transparent PNGs   │               │
+│ ◎ CURRENT    │  thin outline on transparent PNGs   │ PREM:n KNIFE:n│
 │   Immortal 1 │  ── MELEE bottom row (full width) ──│ buddy strip   │
 │ VP 1,234     │                                     │ +N counter    │
 │ RP 400       │                                     │               │
 ├──────────────┴─────────────────────────────────────┴───────────────┤
-│ FOOTER  PREM:n  KNIFE:n  COLLECTION:n,xxx VP   [FM] [PROOF]  DATE  │
+│ FOOTER  COLLECTION:n,xxx VP   [FM] [PROOF]  DATE                   │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
 - **No empty slots:** zero-item zones/rows omitted, grid reflows.
 - **Rank medallions (MVP):** styled circular badge, tier name + tier color (real tier icons = phase 2).
+- **PREM / KNIFE counts:** under the player card (right rail), not in the footer — footer is a single meta line so the grid gets full height.
 - **FM / PROOF:** optional footer segments, each behind an **include-checkbox** (default off) with short text input when enabled (free-form, not API data).
 - **Knives:** always a dedicated full-width bottom strip (stacked skins); never overflow into the gun grid.
 - **Stacking:** same gun's skins are layered in one cell; hover raises that skin's `z-index` + brightens. Thin light outline via multi-`drop-shadow` on the art.

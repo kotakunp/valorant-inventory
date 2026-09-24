@@ -235,6 +235,19 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
               {checkedCards.length > 1 && <div className="sc-more">+{checkedCards.length - 1} MORE</div>}
             </div>
           )}
+          <div className="sc-stats">
+            <div className="sc-stat">
+              <CrownIcon />
+              <span className="sc-stat-label">PREMIUM</span>
+              <span className="sc-stat-val">{premCount}</span>
+            </div>
+            <div className="sc-stat-div" aria-hidden="true" />
+            <div className="sc-stat">
+              <KnifeIcon />
+              <span className="sc-stat-label">KNIFE</span>
+              <span className="sc-stat-val">{knifeCount}</span>
+            </div>
+          </div>
           {checkedBuddies.length > 0 && (
             <div className="sc-buddies">
               <div className="sc-cat-head sc-cat-head--sm">
@@ -253,19 +266,6 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
       </div>
 
       <footer className="sc-footer">
-        <div className="sc-stats">
-          <div className="sc-stat">
-            <CrownIcon />
-            <span className="sc-stat-label">PREMIUM SKINS</span>
-            <span className="sc-stat-val">{premCount}</span>
-          </div>
-          <div className="sc-stat-div" aria-hidden="true" />
-          <div className="sc-stat">
-            <KnifeIcon />
-            <span className="sc-stat-label">KNIFE SKINS</span>
-            <span className="sc-stat-val">{knifeCount}</span>
-          </div>
-        </div>
         <div className="sc-footer-meta">
           <span>COLLECTION: {fmt(value)} VP</span>
           {footer.fm && footer.fmText && <span>FM: {footer.fmText}</span>}
