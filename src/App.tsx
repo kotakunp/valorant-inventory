@@ -91,6 +91,8 @@ export default function App() {
     rqdata: null,
   });
   const [cookieInput, setCookieInput] = useState("");
+  const [skinQuery, setSkinQuery] = useState("");
+  const [previewScale, setPreviewScale] = useState(0.75);
   const [remoteOpen, setRemoteOpen] = useState(false);
   const [remoteCreds, setRemoteCreds] = useState<{ username: string; password: string } | undefined>(() =>
     IS_REMOTE_POPUP ? takeRemoteCreds() : undefined
@@ -98,6 +100,7 @@ export default function App() {
   const remoteWinRef = useRef<Window | null>(null);
   const captchaDivRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const previewAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/rso/config")
@@ -126,6 +129,20 @@ export default function App() {
     return () => window.removeEventListener("message", onMsg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fit preview to available width (export canvas stays fixed 1280×720).
+  useEffect(() => {
+    const el = previewAreaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const fit = () => {
+      const w = el.clientWidth;
+      if (w > 0) setPreviewScale(Math.min(1, Math.max(0.3, (w - 2) / CANVAS_W)));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [data]);
 
   const pages = useMemo(() => {
     if (!data) return null;
@@ -215,10 +232,7 @@ export default function App() {
         setError(json.error ?? `Request failed (${res.status})`);
         return;
       }
-      setData(json);
-      setSelection(buildSelection(json));
-      setChromaSel(defaultChromaMap(json));
-      setPage(0);
+      applyShowcase(json);
     } catch {
       setError("Network error — is the server running on port 3001?");
     } finally {
@@ -302,9 +316,7 @@ export default function App() {
         setError(json.error ?? `Riot sign-in failed (${res.status})`);
         return;
       }
-      setData(json);
-      setSelection(buildSelection(json));
-      setPage(0);
+      applyShowcase(json);
     } catch {
       setError("Network error during Riot sign-in.");
     } finally {
@@ -522,91 +534,141 @@ export default function App() {
     }
   }
 
-  const section = (kind: ItemKind, title: string, items: AnyItem[]) => (
-    <div className="panel" key={kind}>
-      <h3>
-        {title}
-        <span className="count">
-          {items.filter((i) => selection[selKey(kind, i.id)]).length}/{items.length}
-        </span>
-      </h3>
-      <div className="bulk">
-        <button className="btn ghost" onClick={() => setSection(kind, "all")}>All</button>
-        <button className="btn ghost" onClick={() => setSection(kind, "premium")}>Premium</button>
-        <button className="btn ghost" onClick={() => setSection(kind, "none")}>None</button>
+  const section = (kind: ItemKind, title: string, items: AnyItem[]) => {
+    const selectedCount = items.filter((i) => selection[selKey(kind, i.id)]).length;
+    const query = kind === "skin" ? skinQuery.trim().toLowerCase() : "";
+    const visible = query
+      ? items.filter((i) => i.name.toLowerCase().includes(query) || ("weaponName" in i ? i.weaponName.toLowerCase().includes(query) : false))
+      : items;
+
+    return (
+      <div className="panel" key={kind}>
+        <h3>
+          {title}
+          <span className="count">
+            {selectedCount}/{items.length}
+          </span>
+        </h3>
+        <div className="bulk">
+          <button className="btn ghost" onClick={() => setSection(kind, "all")}>All</button>
+          <button className="btn ghost" onClick={() => setSection(kind, "premium")}>Premium</button>
+          <button className="btn ghost" onClick={() => setSection(kind, "none")}>None</button>
+        </div>
+
+        {kind === "skin" && items.length > 12 && (
+          <div className="skin-search">
+            <input
+              type="text"
+              placeholder="Filter skins…"
+              value={skinQuery}
+              onChange={(e) => setSkinQuery(e.target.value)}
+              aria-label="Filter skins"
+            />
+          </div>
+        )}
+
+        {kind === "skin" ? (
+          <div className="skin-grid">
+            {visible.length === 0 && (
+              <div className="skin-empty">
+                {query ? "No skins match your filter." : "No skins in this category."}
+                {!query && " Try NEW ACCOUNT and connect again (or switch region — inventory is shard-specific)."}
+              </div>
+            )}
+            {visible.map((raw) => {
+              const i = raw as import("./types").SkinItem;
+              const on = !!selection[selKey(kind, i.id)];
+              const activeChromaId = chromaSel[i.id];
+              const ch = i.chromas.find((c) => c.id === (activeChromaId ?? i.defaultChromaId)) ?? i.chromas[0];
+              const icon = ch?.icon ?? i.icon;
+              return (
+                <button
+                  key={i.id}
+                  type="button"
+                  className={`skin-cell${on ? " on" : ""}${i.equipped ? " eq" : ""}`}
+                  style={{ "--rarity": rarityColor(i.price) } as CSSProperties}
+                  onClick={() => toggle(kind, i.id)}
+                  title={`${i.name} · ${i.weaponName}${i.price != null ? ` · ${fmt(i.price)} VP` : ""}${i.equipped ? " · equipped" : ""}`}
+                  aria-pressed={on}
+                >
+                  {i.price != null && <span className="vp">{i.price}</span>}
+                  <span className="skin-cell-art">
+                    {icon ? <img src={img(icon)} alt="" /> : null}
+                  </span>
+                  <span className="skin-cell-name">{i.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="chips">
+            {visible.map((i) => {
+              const on = !!selection[selKey(kind, i.id)];
+              const icon = "icon" in i ? i.icon : null;
+              return (
+                <label
+                  key={i.id}
+                  className={"chip" + (on ? " on" : "")}
+                  style={{ "--rarity": rarityColor(i.price) } as CSSProperties}
+                >
+                  <input type="checkbox" checked={on} onChange={() => toggle(kind, i.id)} />
+                  {icon ? (
+                    <img src={img(icon)} width={16} height={16} alt="" />
+                  ) : null}
+                  <span className="chip-name" title={i.name}>{i.name}</span>
+                  {i.price != null && <span className="price">{i.price}</span>}
+                </label>
+              );
+            })}
+            {visible.length === 0 && (
+              <p className="note" style={{ margin: 0 }}>
+                No items in this category.
+              </p>
+            )}
+          </div>
+        )}
+
+        {kind === "skin" &&
+          (() => {
+            const withChromas = (items as import("./types").SkinItem[]).filter(
+              (s) => selection[selKey("skin", s.id)] && s.chromas.length > 1
+            );
+            if (!withChromas.length) return null;
+            return (
+              <div className="chroma-panel">
+                <div className="chroma-panel-label">Chroma — selected skins</div>
+                {withChromas.map((s) => {
+                  const active = chromaSel[s.id] ?? s.defaultChromaId ?? s.chromas[0]?.id;
+                  return (
+                    <div key={s.id} className="chroma-row">
+                      <span className="chroma-skin" title={s.name}>{s.name}</span>
+                      <span className="chroma-dots">
+                        {s.chromas.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className={"chroma-dot" + (active === c.id ? " on" : "")}
+                            title={c.name}
+                            onClick={() => pickChroma(s.id, c.id)}
+                          >
+                            {c.icon ? <img src={img(c.icon)} alt="" /> : c.name.slice(0, 1)}
+                          </button>
+                        ))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        {items.length === 0 && kind !== "skin" && (
+          <p className="note">
+            No items in this category.
+          </p>
+        )}
       </div>
-      <div className="chips">
-        {items.map((i) => {
-          const on = !!selection[selKey(kind, i.id)];
-          const icon = "icon" in i ? i.icon : null;
-          const skinChromas = kind === "skin" && on ? (i as import("./types").SkinItem).chromas ?? [] : [];
-          const activeChromaId = kind === "skin" ? chromaSel[i.id] : undefined;
-          return (
-            <label
-              key={i.id}
-              className={"chip" + (on ? " on" : "")}
-              style={{ "--rarity": rarityColor(i.price) } as CSSProperties}
-            >
-              <input type="checkbox" checked={on} onChange={() => toggle(kind, i.id)} />
-              {(() => {
-                let showIcon = icon;
-                if (kind === "skin" && skinChromas.length) {
-                  const s = i as import("./types").SkinItem;
-                  const ch = s.chromas.find((c) => c.id === (activeChromaId ?? s.defaultChromaId));
-                  if (ch?.icon) showIcon = ch.icon;
-                }
-                return showIcon ? (
-                  <img src={img(showIcon)} width={16} height={16} alt="" style={{ display: "block", borderRadius: 2 }} />
-                ) : null;
-              })()}
-              <span className="chip-name" title={i.name}>{i.name}</span>
-              {i.price != null && <span className="price">{i.price}</span>}
-            </label>
-          );
-        })}
-      </div>
-      {kind === "skin" &&
-        (() => {
-          const withChromas = (items as import("./types").SkinItem[]).filter(
-            (s) => selection[selKey("skin", s.id)] && s.chromas.length > 1
-          );
-          if (!withChromas.length) return null;
-          return (
-            <div className="chroma-panel">
-              <div className="chroma-panel-label">CHROMA — selected skins</div>
-              {withChromas.map((s) => {
-                const active = chromaSel[s.id] ?? s.defaultChromaId ?? s.chromas[0]?.id;
-                return (
-                  <div key={s.id} className="chroma-row">
-                    <span className="chroma-skin" title={s.name}>{s.name}</span>
-                    <span className="chroma-dots">
-                      {s.chromas.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          className={"chroma-dot" + (active === c.id ? " on" : "")}
-                          title={c.name}
-                          onClick={() => pickChroma(s.id, c.id)}
-                        >
-                          {c.icon ? <img src={img(c.icon)} alt="" /> : c.name.slice(0, 1)}
-                        </button>
-                      ))}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-      {items.length === 0 && (
-        <p className="note">
-          No items in this category.{" "}
-          {kind === "skin" &&
-            "If you own skins, try NEW ACCOUNT and connect again (or switch region — inventory is shard-specific)."}
-        </p>
-      )}
-    </div>
-  );
+    );
+  };
 
   if (IS_REMOTE_POPUP) {
     return (
@@ -634,12 +696,17 @@ export default function App() {
 
   if (!data || !pages) {
     return (
-      <div className="app">
-        <div className="app-header">
-          <h1>ACCOUNT SHOWCASE GENERATOR</h1>
-          <span className="sub">VALORANT inventory → 1440p share image · no links, no storage</span>
-        </div>
-        <div className="form-card">
+      <div className="gate">
+        <div className="gate-card">
+          <div className="gate-brand">
+            <span className="gate-logo">
+              ACCOUNT <em>SHOWCASE</em>
+            </span>
+            <span className="gate-tagline">
+              VALORANT inventory → 1440p share image · no links, no storage
+            </span>
+          </div>
+
           {error && <div className="error" style={{ marginTop: 0, marginBottom: 14 }}>{error}</div>}
 
           {/* ---- Cookie paste (primary) ---- */}
@@ -661,18 +728,16 @@ export default function App() {
                   type="text"
                   autoComplete="off"
                   spellCheck={false}
-                  placeholder="paste ssid value, or ssid=…; asid=…"
+                  placeholder="Paste ssid value, or ssid=…; asid=…; tdid=…"
                   value={cookieInput}
                   onChange={(e) => setCookieInput(e.target.value)}
                 />
                 <p className="cookie-hint">
-                  Recommended: F12 → Network → open <code>auth.riotgames.com</code> → click any
-                  request → Headers → copy the full <strong>cookie</strong> value
-                  (<code>ssid=…; asid=…; tdid=…</code>). ssid alone is often not enough.
+                  Full Cookie header recommended — ssid alone is often not enough.
                 </p>
               </div>
             </div>
-            <details className="cookie-howto" open>
+            <details className="cookie-howto">
               <summary>How to get it — 30 seconds, official login, no password here</summary>
               <ol>
                 <li>
@@ -894,7 +959,7 @@ export default function App() {
             )}
           </details>
 
-          <p className="note">
+          <p className="gate-foot">
             Cookie and tokens are used in request memory only — never stored or logged — and the
             generated image contains no link. Unofficial tool using Riot&apos;s login and client endpoints;
             no affiliation with Riot Games. Don&apos;t share session tokens with anyone.
@@ -904,63 +969,74 @@ export default function App() {
     );
   }
 
-  const scale = 0.75;
   const shownCount = pages.totalSelected - pages.truncated;
+
+  const resetAccount = () => {
+    setData(null);
+    setSelection({});
+    setChromaSel({});
+    setError(null);
+    setLoading(null);
+    setPage(0);
+    setSkinQuery("");
+    setForm({ region: form.region, accessToken: "", entitlementsToken: "", puuid: "" });
+    setCreds({ email: "", password: "", otp: "" });
+    setAuth({ mode: "idle", sessionId: "", email: "" });
+    setCookieInput("");
+    setCaptchaNeeded(false);
+    setCaptchaStatus("loading");
+    setCaptchaSolver(false);
+    setRemoteOpen(false);
+    setRemoteCreds(undefined);
+    if (captchaDivRef.current) captchaDivRef.current.innerHTML = "";
+    widgetIdRef.current = null;
+  };
 
   return (
     <div className="app">
-      <div className="app-header">
-        <h1>ACCOUNT SHOWCASE GENERATOR</h1>
-        <span className="sub">
-          {data.gameName}
-          {data.tagLine ? `#${data.tagLine}` : ""} · {data.region.toUpperCase()}
-          {data.accountLevel != null ? ` · LV. ${data.accountLevel}` : ""}
+      <header className="topbar">
+        <span className="topbar-brand">
+          SHOW<span>CASE</span>
         </span>
-        <button
-          className="btn ghost"
-          style={{ marginLeft: "auto" }}
-          onClick={() => {
-            setData(null);
-            setSelection({});
-            setChromaSel({});
-            setError(null);
-            setLoading(null);
-            setForm({ region: form.region, accessToken: "", entitlementsToken: "", puuid: "" });
-            setCreds({ email: "", password: "", otp: "" });
-            setAuth({ mode: "idle", sessionId: "", email: "" });
-            setCookieInput("");
-            setCaptchaNeeded(false);
-            setCaptchaStatus("loading");
-            setCaptchaSolver(false);
-            setRemoteOpen(false);
-            setRemoteCreds(undefined);
-            if (captchaDivRef.current) captchaDivRef.current.innerHTML = "";
-            widgetIdRef.current = null;
-          }}
-        >
-          NEW ACCOUNT
-        </button>
-      </div>
+        <div className="topbar-id">
+          <span className="topbar-name">
+            {data.gameName}
+            {data.tagLine && <span className="topbar-tag">#{data.tagLine}</span>}
+          </span>
+          <div className="topbar-meta">
+            {data.accountLevel != null && <span className="pill">LV. {data.accountLevel}</span>}
+            <span className="pill region">{data.region.toUpperCase()}</span>
+            <span>
+              {shownCount}/{pages.totalSelected} skins · {pages.density.name}
+            </span>
+          </div>
+        </div>
+        <div className="topbar-actions">
+          <button className="btn ghost" onClick={resetAccount}>New account</button>
+        </div>
+      </header>
       {error && <div className="error">{error}</div>}
       <div className="workspace">
         <div className="controls">
           <div className="panel">
-            <h3>SELECTION</h3>
+            <h3>Selection</h3>
             <div className="bulk">
               <button className="btn ghost" onClick={() => allSections("premium")}>Select all premium</button>
               <button className="btn ghost" onClick={() => allSections("all")}>Select all</button>
               <button className="btn ghost" onClick={() => allSections("none")}>Clear all</button>
             </div>
             {!data.pricesAvailable && (
-              <p className="note">Price feed unavailable — defaults fall back to the level heuristic.</p>
+              <p className="note" style={{ marginTop: 0 }}>
+                Price feed unavailable — defaults fall back to the level heuristic.
+              </p>
             )}
           </div>
-          {section("skin", "SKINS", data.skins)}
-          {section("card", "CARDS", data.cards)}
-          {section("title", "TITLES", data.titles)}
-          {section("buddy", "BUDDIES", data.buddies)}
+          {section("skin", "Skins", data.skins)}
+          {section("card", "Cards", data.cards)}
+          {section("title", "Titles", data.titles)}
+          {section("buddy", "Buddies", data.buddies)}
           <div className="panel">
-            <h3>FOOTER FIELDS</h3>
+            <h3>Footer fields</h3>
             <div className="footer-opts">
               <label className="opt">
                 <input type="checkbox" checked={fm.on} onChange={(e) => setFm({ ...fm, on: e.target.checked })} />
@@ -980,7 +1056,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="preview-area">
+        <div className="preview-area" ref={previewAreaRef}>
           <div className="preview-bar">
             <button className="btn" onClick={exportImages} disabled={exporting}>
               {exporting
@@ -1002,11 +1078,14 @@ export default function App() {
               </div>
             )}
             <span className="export-note">
-              {shownCount}/{pages.totalSelected} skins · {pages.density.name} grid · click a tile to toggle
+              Click a tile to toggle · hover for chromas
             </span>
           </div>
-          <div className="preview-frame" style={{ width: CANVAS_W * scale, height: CANVAS_H * scale }}>
-            <div className="preview-scale" style={{ transform: `scale(${scale})` }}>
+          <div
+            className="preview-frame"
+            style={{ width: Math.round(CANVAS_W * previewScale), height: Math.round(CANVAS_H * previewScale) }}
+          >
+            <div className="preview-scale" style={{ transform: `scale(${previewScale})` }}>
               <Showcase
                 payload={data}
                 pages={pages}
@@ -1025,7 +1104,14 @@ export default function App() {
       <div className="hidden-export" aria-hidden="true">
         {pages.gridPages.map((_, i) => (
           <div key={i} data-export-page>
-            <Showcase payload={data} pages={pages} page={i} selection={selection} footer={footerOpts} />
+            <Showcase
+              payload={data}
+              pages={pages}
+              page={i}
+              selection={selection}
+              chromaSel={chromaSel}
+              footer={footerOpts}
+            />
           </div>
         ))}
       </div>

@@ -91,7 +91,7 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
                 title={c.name}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onPickChroma(s.id, c.id);
+                  onPickChroma!(s.id, c.id);
                 }}
               >
                 {c.icon ? <img src={imgUrl(c.icon)!} alt="" /> : <span>{c.name.slice(0, 1)}</span>}
