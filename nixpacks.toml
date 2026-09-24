@@ -8,5 +8,5 @@ cmds = ["npm ci"]
 cmds = ["npm run build"]
 
 [start]
-# Headed chromium under Xvfb — headless trips Riot/Akamai and can freeze screenshots.
-cmd = "xvfb-run -a npm start"
+# Best-effort Xvfb for headed Chromium; never block the app if Xvfb is broken/missing.
+cmd = "sh -c 'command -v Xvfb >/dev/null 2>&1 && { Xvfb :99 -screen 0 1280x800x24 >/tmp/xvfb.log 2>&1 & export DISPLAY=:99; }; exec npm start'"
