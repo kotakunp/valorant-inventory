@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, isPremiumSkin, paginate, rarityColor, tierInfo, WEAPON_ORDER } from "./logic";
+import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, paginate, rarityColor, tierInfo, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
 import type { CardItem, ShowcasePayload, SkinItem } from "./types";
+import { selKey } from "./types";
 
 const skin = (over: Partial<SkinItem> = {}): SkinItem => ({
   id: over.id ?? "s1", name: "X", weaponName: "Vandal", icon: null, price: null,
@@ -38,8 +39,48 @@ describe("defaultChecked", () => {
   });
 });
 
+describe("loadout categories", () => {
+  it("official loadout order = sidearms → … → heavies (no melee)", () => {
+    expect(LOADOUT_GUNS).toEqual([
+      "Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff",
+      "Stinger", "Spectre",
+      "Bucky", "Judge",
+      "Bulldog", "Guardian", "Phantom", "Vandal",
+      "Marshal", "Outlaw", "Operator",
+      "Ares", "Odin",
+    ]);
+    expect(LOADOUT_GUNS).toHaveLength(WEAPON_ORDER.length);
+    const flat = WEAPON_CATEGORIES.flatMap((c) => c.guns);
+    expect([...flat]).toEqual([...LOADOUT_GUNS]);
+  });
+});
+
+describe("buildLoadoutSlots", () => {
+  const s = (id: string, weaponName: string, isKnife = false) =>
+    skin({ id, weaponName, isKnife });
+
+  it("always includes every official gun (empty items when unselected)", () => {
+    const slots = buildLoadoutSlots([s("1", "Vandal")]);
+    expect(slots).toHaveLength(LOADOUT_GUNS.length);
+    expect(slots.map((g) => g.label)).toEqual(LOADOUT_GUNS.map((g) => g.toUpperCase()));
+    const vandal = slots.find((g) => g.id === "VANDAL")!;
+    expect(vandal.items).toHaveLength(1);
+    const classic = slots.find((g) => g.id === "CLASSIC")!;
+    expect(classic.items).toHaveLength(0);
+  });
+
+  it("unknown guns append after official slots", () => {
+    const slots = buildLoadoutSlots([s("1", "Mystery Gun")]);
+    expect(slots).toHaveLength(LOADOUT_GUNS.length + 1);
+    expect(slots.at(-1)!.label).toBe("MYSTERY GUN");
+  });
+});
+
 describe("paginate", () => {
-  /** k distinct gun cells (official names for the first 19, unique unknowns after). */
+  const selectAll = (skins: SkinItem[]) =>
+    Object.fromEntries(skins.map((s) => [selKey("skin", s.id), true]));
+
+  /** k distinct official guns (first WEAPON_ORDER names), all selected. */
   const uniqueGuns = (k: number, knife = false): SkinItem[] =>
     Array.from({ length: k }, (_, i) =>
       skin({
@@ -51,66 +92,79 @@ describe("paginate", () => {
   const stackOf = (gun: string, n: number) =>
     Array.from({ length: n }, (_, i) => skin({ id: `${gun}-${i}`, weaponName: gun }));
 
-  it("single page for <= 16 gun cells (comfort, 4×4)", () => {
-    const p = paginate(uniqueGuns(16));
-    expect(p.density.name).toBe("comfort");
+  it("always paginates loadout slots (19 guns), not selected-skin count", () => {
+    const skins = uniqueGuns(3);
+    const p = paginate(skins, selectAll(skins));
+    expect(p.gridPages[0]).toHaveLength(LOADOUT_GUNS.length);
+    expect(p.density.name).toBe("standard"); // 19 ≤ 20
+    expect(p.gridPages).toHaveLength(1);
+    const empty = p.gridPages[0].filter((g) => g.items.length === 0);
+    expect(empty).toHaveLength(LOADOUT_GUNS.length - 3);
+  });
+
+  it("empty selection still shows all empty gun slots", () => {
+    const p = paginate([], {});
+    expect(p.totalSelected).toBe(0);
+    expect(p.gridPages).toHaveLength(1);
+    expect(p.gridPages[0]).toHaveLength(LOADOUT_GUNS.length);
+    expect(p.gridPages[0].every((g) => g.items.length === 0)).toBe(true);
+    expect(p.knifeItems).toHaveLength(0);
+  });
+
+  it("stacks many skins of one gun into a single slot", () => {
+    const skins = stackOf("Vandal", 40);
+    const p = paginate(skins, selectAll(skins));
+    expect(p.gridPages).toHaveLength(1);
+    expect(p.gridPages[0]).toHaveLength(LOADOUT_GUNS.length);
+    const vandal = p.gridPages[0].find((g) => g.id === "VANDAL")!;
+    expect(vandal.items).toHaveLength(40);
+  });
+
+  it("unknown guns prefer fewest pages (21–32 slots → dense 1 page)", () => {
+    const unknowns = Array.from({ length: 5 }, (_, i) => skin({ id: `u${i}`, weaponName: `Reserve Gun ${i}` }));
+    const p = paginate(unknowns, selectAll(unknowns));
+    expect(p.gridPages[0]).toHaveLength(LOADOUT_GUNS.length + 5);
+    expect(p.density.name).toBe("dense"); // 24 ≤ 32 → 1 page
     expect(p.gridPages.length).toBe(1);
+    expect(p.truncated).toBe(0);
   });
-  it("two pages at 17 guns", () => {
-    const p = paginate(uniqueGuns(17));
-    expect(p.density.name).toBe("comfort");
-    expect(p.gridPages.length).toBe(2);
-  });
-  it("three pages still comfort at 48 guns", () => {
-    const p = paginate(uniqueGuns(48));
-    expect(p.density.name).toBe("comfort");
-    expect(p.gridPages.length).toBe(3);
-  });
-  it("bumps density to stay within 3 pages", () => {
-    const p = paginate(uniqueGuns(49));
-    expect(p.density.name).toBe("standard");
-    expect(p.gridPages.length).toBe(3);
-  });
-  it("truncates gun cells beyond 3 dense pages with note", () => {
-    const p = paginate(uniqueGuns(100));
+
+  it("truncates slots beyond 3 dense pages with note", () => {
+    const guns = uniqueGuns(100); // 19 official + 81 unknown = 100 slots
+    const p = paginate(guns, selectAll(guns));
     expect(p.density.name).toBe("dense");
     expect(p.gridPages.length).toBe(3);
-    expect(p.truncated).toBe(4);
+    expect(p.truncated).toBe(4); // 100 - 96
   });
-  it("stacks many skins of one gun into a single cell (no extra pages)", () => {
-    const p = paginate(stackOf("Vandal", 40));
-    expect(p.gridPages.length).toBe(1);
-    expect(p.gridPages[0]).toHaveLength(40);
-  });
-  it("knives go to the bottom-row knifeItems, not the gun grid", () => {
-    const p = paginate(uniqueGuns(5, true));
-    expect(p.gridPages.flat()).toHaveLength(0);
+
+  it("knives go to knifeItems; gun grid still has all empty/selected slots", () => {
+    const knives = uniqueGuns(5, true);
+    const p = paginate(knives, selectAll(knives));
+    expect(p.gridPages[0]).toHaveLength(LOADOUT_GUNS.length);
+    expect(p.gridPages[0].every((g) => g.items.length === 0)).toBe(true);
     expect(p.knifeItems).toHaveLength(5);
     expect(p.totalSelected).toBe(5);
   });
-  it("knives-only still yields one empty grid page + knife row items", () => {
-    const p = paginate([
-      skin({ id: "k1", isKnife: true, weaponName: "Knife" }),
-      skin({ id: "k2", isKnife: true, weaponName: "Knife" }),
-      skin({ id: "k3", isKnife: true, weaponName: "Knife" }),
-    ]);
-    expect(p.gridPages.length).toBe(1);
-    expect(p.gridPages[0]).toHaveLength(0);
-    expect(p.knifeItems).toHaveLength(3);
-  });
-  it("empty selection yields one empty page", () => {
-    const p = paginate([]);
-    expect(p.gridPages).toHaveLength(1);
-    expect(p.knifeItems).toHaveLength(0);
-  });
+
   it("mixed guns + knives split correctly", () => {
-    const p = paginate([
-      ...uniqueGuns(3),
-      skin({ id: "knife1", isKnife: true, weaponName: "Knife" }),
-    ]);
-    expect(p.gridPages[0]).toHaveLength(3);
+    const guns = uniqueGuns(3);
+    const knife = skin({ id: "knife1", isKnife: true, weaponName: "Knife" });
+    const all = [...guns, knife];
+    const p = paginate(all, selectAll(all));
+    expect(p.gridPages[0]).toHaveLength(LOADOUT_GUNS.length);
     expect(p.knifeItems).toHaveLength(1);
     expect(p.totalSelected).toBe(4);
+    expect(p.gridPages[0].filter((g) => g.items.length > 0)).toHaveLength(3);
+  });
+
+  it("unselected skins do not appear in slots", () => {
+    const guns = uniqueGuns(2);
+    const selection = { [selKey("skin", guns[0].id)]: true, [selKey("skin", guns[1].id)]: false };
+    const p = paginate(guns, selection);
+    expect(p.totalSelected).toBe(1);
+    const withItems = p.gridPages[0].filter((g) => g.items.length > 0);
+    expect(withItems).toHaveLength(1);
+    expect(withItems[0].items[0].id).toBe(guns[0].id);
   });
 });
 

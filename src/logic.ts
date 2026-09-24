@@ -42,6 +42,19 @@ export const WEAPON_ORDER = [
   "Odin",
 ] as const;
 
+/** Loadout categories as shown in VALORANT collection/arsenal (sidearms → … → heavies). */
+export const WEAPON_CATEGORIES = [
+  { id: "sidearms", label: "SIDEARMS", guns: ["Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff"] },
+  { id: "smgs", label: "SMGS", guns: ["Stinger", "Spectre"] },
+  { id: "shotguns", label: "SHOTGUNS", guns: ["Bucky", "Judge"] },
+  { id: "rifles", label: "RIFLES", guns: ["Bulldog", "Guardian", "Phantom", "Vandal"] },
+  { id: "snipers", label: "SNIPERS", guns: ["Marshal", "Outlaw", "Operator"] },
+  { id: "heavies", label: "HEAVIES", guns: ["Ares", "Odin"] },
+] as const;
+
+/** Flat gun list in official loadout category order (excludes melee). */
+export const LOADOUT_GUNS: readonly string[] = WEAPON_CATEGORIES.flatMap((c) => c.guns);
+
 const ORDER_KEYS = [...WEAPON_ORDER.map((w) => w.toUpperCase()), "MELEE"];
 
 /** Uppercase gun label for a skin (MELEE for knives; falls back to weaponName). */
@@ -83,6 +96,23 @@ export function groupByGun(items: SkinItem[]): GunGroup[] {
   }));
   const unknown = unknownSeen.map((k) => ({ id: k, label: k, items: buckets.get(k)! }));
   return [...known, ...unknown];
+}
+
+/**
+ * Always one slot per official loadout gun (empty `items` = empty rectangle),
+ * then any unknown guns that have selected skins.
+ */
+export function buildLoadoutSlots(gunsOnly: SkinItem[]): GunGroup[] {
+  const byId = new Map(groupByGun(gunsOnly).map((g) => [g.id, g]));
+  const official = new Set(LOADOUT_GUNS.map((w) => w.toUpperCase()));
+  const out: GunGroup[] = LOADOUT_GUNS.map((w) => {
+    const id = w.toUpperCase();
+    return byId.get(id) ?? { id, label: id, items: [] };
+  });
+  for (const g of groupByGun(gunsOnly)) {
+    if (!official.has(g.id)) out.push(g);
+  }
+  return out;
 }
 
 export type AnyItem = SkinItem | CardItem | TitleItem | BuddyItem;
@@ -168,34 +198,48 @@ export type Density = (typeof DENSITIES)[number];
 
 export interface Pages {
   density: Density;
-  /** Non-knife skins, chunked by gun *cells* (one cell per gun group). */
-  gridPages: SkinItem[][];
+  /** Loadout gun slots (empty items allowed), chunked by density capacity. */
+  gridPages: GunGroup[][];
   /** All selected knives — always rendered on the full-width bottom row. */
   knifeItems: SkinItem[];
   totalSelected: number;
   truncated: number;
 }
 
-export function paginate(selected: SkinItem[]): Pages {
+/** Prefer fewest pages (1 → 2 → 3); fall back to dense (then truncate). */
+function pickDensity(n: number): Density {
+  return (
+    DENSITIES.find((d) => Math.ceil(n / d.capacity) <= 1) ??
+    DENSITIES.find((d) => Math.ceil(n / d.capacity) <= 2) ??
+    DENSITIES.find((d) => Math.ceil(n / d.capacity) <= 3) ??
+    DENSITIES[2]
+  );
+}
+
+/**
+ * Build showcase pages from the full inventory + selection.
+ * Always includes every official loadout gun as a slot (empty = blank cell).
+ */
+export function paginate(allSkins: SkinItem[], selection: Selection): Pages {
+  const selected = allSkins.filter((s) => selection[selKey("skin", s.id)]);
   const total = selected.length;
   const knifeItems = selected.filter((s) => s.isKnife);
   const gunsOnly = selected.filter((s) => !s.isKnife);
-  // One stack cell per gun — capacity is cells, not individual skins.
-  const groups = groupByGun(gunsOnly);
-  const density = DENSITIES.find((d) => Math.ceil(groups.length / d.capacity) <= 3) ?? DENSITIES[2];
+  const slots = buildLoadoutSlots(gunsOnly);
+  const density = pickDensity(slots.length);
   const cap = density.capacity;
   const maxCells = cap * 3;
 
   let truncated = 0;
-  let kept = groups;
-  if (groups.length > maxCells) {
-    truncated = groups.slice(maxCells).reduce((n, g) => n + g.items.length, 0);
-    kept = groups.slice(0, maxCells);
+  let kept = slots;
+  if (slots.length > maxCells) {
+    truncated = slots.slice(maxCells).reduce((n, g) => n + g.items.length, 0);
+    kept = slots.slice(0, maxCells);
   }
 
-  const gridPages: SkinItem[][] = [];
+  const gridPages: GunGroup[][] = [];
   for (let i = 0; i < kept.length; i += cap) {
-    gridPages.push(kept.slice(i, i + cap).flatMap((g) => g.items));
+    gridPages.push(kept.slice(i, i + cap));
   }
   if (gridPages.length === 0) gridPages.push([]);
   return { density, gridPages, knifeItems, totalSelected: total, truncated };

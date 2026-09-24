@@ -57,7 +57,7 @@ Verified against the unofficial API docs (techchrism) on 2026-09-23:
 
 ## 6. Selection rules (checkboxes)
 
-Every item is a **checkbox** (selection panels; skin tiles also toggle on click in preview).
+Every item is a **checkbox** (sidebar selection panels). Preview skins **do not toggle on click** — click opens a context menu (chromas, show in front, remove).
 
 | Item | Default checked when |
 |---|---|
@@ -76,7 +76,7 @@ Every item is a **checkbox** (selection panels; skin tiles also toggle on click 
 ## 7. Image output spec
 
 - **Base canvas: 1280 × 720** CSS px, exported with `pixelRatio: 2` → **2560 × 1440 PNG (1440p, 16:9)**.
-- **Pagination:** one **stack cell per gun** (all skins of a gun layered in one slot); knives always on the full-width bottom row (not paginated). Density picks the *smallest* layout keeping pages ≤ 3. Each skin sits in a **square image frame** (uniform size via `aspect-ratio: 1` + container queries; art `object-fit: contain`):
+- **Pagination:** loadout **slots** = every official gun (19, VALORANT category order: sidearms → SMGs → shotguns → rifles → snipers → heavies) + any unknown guns with selected skins; knives always on the full-width bottom row (not paginated). Removing the last skin of a gun keeps an **empty slot** (dashed rectangle + gun name). Density picks fewest pages (1 → 2 → 3), then dense:
 
   | Density | Grid (center zone) | Capacity/page (gun cells) |
   |---|---|---|
@@ -84,8 +84,8 @@ Every item is a **checkbox** (selection panels; skin tiles also toggle on click 
   | Standard | 5 cols × 4 rows | 20 |
   | Dense | 8 cols × 4 rows | 32 |
 
-  - ≤ 16 distinct guns → exactly 1 image. More guns → first density that fits in ≤ 3 pages.
-  - \> 96 gun cells → Dense 3 pages, footer note `showing … / N`.
+  - 19 official slots → Standard (1 page). Unknown guns can push to Comfort multi-page or Dense.
+  - \> 96 slots → Dense 3 pages, note `showing … / N`.
 - One layout template for all pages; only the gun-cell chunk differs (header/ranks/card rail/footer/knife row repeat). Filenames `showcase-<riotid>-p1.png`…
 - Export after `document.fonts.ready` + all `<img>` decoded; images served same-origin via `/img` proxy (no canvas tainting). No inventory data in any URL.
 
@@ -98,20 +98,19 @@ Every item is a **checkbox** (selection panels; skin tiles also toggle on click 
 │ HEADER   [RIOT ID #TAG]   LV.207   ·   NA   ·  <equipped title>    │
 ├─────────────────────────────────────────────┬───────────────────────┤
 │ COLLECTION GRID                            │ PLAYER CARD           │
-│ one cell per gun — skins stacked           │ tall art panel        │
-│ as layered art (hover → front),            │ PEAK / CURRENT RANK   │
-│ thin outline on transparent PNGs           │ VP / RP               │
-│ ── MELEE bottom row (full width) ──        │ PREM:n  KNIFE:n       │
+│ one cell per official gun (loadout order)  │ tall art panel        │
+│ — stacked skins, empty = blank slot        │ PEAK / CURRENT RANK   │
+│ click skin → menu (chroma/front/remove)    │ VP / RP               │
+│ ── MELEE bottom row (always) ──            │ PREM:n  KNIFE:n       │
 │                                            │ buddies +N            │
 ├────────────────────────────────────────────┴───────────────────────┤
-│ FOOTER  COLLECTION:n,xxx VP   [FM] [PROOF]  DATE                   │
+│ (no footer)                                                        │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-- **No empty slots:** zero-item zones/rows omitted, grid reflows.
+- **Empty slots always rendered** for official guns (and empty MELEE strip) — matches VALORANT loadout.
 - **Rank medallions (MVP):** styled circular badge, tier name + tier color (real tier icons = phase 2).
-- **Right rail only:** card + ranks + wallet + PREM/KNIFE + buddies under the player card; skins grid takes full remaining width (no left rail).
-- **FM / PROOF:** optional footer segments, each behind an **include-checkbox** (default off) with short text input when enabled (free-form, not API data).
+- **Right rail only:** card + ranks + wallet + PREM/KNIFE + buddies under the player card; skins grid takes full remaining width (no left rail). No footer bar.
 - **Knives:** always a dedicated full-width bottom strip (stacked skins); never overflow into the gun grid.
 - **Stacking:** same gun's skins are layered in one cell; hover raises that skin's `z-index` + brightens. Thin light outline via multi-`drop-shadow` on the art.
 - Page indicator `1/2` bottom-right when multi-page.

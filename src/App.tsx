@@ -65,6 +65,7 @@ export default function App() {
   const [data, setData] = useState<ShowcasePayload | null>(null);
   const [selection, setSelection] = useState<Selection>({});
   const [chromaSel, setChromaSel] = useState<ChromaSelection>({});
+  const [bringToFront, setBringToFront] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<LoadKind | null>(null);
   const [fm, setFm] = useState({ on: false, text: "" });
@@ -146,7 +147,7 @@ export default function App() {
 
   const pages = useMemo(() => {
     if (!data) return null;
-    return paginate(data.skins.filter((s) => selection[selKey("skin", s.id)]));
+    return paginate(data.skins, selection);
   }, [data, selection]);
 
   const img = (u: string | null) => (u ? `/img/${encodeURIComponent(u)}` : undefined);
@@ -241,6 +242,12 @@ export default function App() {
 
   const toggle = (kind: ItemKind, id: string) =>
     setSelection((s) => ({ ...s, [selKey(kind, id)]: !s[selKey(kind, id)] }));
+
+  const removeSkin = (id: string) =>
+    setSelection((s) => ({ ...s, [selKey("skin", id)]: false }));
+
+  const bringSkinToFront = (gunId: string, skinId: string) =>
+    setBringToFront((m) => ({ ...m, [gunId]: skinId }));
 
   const pickChroma = (skinId: string, chromaId: string) =>
     setChromaSel((s) => ({ ...s, [skinId]: chromaId }));
@@ -998,6 +1005,7 @@ export default function App() {
     setData(null);
     setSelection({});
     setChromaSel({});
+    setBringToFront({});
     setError(null);
     setLoading(null);
     setPage(0);
@@ -1101,7 +1109,7 @@ export default function App() {
               </div>
             )}
             <span className="export-note">
-              Click a tile to toggle · hover for chromas
+              Click a skin · menu to remove / front
             </span>
           </div>
           <div
@@ -1115,7 +1123,9 @@ export default function App() {
                 page={page}
                 selection={selection}
                 chromaSel={chromaSel}
-                onToggleSkin={(id) => toggle("skin", id)}
+                bringToFront={bringToFront}
+                onRemoveSkin={removeSkin}
+                onBringToFront={bringSkinToFront}
                 onPickChroma={pickChroma}
               />
             </div>
@@ -1132,6 +1142,7 @@ export default function App() {
               page={i}
               selection={selection}
               chromaSel={chromaSel}
+              bringToFront={bringToFront}
             />
           </div>
         ))}
