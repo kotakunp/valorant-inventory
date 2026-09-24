@@ -1,7 +1,7 @@
 import type { ChromaSelection, RankBadge, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
 import { selKey } from "./types";
 import type { Pages } from "./logic";
-import { rarityColor, tierInfo, collectionValue, groupByGun, isPremiumSkin } from "./logic";
+import { rarityColor, tierInfo, groupByGun, isPremiumSkin } from "./logic";
 
 export const CANVAS_W = 1280;
 export const CANVAS_H = 720;
@@ -15,7 +15,6 @@ interface Props {
   page: number;
   selection: Selection;
   chromaSel?: ChromaSelection;
-  footer: { fm: boolean; fmText: string; proof: boolean; proofText: string };
   onToggleSkin?: (id: string) => void;
   onPickChroma?: (skinId: string, chromaId: string) => void;
 }
@@ -77,7 +76,7 @@ function Medallion({ label, tier, badge }: { label: string; tier: number | null;
   );
 }
 
-export function Showcase({ payload, pages, page, selection, chromaSel = {}, footer, onToggleSkin, onPickChroma }: Props) {
+export function Showcase({ payload, pages, page, selection, chromaSel = {}, onToggleSkin, onPickChroma }: Props) {
   const isOn = (kind: ItemKind, id: string) => !!selection[selKey(kind, id)];
   const checkedSkins = payload.skins.filter((s) => isOn("skin", s.id));
   // Shared premium rule (price / content tier / level fallback) — matches selection.
@@ -88,11 +87,9 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
   const checkedBuddies = payload.buddies.filter((b) => isOn("buddy", b.id));
   const card = checkedCards.find((c) => c.equipped) ?? checkedCards[0];
   const title = checkedTitles.find((t) => t.equipped) ?? checkedTitles[0];
-  const value = collectionValue(payload, selection);
   const pageCount = pages.gridPages.length;
   const gridItems = pages.gridPages[page] ?? [];
   const knifeItems = pages.knifeItems ?? [];
-  const date = payload.generatedAt.slice(0, 10);
   const guns = groupByGun(gridItems);
   const knives = groupByGun(knifeItems);
 
@@ -235,8 +232,10 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
             </div>
           )}
           <div className="sc-rail-info">
-            <Medallion label="PEAK RANK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
-            <Medallion label="CURRENT RANK" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
+            <div className="sc-ranks">
+              <Medallion label="PEAK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
+              <Medallion label="CURRENT" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
+            </div>
             {(payload.wallet.vp != null || payload.wallet.rp != null) && (
               <div className="sc-wallet">
                 {payload.wallet.vp != null && <span className="sc-chip">◆ {fmt(payload.wallet.vp)} VP</span>}
@@ -273,18 +272,6 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
           )}
         </aside>
       </div>
-
-      <footer className="sc-footer">
-        <div className="sc-footer-meta">
-          <span>COLLECTION: {fmt(value)} VP</span>
-          {footer.fm && footer.fmText && <span>FM: {footer.fmText}</span>}
-          {footer.proof && footer.proofText && <span>PROOF: {footer.proofText}</span>}
-          <span>
-            {date}
-            {pageCount > 1 && ` · ${page + 1}/${pageCount}`}
-          </span>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -149,7 +149,6 @@ export default function App() {
     return paginate(data.skins.filter((s) => selection[selKey("skin", s.id)]));
   }, [data, selection]);
 
-  const footerOpts = { fm: fm.on, fmText: fm.text, proof: proof.on, proofText: proof.text };
   const img = (u: string | null) => (u ? `/img/${encodeURIComponent(u)}` : undefined);
 
   function defaultChromaMap(payload: ShowcasePayload): ChromaSelection {
@@ -1116,7 +1115,6 @@ export default function App() {
                 page={page}
                 selection={selection}
                 chromaSel={chromaSel}
-                footer={footerOpts}
                 onToggleSkin={(id) => toggle("skin", id)}
                 onPickChroma={pickChroma}
               />
@@ -1134,7 +1132,6 @@ export default function App() {
               page={i}
               selection={selection}
               chromaSel={chromaSel}
-              footer={footerOpts}
             />
           </div>
         ))}

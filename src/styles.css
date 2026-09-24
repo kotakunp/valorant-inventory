@@ -727,31 +727,31 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 18px 32px 8px 28px;
+  gap: 10px;
+  padding: 8px 28px 4px;
 }
 .sc-logo {
-  width: 40px;
-  height: 36px;
+  width: 26px;
+  height: 24px;
   flex-shrink: 0;
   background: var(--accent);
   clip-path: polygon(0 0, 32% 0, 50% 58%, 68% 0, 100% 0, 50% 100%);
 }
 .sc-header-div {
   width: 2px;
-  height: 28px;
+  height: 18px;
   background: rgba(255, 255, 255, 0.2);
 }
 .sc-title {
   font-family: var(--font-display);
-  font-size: 42px;
+  font-size: 28px;
   line-height: 1;
   letter-spacing: 0.08em;
   color: #fff;
 }
 .sc-header-rule {
   flex: 1;
-  height: 3px;
+  height: 2px;
   min-width: 40px;
   background: linear-gradient(90deg, var(--accent), rgba(255, 70, 85, 0.05));
   clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
@@ -759,9 +759,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-badge {
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.04);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 3px 10px;
+  padding: 2px 8px;
   border-radius: 2px;
   letter-spacing: 0.1em;
   color: #cfd6dc;
@@ -776,13 +776,23 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   flex: 1;
   display: flex;
   gap: 14px;
-  padding: 8px 28px 4px;
+  padding: 6px 28px 8px;
   min-height: 0;
+}
+/* PEAK + CURRENT side by side in the 184px rail */
+.sc-ranks {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.sc-ranks .sc-rank-panel {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 4px 8px;
 }
 .sc-rank-panel {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 8px 6px 10px;
   clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
   flex-shrink: 0;
 }
@@ -790,13 +800,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  font-size: 9px;
+  gap: 4px;
+  font-size: 8px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   color: var(--accent);
   text-align: center;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .sc-rank-caret {
   width: 0;
@@ -806,8 +818,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   border-top: 5px solid var(--accent);
 }
 .sc-medal-badge {
-  width: 72px;
-  height: 72px;
+  width: 52px;
+  height: 52px;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -823,20 +835,23 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-medal-fallback {
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 11px;
   text-align: center;
   line-height: 1.15;
   letter-spacing: 0.04em;
-  padding: 0 6px;
+  padding: 0 4px;
 }
 .sc-medal-name {
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 11px;
   text-align: center;
   line-height: 1.1;
-  letter-spacing: 0.06em;
-  margin-top: 4px;
+  letter-spacing: 0.04em;
+  margin-top: 3px;
   color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sc-wallet { display: flex; flex-direction: column; gap: 5px; margin-top: 0; flex-shrink: 0; }
 .sc-chip {
@@ -1274,19 +1289,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-buddies { flex-shrink: 0; }
 .sc-buddy-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .sc-buddy-row img { width: 30px; height: 30px; object-fit: contain; }
-
-/* footer: single meta line — stats live under the player card */
-.sc-footer {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  padding: 6px 28px 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.35));
-}
 .sc-stats {
   display: flex;
   align-items: center;
@@ -1318,16 +1320,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: rgba(255, 255, 255, 0.14);
 }
 .sc-stat svg { width: 14px; height: 12px; }
-.sc-footer-meta {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  justify-content: center;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--faint);
-  text-transform: uppercase;
-}
 
 /* density: fit more gun cells in fixed canvas */
 .density-dense .sc-cat-name { font-size: 13px; }
