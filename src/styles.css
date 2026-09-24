@@ -925,9 +925,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   position: relative;
   flex: 1;
   min-height: 0;
-  background: linear-gradient(165deg, #15202b 0%, #0c141d 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  background: transparent;
+  border: none;
   overflow: hidden;
   container-type: size;
 }
@@ -969,8 +968,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 /* Square image frame — one fixed size for every skin in the cell */
 .sc-stack-frame {
-  width: min(78cqw, 78cqh);
-  height: min(78cqw, 78cqh);
+  width: min(96cqw, 96cqh);
+  height: min(96cqw, 96cqh);
   aspect-ratio: 1;
   display: flex;
   align-items: center;
@@ -980,7 +979,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   transition: transform 0.12s ease, filter 0.12s ease;
 }
 .sc-stack-item:hover .sc-stack-frame {
-  transform: scale(1.08);
+  transform: scale(1.06);
   filter: brightness(1.12);
 }
 .sc-stack-art {
@@ -1006,8 +1005,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-stack-item .sc-fallback {
   pointer-events: auto;
-  width: min(78cqw, 78cqh);
-  height: min(78cqw, 78cqh);
+  width: min(96cqw, 96cqh);
+  height: min(96cqw, 96cqh);
   aspect-ratio: 1;
   display: flex;
   align-items: center;
@@ -1056,9 +1055,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   position: relative;
   flex: 1 1 0;
   min-width: 0;
-  background: linear-gradient(165deg, #15202b 0%, #0c141d 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  background: transparent;
+  border: none;
   overflow: hidden;
   container-type: size;
 }
@@ -1069,8 +1067,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   z-index: 40 !important;
 }
 .sc-knife-cell .sc-stack-frame {
-  width: min(78cqw, 78cqh);
-  height: min(78cqw, 78cqh);
+  width: min(96cqw, 96cqh);
+  height: min(96cqw, 96cqh);
 }
 .sc-knife-cell .sc-stack-name {
   opacity: 1;

@@ -116,7 +116,6 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
         onClick={onToggleSkin ? () => onToggleSkin(s.id) : undefined}
         title={s.name}
       >
-        <span className="sc-tile-gem" style={{ background: rarity, boxShadow: `0 0 8px ${rarity}` }} />
         {s.equipped && <span className="sc-check">✓</span>}
         {tileIcon(s) ? (
           <span className="sc-stack-frame">
