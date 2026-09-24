@@ -964,20 +964,24 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
     calc((var(--i, 2) - 2) * 4.5%)
   );
 }
-.sc-stack-item:hover {
-  z-index: 40 !important;
-  transform: translate(0, -4%) scale(1.06);
-  filter: brightness(1.15);
-}
-/* Square image frame — same footprint for every skin in a cell */
+/* Raise the layer only — no transform/filter on the full-cell item (that reads as bg hover) */
+.sc-stack-item:hover { z-index: 40 !important; }
+
+/* Square image frame — one fixed size for every skin in the cell */
 .sc-stack-frame {
   width: min(78cqw, 78cqh);
+  height: min(78cqw, 78cqh);
   aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: auto;
   flex-shrink: 0;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+.sc-stack-item:hover .sc-stack-frame {
+  transform: scale(1.08);
+  filter: brightness(1.12);
 }
 .sc-stack-art {
   width: 100%;
@@ -1003,6 +1007,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-stack-item .sc-fallback {
   pointer-events: auto;
   width: min(78cqw, 78cqh);
+  height: min(78cqw, 78cqh);
   aspect-ratio: 1;
   display: flex;
   align-items: center;
@@ -1061,10 +1066,11 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   transform: none;
 }
 .sc-knife-cell .sc-stack-item:hover {
-  transform: scale(1.06);
+  z-index: 40 !important;
 }
 .sc-knife-cell .sc-stack-frame {
-  width: min(72cqw, 72cqh);
+  width: min(78cqw, 78cqh);
+  height: min(78cqw, 78cqh);
 }
 .sc-knife-cell .sc-stack-name {
   opacity: 1;
