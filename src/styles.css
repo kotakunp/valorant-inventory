@@ -951,35 +951,25 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-stack-item:hover { z-index: 40 !important; }
 
-/* Card footprint only — no fill so lower skins show through */
+/* Hitbox = the img itself (frame is display:contents — no extra box) */
 .sc-stack-frame {
-  width: 50%;
-  height: 78%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: auto;
-  flex-shrink: 0;
-  background: transparent;
-  border: none;
-  transition: transform 0.12s ease, filter 0.12s ease;
-}
-.sc-stack-item:hover .sc-stack-frame {
-  transform: scale(1.08);
-  filter: brightness(1.12);
+  display: contents;
+  pointer-events: none;
 }
 .sc-stack-art {
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
+  /* height drives size; width follows intrinsic gun aspect (tight to outline) */
+  height: 68%;
+  width: auto;
+  max-width: 88%;
   object-fit: contain;
   pointer-events: auto;
+  flex-shrink: 0;
   filter: drop-shadow(1px 0 0 rgba(232, 236, 240, 0.55))
     drop-shadow(-1px 0 0 rgba(232, 236, 240, 0.55))
     drop-shadow(0 1px 0 rgba(232, 236, 240, 0.55))
     drop-shadow(0 -1px 0 rgba(232, 236, 240, 0.55))
     drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7));
+  transition: filter 0.12s ease, transform 0.12s ease;
 }
 .sc-stack-item:hover .sc-stack-art {
   filter: drop-shadow(1px 0 0 rgba(255, 255, 255, 0.85))
@@ -987,17 +977,19 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
     drop-shadow(0 1px 0 rgba(255, 255, 255, 0.85))
     drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.85))
     drop-shadow(0 4px 10px rgba(0, 0, 0, 0.75));
+  transform: scale(1.06);
 }
 .sc-stack-item .sc-fallback {
   pointer-events: auto;
-  width: 50%;
-  height: 78%;
+  height: 55%;
+  width: auto;
+  max-width: 80%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 9px;
   text-align: center;
-  padding: 3px;
+  padding: 4px 6px;
   background: transparent;
   border: none;
 }
@@ -1055,9 +1047,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-knife-cell .sc-stack-item:hover {
   z-index: 40 !important;
 }
-.sc-knife-cell .sc-stack-frame {
-  width: 70%;
-  height: 80%;
+.sc-knife-cell .sc-stack-art {
+  height: 78%;
+  max-width: 92%;
 }
 .sc-knife-cell .sc-stack-name {
   opacity: 1;
