@@ -966,11 +966,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* Raise the layer only — no transform/filter on the full-cell item (that reads as bg hover) */
 .sc-stack-item:hover { z-index: 40 !important; }
 
-/* Square image frame — one fixed size for every skin in the cell */
+/* Image frame fills the whole cell — art gets max size */
 .sc-stack-frame {
-  width: min(96cqw, 96cqh);
-  height: min(96cqw, 96cqh);
-  aspect-ratio: 1;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1005,9 +1004,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-stack-item .sc-fallback {
   pointer-events: auto;
-  width: min(96cqw, 96cqh);
-  height: min(96cqw, 96cqh);
-  aspect-ratio: 1;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1067,8 +1065,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   z-index: 40 !important;
 }
 .sc-knife-cell .sc-stack-frame {
-  width: min(96cqw, 96cqh);
-  height: min(96cqw, 96cqh);
+  width: 100%;
+  height: 100%;
 }
 .sc-knife-cell .sc-stack-name {
   opacity: 1;
