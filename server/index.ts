@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { buildShowcase, UpstreamError } from "./valorant";
 import type { Region } from "../src/types";
 import { getRsoConfig, buildAuthorizeUrl, handleRsoExchange } from "./rso";
-import { startLogin, submitMfa, rateLimit, AuthFlowError, loginWithCookies, normalizeRegion, requestCaptchaChallenge } from "./riotAuth";
+import { startLogin, submitMfa, rateLimit, AuthFlowError, loginWithCookies, normalizeRegion, requestCaptchaChallenge, parseCookieInput } from "./riotAuth";
 import { autoLoginWithBrowser } from "./browserLogin";
 import {
   startRemoteBrowser,
@@ -294,15 +294,24 @@ app.post("/api/login/cookies", async (req, res) => {
     res.status(400).json({ error: "Paste your ssid cookie value (see the how-to)." });
     return;
   }
-  if (!rateLimit(`login:${req.ip}`)) {
-    res.status(429).json({ error: "Too many attempts — wait a minute and try again." });
+  // Validate ssid before the rate limit so bad pastes never burn quota.
+  const pairs = parseCookieInput(cookies);
+  if (!pairs.some(([n]) => n === "ssid")) {
+    res.status(400).json({
+      error: "Couldn't find an ssid cookie in what you pasted — copy the ssid value from auth.riotgames.com cookies (see the how-to).",
+    });
+    return;
+  }
+  // Separate bucket: cookie pastes are cheap/local and shouldn't share password quota.
+  if (!rateLimit(`cookies:${req.ip}`, 10, 60_000)) {
+    res.status(429).json({ error: "Too many cookie attempts — wait a minute and try again." });
     return;
   }
   try {
     const out = await loginWithCookies(cookies);
     res.json(
       await buildShowcase({
-        region: out.region ?? region ?? "na",
+        region: out.region ?? normalizeRegion(region) ?? "na",
         accessToken: out.accessToken,
         entitlementsToken: out.entitlementsToken,
         puuid: out.puuid || undefined,

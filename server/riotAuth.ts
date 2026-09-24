@@ -153,21 +153,41 @@ export function normalizeRegion(value: unknown): Region | null {
 }
 
 /** Forgiving parser for what users paste:
- *  bare value → ssid=<value>;  single pair "ssid=abc";  or multi "ssid=a; asid=b; …". */
+ *  bare value → ssid=<value>;  single pair "ssid=abc";  or multi "ssid=a; asid=b; …".
+ *  Normalizes: strips a leading "Cookie:" header, lowercases cookie names,
+ *  allows spaces around "=", and strips surrounding quotes on values. */
 export function parseCookieInput(raw: string): Array<[string, string]> {
-  const input = raw.trim();
+  let input = raw.trim().replace(/^cookie:\s*/i, "");
   if (!input) return [];
   if (!input.includes(";")) {
-    const m = /^(ssid|tdid|asid|clid|ccid|__cf_bm)=(.*)$/.exec(input);
-    if (m) return [[m[1], m[2].trim()]];
-    return [["ssid", input]];
+    // Pair with a known cookie name (any case / spaces around =).
+    const m = /^([a-z_][a-z0-9_-]*)\s*=\s*(.*)$/i.exec(input);
+    if (m) {
+      const name = m[1].toLowerCase();
+      const value = m[2].trim().replace(/^"(.*)"$/, "$1");
+      if (["ssid", "tdid", "asid", "clid", "ccid", "__cf_bm"].includes(name)) {
+        return [[name, value]];
+      }
+      // Unrecognized single pair: bare ssid values may contain '=' (base64 padding).
+      // Only treat as a pair when the name looks like a cookie name AND value is non-empty
+      // without another '=' — otherwise fall through to bare-value (legacy behavior for "foo=bar").
+      return [["ssid", input.replace(/^"|"$/g, "")]];
+    }
+    return [["ssid", input.replace(/^"|"$/g, "")]];
   }
   const out: Array<[string, string]> = [];
   for (const part of input.split(";")) {
     const p = part.trim();
     if (!p) continue;
     const i = p.indexOf("=");
-    if (i > 0) out.push([p.slice(0, i).trim(), p.slice(i + 1).trim()]);
+    if (i > 0) {
+      const name = p.slice(0, i).trim().toLowerCase();
+      const value = p
+        .slice(i + 1)
+        .trim()
+        .replace(/^"(.*)"$/, "$1");
+      if (name) out.push([name, value]);
+    }
   }
   return out;
 }

@@ -36,6 +36,22 @@ input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 15px; padding: 7px 14px; }
 .btn.ghost:hover { border-color: var(--accent); color: var(--text); }
+.btn-block { width: 100%; display: block; }
+.label-hint { text-transform: none; letter-spacing: 0; font-weight: 400; opacity: 0.75; }
+.cookie-hint {
+  color: var(--muted); font-size: 12px; margin: 8px 0 0; line-height: 1.5;
+}
+.cookie-hint code { background: #0c141d; padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+.other-ways {
+  border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px;
+  margin-top: 18px; background: rgba(255, 255, 255, 0.02);
+}
+.other-ways summary {
+  cursor: pointer; color: var(--muted); font-size: 12px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+.other-ways summary:hover { color: var(--text); }
+.other-ways[open] summary { color: var(--text); margin-bottom: 4px; }
 .error {
   background: rgba(255, 70, 85, 0.12); border: 1px solid var(--accent); color: #ffb3ba;
   padding: 12px 14px; border-radius: 4px; margin-top: 14px; font-size: 14px;

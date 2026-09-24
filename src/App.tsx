@@ -43,12 +43,29 @@ function takeRemoteCreds(): { username: string; password: string } | undefined {
   return undefined;
 }
 
+type LoadKind = "cookies" | "password" | "mfa" | "auto" | "tokens" | "rso";
+
+/** Normalize a pasted cookie string for the API (strip Cookie: header, trim). */
+function normalizeCookiePaste(raw: string): string {
+  return raw.trim().replace(/^cookie:\s*/i, "");
+}
+
+/** Light client pre-check — structured pastes without ssid never hit the server. */
+function cookiePasteLooksValid(raw: string): boolean {
+  const s = normalizeCookiePaste(raw);
+  if (!s) return false;
+  if (/ssid\s*=/i.test(s)) return true;
+  // Bare ssid (may contain '=' padding) — no other cookie-name= prefix.
+  if (!s.includes(";") && !/^[a-z_][a-z0-9_-]*\s*=/i.test(s)) return true;
+  return false;
+}
+
 export default function App() {
   const [form, setForm] = useState({ region: "na" as Region, accessToken: "", entitlementsToken: "", puuid: "" });
   const [data, setData] = useState<ShowcasePayload | null>(null);
   const [selection, setSelection] = useState<Selection>({});
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<LoadKind | null>(null);
   const [fm, setFm] = useState({ on: false, text: "" });
   const [proof, setProof] = useState({ on: false, text: "" });
   const [page, setPage] = useState(0);
@@ -164,7 +181,7 @@ export default function App() {
       return;
     }
     setError(null);
-    setLoading(true);
+    setLoading("tokens");
     try {
       const res = await fetch("/api/account", {
         method: "POST",
@@ -187,7 +204,7 @@ export default function App() {
     } catch {
       setError("Network error — is the server running on port 3001?");
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }
 
@@ -251,7 +268,7 @@ export default function App() {
   }
 
   async function exchangeRsoCode(code: string) {
-    setLoading(true);
+    setLoading("rso");
     setError(null);
     try {
       const res = await fetch("/api/rso/exchange", {
@@ -271,7 +288,7 @@ export default function App() {
       setError("Network error during Riot sign-in.");
     } finally {
       sessionStorage.removeItem(RSO_REGION_KEY);
-      setLoading(false);
+      setLoading(null);
     }
   }
 
@@ -322,7 +339,7 @@ export default function App() {
     }
 
     setError(null);
-    setLoading(true);
+    setLoading("password");
     try {
       const res = await fetch("/api/login", {
         method: "POST",
@@ -368,7 +385,7 @@ export default function App() {
     } catch {
       setError("Network error during sign-in.");
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }
 
@@ -378,7 +395,7 @@ export default function App() {
       return;
     }
     setError(null);
-    setLoading(true);
+    setLoading("mfa");
     try {
       const res = await fetch("/api/login/mfa", {
         method: "POST",
@@ -396,13 +413,13 @@ export default function App() {
     } catch {
       setError("Network error during verification.");
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }
 
   async function submitAuto() {
     setError(null);
-    setLoading(true);
+    setLoading("auto");
     // Prefill path: if email+password are on our form, skip local Chrome and go remote with fill.
     const canPrefill = !!creds.email && !!creds.password;
     try {
@@ -424,7 +441,7 @@ export default function App() {
       if (canPrefill) stashRemoteCreds(creds.email, creds.password);
       openRemotePopup();
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }
 
@@ -453,17 +470,24 @@ export default function App() {
 
   async function submitCookies(e?: { preventDefault(): void }) {
     e?.preventDefault();
-    if (!cookieInput.trim()) {
+    const pasted = normalizeCookiePaste(cookieInput);
+    if (!pasted) {
       setError("Paste your ssid cookie value first (see the how-to above).");
       return;
     }
+    if (!cookiePasteLooksValid(pasted)) {
+      setError(
+        "That paste doesn't include an ssid cookie. Copy the ssid value (or the full Cookie header) from auth.riotgames.com — see the how-to above."
+      );
+      return;
+    }
     setError(null);
-    setLoading(true);
+    setLoading("cookies");
     try {
       const res = await fetch("/api/login/cookies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cookies: cookieInput.trim(), region: form.region }),
+        body: JSON.stringify({ cookies: pasted, region: form.region }),
       });
       const json = (await res.json().catch(() => ({}))) as ShowcasePayload & { error?: string };
       if (!res.ok || json.error) {
@@ -475,7 +499,7 @@ export default function App() {
     } catch {
       setError("Network error during cookie connect.");
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }
 
@@ -545,140 +569,75 @@ export default function App() {
           <h1>ACCOUNT SHOWCASE GENERATOR</h1>
           <span className="sub">VALORANT inventory → 1440p share image · no links, no storage</span>
         </div>
-        <form className="form-card" onSubmit={submitLogin}>
-          <div className="form-row">
-            <div className="form-col">
-              <label>Region</label>
-              <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value as Region })}>
-                {REGIONS.map((r) => (
-                  <option key={r} value={r}>{r.toUpperCase()}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-col">
-              <label>PUUID (optional fallback)</label>
-              <input
-                type="text"
-                placeholder="auto-resolved from your access token"
-                value={form.puuid}
-                onChange={(e) => setForm({ ...form, puuid: e.target.value })}
-              />
-            </div>
-          </div>
-          {auth.mode !== "mfa" && (
-            <>
-              <div className="form-row">
-                <div className="form-col">
-                  <label>Riot email / username</label>
-                  <input
-                    type="text"
-                    autoComplete="username"
-                    placeholder="you@example.com"
-                    required
-                    value={creds.email}
-                    onChange={(e) => setCreds({ ...creds, email: e.target.value })}
-                  />
-                </div>
+        <div className="form-card">
+          {error && <div className="error" style={{ marginTop: 0, marginBottom: 14 }}>{error}</div>}
+
+          {/* ---- Cookie paste (primary) ---- */}
+          <form onSubmit={submitCookies}>
+            <div className="form-row">
+              <div className="form-col">
+                <label>Region <span className="label-hint">(usually auto-detected)</span></label>
+                <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value as Region })}>
+                  {REGIONS.map((r) => (
+                    <option key={r} value={r}>{r.toUpperCase()}</option>
+                  ))}
+                </select>
               </div>
-              <div className="form-row">
-                <div className="form-col">
-                  <label>Password</label>
-                  <input
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    value={creds.password}
-                    onChange={(e) => setCreds({ ...creds, password: e.target.value })}
-                  />
-                </div>
+            </div>
+            <div className="form-row">
+              <div className="form-col">
+                <label>ssid cookie</label>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="paste ssid value, or ssid=…; asid=…"
+                  value={cookieInput}
+                  onChange={(e) => setCookieInput(e.target.value)}
+                />
+                <p className="cookie-hint">
+                  F12 → Network → <code>auth.riotgames.com</code> → copy the Cookie header · or Application → Cookies → ssid
+                </p>
               </div>
-            </>
-          )}
-          <div
-            className={
-              "captcha-box" + (!captchaNeeded || auth.mode === "mfa" ? " captcha-hidden" : "")
-            }
-            ref={captchaDivRef}
-          >
-            {captchaStatus === "error" && (
-              <span className="note" style={{ color: "#ffb3ba" }}>
-                Hosted captcha is rejected by Riot (host-lock). Use AUTO LOGIN (remote browser) or
-                paste the ssid cookie. Set <code>CAPMONSTER_API_KEY</code> to enable password mode.
-              </span>
-            )}
-          </div>
-          {auth.mode !== "mfa" && (
-            <button
-              className="btn"
-              type="submit"
-              disabled={loading || (captchaNeeded && !captchaSolver && captchaStatus !== "ready" && captchaStatus !== "error")}
-            >
-              {loading ? "SIGNING IN…" : "SIGN IN & FETCH COLLECTION"}
-            </button>
-          )}
-          {auth.mode === "mfa" && (
-            <div className="mfa-box">
-              <p className="note" style={{ marginTop: 0 }}>
-                We sent a verification code
-                {auth.email ? (<> to <strong>{auth.email}</strong></>) : " to your email"}. Enter it below to
-                continue.
+            </div>
+            <details className="cookie-howto" open>
+              <summary>How to get it — 30 seconds, official login, no password here</summary>
+              <ol>
+                <li>
+                  Log in at <strong>playvalorant.com</strong> (or <strong>account.riotgames.com</strong>)
+                  in your browser — Riot&apos;s real page, captcha and 2FA included. Tick{" "}
+                  <em>Remember me</em>.
+                </li>
+                <li>
+                  <strong>Recommended — Network tab:</strong> press <strong>F12</strong> →{" "}
+                  <strong>Network</strong> → open <code>https://auth.riotgames.com/</code> in that tab
+                  (the &quot;An error occurred&quot; page is normal — ignore it) → click the{" "}
+                  <code>auth.riotgames.com</code> request → <strong>Request Headers</strong> → copy the
+                  entire <strong>cookie</strong> value (a long <code>ssid=…; asid=…; tdid=…</code>{" "}
+                  string).
+                </li>
+                <li>
+                  <strong>Or Application tab:</strong> <strong>F12</strong> →{" "}
+                  <strong>Application</strong> (Chrome) / <strong>Storage</strong> (Firefox) →{" "}
+                  <strong>Cookies</strong> → select <strong>auth.riotgames.com</strong> or{" "}
+                  <strong>.riotgames.com</strong> — <em>not</em> <code>playvalorant.com</code> → copy
+                  the <strong>ssid</strong> value. (Firefox may truncate long values; prefer the
+                  Network method.)
+                </li>
+              </ol>
+              <p className="note" style={{ marginTop: 6 }}>
+                Your password never leaves Riot. The cookie is used once to mint API tokens, then
+                discarded — no login is performed by us at all.
               </p>
-              <div className="form-row">
-                <div className="form-col">
-                  <label>Verification code</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    placeholder="123456"
-                    value={creds.otp}
-                    onChange={(e) => setCreds({ ...creds, otp: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void submitMfaOtp();
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="mfa-actions">
-                <button className="btn" type="button" onClick={submitMfaOtp} disabled={loading}>
-                  {loading ? "VERIFYING…" : "VERIFY & FETCH"}
-                </button>
-                <button
-                  className="btn ghost"
-                  type="button"
-                  onClick={() => {
-                    setAuth({ mode: "idle", sessionId: "", email: "" });
-                    setCreds((c) => ({ ...c, otp: "" }));
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-          <div className="or-divider">or open a Chrome login window (automatic, recommended)</div>
-          <button
-            className="btn"
-            type="button"
-            style={{ width: "100%" }}
-            onClick={submitAuto}
-            disabled={loading}
-          >
-            {loading ? "CHECK THE CHROME WINDOW…" : "AUTO LOGIN (OPENS CHROME)"}
-          </button>
-          <p className="note" style={{ marginTop: 8 }}>
-            If your Chrome is already logged into Riot, this usually just works — macOS will ask
-            once for Keychain access (click <em>Always Allow</em>). Otherwise a window opens: log
-            in there once (tick <em>Remember me</em>), and later clicks reuse the saved session
-            with no copying. Riot&apos;s real page handles captcha and 2FA; your password never
-            touches this app. On the hosted site this falls back to a remote browser below.
-          </p>
+            </details>
+            <button className="btn btn-block" type="submit" disabled={loading !== null}>
+              {loading === "cookies" ? "CONNECTING…" : "CONNECT WITH COOKIE"}
+            </button>
+          </form>
+
           {remoteOpen && !IS_REMOTE_POPUP && (
             <>
-              <div className="or-divider">remote browser (hosted — captcha/2FA on Riot&apos;s page)</div>
+              <div className="or-divider">remote browser</div>
               <RemoteBrowserPanel
                 region={form.region}
                 credentials={remoteCreds}
@@ -690,97 +649,185 @@ export default function App() {
               />
             </>
           )}
-          <div className="or-divider">or connect with a browser cookie (manual paste)</div>
-          <div className="form-row">
-            <div className="form-col">
-              <label>ssid cookie (value, or full cookie string)</label>
-              <input
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="paste just the ssid value, or ssid=…; asid=…"
-                value={cookieInput}
-                onChange={(e) => setCookieInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void submitCookies();
+
+          {/* ---- Everything else (collapsed) ---- */}
+          <details className="other-ways">
+            <summary>Other ways to sign in</summary>
+
+            <div className="form-row" style={{ marginTop: 12 }}>
+              <div className="form-col">
+                <label>PUUID (optional fallback)</label>
+                <input
+                  type="text"
+                  placeholder="auto-resolved from your access token"
+                  value={form.puuid}
+                  onChange={(e) => setForm({ ...form, puuid: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="or-divider">email / password (needs CAPMONSTER on hosted)</div>
+            <form onSubmit={submitLogin}>
+              {auth.mode !== "mfa" && (
+                <>
+                  <div className="form-row">
+                    <div className="form-col">
+                      <label>Riot email / username</label>
+                      <input
+                        type="text"
+                        autoComplete="username"
+                        placeholder="you@example.com"
+                        value={creds.email}
+                        onChange={(e) => setCreds({ ...creds, email: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-col">
+                      <label>Password</label>
+                      <input
+                        type="password"
+                        autoComplete="current-password"
+                        value={creds.password}
+                        onChange={(e) => setCreds({ ...creds, password: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+              <div
+                className={
+                  "captcha-box" + (!captchaNeeded || auth.mode === "mfa" ? " captcha-hidden" : "")
+                }
+                ref={captchaDivRef}
+              >
+                {captchaStatus === "error" && (
+                  <span className="note" style={{ color: "#ffb3ba" }}>
+                    Hosted captcha is rejected by Riot (host-lock). Paste the ssid cookie above, or
+                    set <code>CAPMONSTER_API_KEY</code> to enable password mode.
+                  </span>
+                )}
+              </div>
+              {auth.mode !== "mfa" && (
+                <button
+                  className="btn btn-block"
+                  type="submit"
+                  disabled={
+                    loading !== null ||
+                    (captchaNeeded && !captchaSolver && captchaStatus !== "ready" && captchaStatus !== "error")
                   }
-                }}
-              />
-            </div>
-          </div>
-          <details className="cookie-howto">
-            <summary>How to get it — 30 seconds, official login, no password here</summary>
-            <ol>
-              <li>
-                Log in at <strong>playvalorant.com</strong> (or <strong>account.riotgames.com</strong>)
-                in your browser — Riot&apos;s real page, captcha and 2FA included. Tick{" "}
-                <em>Remember me</em>.
-              </li>
-              <li>
-                <strong>Recommended — Network tab:</strong> press <strong>F12</strong> →{" "}
-                <strong>Network</strong> → open <code>https://auth.riotgames.com/</code> in that tab
-                (the &quot;An error occurred&quot; page is normal — ignore it) → click the{" "}
-                <code>auth.riotgames.com</code> request → <strong>Request Headers</strong> → copy the
-                entire <strong>cookie</strong> value (a long <code>ssid=…; asid=…; tdid=…</code>{" "}
-                string).
-              </li>
-              <li>
-                <strong>Or Application tab:</strong> <strong>F12</strong> →{" "}
-                <strong>Application</strong> (Chrome) / <strong>Storage</strong> (Firefox) →{" "}
-                <strong>Cookies</strong> → select <strong>auth.riotgames.com</strong> or{" "}
-                <strong>.riotgames.com</strong> — <em>not</em> <code>playvalorant.com</code> → copy
-                the <strong>ssid</strong> value. (Firefox may truncate long values; prefer the
-                Network method.)
-              </li>
-            </ol>
-            <p className="note" style={{ marginTop: 6 }}>
-              Your password never leaves Riot. The cookie is used once to mint API tokens, then
-              discarded — no login is performed by us at all.
-            </p>
-          </details>
-          <button className="btn manual" type="button" onClick={submitCookies} disabled={loading}>
-            {loading ? "CONNECTING…" : "CONNECT WITH COOKIE"}
-          </button>
-          <div className="or-divider">or paste session tokens manually</div>
-          <div className="form-row">
-            <div className="form-col">
-              <label>Access token</label>
-              <textarea
-                rows={3}
-                placeholder="eyJ..."
-                value={form.accessToken}
-                onChange={(e) => setForm({ ...form, accessToken: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="form-row">
-            <div className="form-col">
-              <label>Entitlements token (JWT)</label>
-              <textarea
-                rows={3}
-                placeholder="eyJ..."
-                value={form.entitlementsToken}
-                onChange={(e) => setForm({ ...form, entitlementsToken: e.target.value })}
-              />
-            </div>
-          </div>
-          <button className="btn manual" type="button" onClick={fetchAccount} disabled={loading}>
-            {loading ? "FETCHING…" : "FETCH WITH PASTED TOKENS"}
-          </button>
-          {rso?.configured && (
-            <button type="button" className="btn rso-btn" onClick={startRso} style={{ marginTop: 10 }}>
-              {loading ? "WORKING…" : "SIGN IN WITH RIOT (OAUTH)"}
+                >
+                  {loading === "password" ? "SIGNING IN…" : "SIGN IN & FETCH COLLECTION"}
+                </button>
+              )}
+            </form>
+            {auth.mode === "mfa" && (
+              <div className="mfa-box">
+                <p className="note" style={{ marginTop: 0 }}>
+                  We sent a verification code
+                  {auth.email ? (<> to <strong>{auth.email}</strong></>) : " to your email"}. Enter it below to
+                  continue.
+                </p>
+                <div className="form-row">
+                  <div className="form-col">
+                    <label>Verification code</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      value={creds.otp}
+                      onChange={(e) => setCreds({ ...creds, otp: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void submitMfaOtp();
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="mfa-actions">
+                  <button className="btn" type="button" onClick={submitMfaOtp} disabled={loading !== null}>
+                    {loading === "mfa" ? "VERIFYING…" : "VERIFY & FETCH"}
+                  </button>
+                  <button
+                    className="btn ghost"
+                    type="button"
+                    onClick={() => {
+                      setAuth({ mode: "idle", sessionId: "", email: "" });
+                      setCreds((c) => ({ ...c, otp: "" }));
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="or-divider">or open a Chrome login window</div>
+            <button
+              className="btn btn-block"
+              type="button"
+              onClick={submitAuto}
+              disabled={loading !== null}
+            >
+              {loading === "auto" ? "CHECK THE CHROME WINDOW…" : "AUTO LOGIN (OPENS CHROME)"}
             </button>
-          )}
+            <p className="note" style={{ marginTop: 8 }}>
+              If your Chrome is already logged into Riot, this usually just works — macOS will ask
+              once for Keychain access (click <em>Always Allow</em>). Otherwise a window opens: log
+              in there once (tick <em>Remember me</em>), and later clicks reuse the saved session
+              with no copying. On the hosted site this falls back to a remote browser.
+            </p>
+
+            <div className="or-divider">or paste session tokens manually</div>
+            <form onSubmit={fetchAccount}>
+              <div className="form-row">
+                <div className="form-col">
+                  <label>Access token</label>
+                  <textarea
+                    rows={3}
+                    placeholder="eyJ..."
+                    value={form.accessToken}
+                    onChange={(e) => setForm({ ...form, accessToken: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-col">
+                  <label>Entitlements token (JWT)</label>
+                  <textarea
+                    rows={3}
+                    placeholder="eyJ..."
+                    value={form.entitlementsToken}
+                    onChange={(e) => setForm({ ...form, entitlementsToken: e.target.value })}
+                  />
+                </div>
+              </div>
+              <button className="btn manual" type="submit" disabled={loading !== null}>
+                {loading === "tokens" ? "FETCHING…" : "FETCH WITH PASTED TOKENS"}
+              </button>
+            </form>
+            {rso?.configured && (
+              <button
+                type="button"
+                className="btn rso-btn"
+                onClick={startRso}
+                style={{ marginTop: 10 }}
+                disabled={loading !== null}
+              >
+                {loading === "rso" ? "WORKING…" : "SIGN IN WITH RIOT (OAUTH)"}
+              </button>
+            )}
+          </details>
+
           <p className="note">
-            Email/password and tokens are used in request memory only — never stored or logged — and the
+            Cookie and tokens are used in request memory only — never stored or logged — and the
             generated image contains no link. Unofficial tool using Riot&apos;s login and client endpoints;
             no affiliation with Riot Games. Don&apos;t share session tokens with anyone.
           </p>
-        </form>
-        {error && <div className="error">{error}</div>}
+        </div>
       </div>
     );
   }
@@ -804,7 +851,18 @@ export default function App() {
             setData(null);
             setSelection({});
             setError(null);
-            setForm({ ...form, accessToken: "", entitlementsToken: "", puuid: "" });
+            setLoading(null);
+            setForm({ region: form.region, accessToken: "", entitlementsToken: "", puuid: "" });
+            setCreds({ email: "", password: "", otp: "" });
+            setAuth({ mode: "idle", sessionId: "", email: "" });
+            setCookieInput("");
+            setCaptchaNeeded(false);
+            setCaptchaStatus("loading");
+            setCaptchaSolver(false);
+            setRemoteOpen(false);
+            setRemoteCreds(undefined);
+            if (captchaDivRef.current) captchaDivRef.current.innerHTML = "";
+            widgetIdRef.current = null;
           }}
         >
           NEW ACCOUNT
