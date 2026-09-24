@@ -4,11 +4,11 @@
 // on Riot's real domain (captcha/2FA stay on Riot's page — host OK).
 // RULES: cookie values live only in this request chain; never logged.
 
-import { chromium, type BrowserContext, type Page } from "playwright-core";
+import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
-import { AuthFlowError, loginWithCookies, type AuthResult } from "./riotAuth";
+import { AuthFlowError, loginWithCookies } from "./riotAuth";
 import { riotCookieHeader } from "./browserLogin";
 import { buildShowcase } from "./valorant";
 import type { ShowcasePayload } from "../src/types";
@@ -18,6 +18,15 @@ const LOGIN_URL = "https://account.riotgames.com/";
 const SESSION_TTL_MS = 5 * 60_000;
 const FRAME_JPEG_QUALITY = 70;
 const VIEWPORT = { width: 1280, height: 800 };
+// Realistic UA — headless default UA trips Riot/Akamai loaders.
+const UA =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const LAUNCH_ARGS = [
+  "--no-sandbox",
+  "--disable-dev-shm-usage",
+  "--disable-gpu",
+  "--disable-blink-features=AutomationControlled",
+];
 
 export type BrowserPhase = "starting" | "login" | "harvesting" | "done" | "error" | "expired";
 
@@ -27,10 +36,12 @@ export interface BrowserStatus {
   width: number;
   height: number;
   error?: string;
+  url?: string;
 }
 
 interface RemoteSession {
   id: string;
+  browser: Browser;
   ctx: BrowserContext;
   page: Page;
   cdp: import("playwright-core").CDPSession | null;
@@ -40,12 +51,14 @@ interface RemoteSession {
   result: ShowcasePayload | null;
   frameLoop: Promise<void> | null;
   lastFrame: Buffer | null;
+  lastFrameAt: number;
   width: number;
   height: number;
   stopping: boolean;
 }
 
 let session: RemoteSession | null = null;
+let startLock: Promise<unknown> = Promise.resolve();
 
 function pruneIfStale(): void {
   if (!session) return;
@@ -67,6 +80,11 @@ async function closeSession(phase: BrowserPhase = "expired"): Promise<void> {
   }
   try {
     await s.ctx.close();
+  } catch {
+    /* already closed */
+  }
+  try {
+    await s.browser.close();
   } catch {
     /* already closed */
   }
@@ -127,43 +145,64 @@ function candidateExecutables(): string[] {
   });
 }
 
-async function launchContext(): Promise<BrowserContext> {
-  const base = {
-    headless: true,
-    viewport: VIEWPORT,
-    args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
-  };
+function errText(e: unknown): string {
+  return e instanceof Error ? e.message.replace(/\s+/g, " ").slice(0, 180) : "unknown error";
+}
+
+async function launchSession(): Promise<{ browser: Browser; ctx: BrowserContext }> {
+  const errors: string[] = [];
   const execs = candidateExecutables();
-  let lastErr: unknown = null;
-  if (execs.length > 0) {
-    for (const executablePath of execs) {
-      try {
-        return await chromium.launchPersistentContext(profileDir(), {
-          ...base,
-          executablePath,
-        });
-      } catch (e) {
-        lastErr = e;
-        /* try next */
-      }
+
+  // Non-persistent launch first — avoids profile locks from crashed runs.
+  for (const executablePath of execs) {
+    try {
+      const browser = await chromium.launch({ headless: true, executablePath, args: LAUNCH_ARGS });
+      const ctx = await browser.newContext({ viewport: VIEWPORT, userAgent: UA });
+      return { browser, ctx };
+    } catch (e) {
+      errors.push(`${path.basename(executablePath)}: ${errText(e)}`);
     }
   }
-  // Fall back to system channel names (works on dev machines with Chrome/Edge).
+
+  // Channel fallbacks (dev machines with Google Chrome only — not msedge on VPS).
   try {
-    return await chromium.launchPersistentContext(profileDir(), { ...base, channel: "chrome" });
+    const browser = await chromium.launch({ headless: true, channel: "chrome", args: LAUNCH_ARGS });
+    const ctx = await browser.newContext({ viewport: VIEWPORT, userAgent: UA });
+    return { browser, ctx };
   } catch (e) {
-    lastErr = e;
+    errors.push(`chrome-channel: ${errText(e)}`);
   }
-  try {
-    return await chromium.launchPersistentContext(profileDir(), { ...base, channel: "msedge" });
-  } catch (e) {
-    lastErr = e;
+
+  // Last resort: persistent context with a wiped profile (some distros only work this way).
+  if (execs.length > 0) {
+    try {
+      fs.rmSync(profileDir(), { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+    try {
+      const ctx = await chromium.launchPersistentContext(profileDir(), {
+        headless: true,
+        viewport: VIEWPORT,
+        userAgent: UA,
+        executablePath: execs[0],
+        args: LAUNCH_ARGS,
+      });
+      const browser = ctx.browser();
+      if (!browser) {
+        await ctx.close();
+        throw new Error("persistent context had no browser");
+      }
+      return { browser, ctx };
+    } catch (e) {
+      errors.push(`persistent: ${errText(e)}`);
+    }
   }
+
   const checked = execs.length ? execs.join(", ") : "(none on PATH)";
-  const reason = lastErr instanceof Error ? lastErr.message.slice(0, 200) : "unknown";
   throw new AuthFlowError(
     "Remote browser unavailable — Chromium failed to launch on the server. " +
-      `Checked: ${checked}. Last error: ${reason}. ` +
+      `Checked: ${checked}. Attempts: ${errors.join(" | ")}. ` +
       "Ensure nixpacks installs chromium (nixPkgs) or set CHROME_PATH, or paste the ssid cookie.",
     503
   );
@@ -182,6 +221,7 @@ async function startScreencast(s: RemoteSession): Promise<void> {
       if (s.stopping || session !== s) return;
       try {
         s.lastFrame = Buffer.from(params.data, "base64");
+        s.lastFrameAt = Date.now();
       } catch {
         /* bad frame */
       }
@@ -195,6 +235,11 @@ async function startScreencast(s: RemoteSession): Promise<void> {
       maxHeight: VIEWPORT.height,
       everyNthFrame: 1,
     });
+    // Watchdog: if screencast never delivers a frame, fall back to timed screenshots.
+    await new Promise((r) => setTimeout(r, 2500));
+    if (!s.stopping && session === s && Date.now() - s.lastFrameAt > 2000) {
+      await captureFallbackLoop(s);
+    }
   } catch {
     s.cdp = null;
     await captureFallbackLoop(s);
@@ -210,6 +255,7 @@ async function captureFallbackLoop(s: RemoteSession): Promise<void> {
         new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("shot timeout")), 2500)),
       ]);
       s.lastFrame = Buffer.from(buf);
+      s.lastFrameAt = Date.now();
     } catch {
       /* navigating */
     }
@@ -262,52 +308,84 @@ function startPoller(s: RemoteSession): void {
 }
 
 export async function startRemoteBrowser(region: Region): Promise<BrowserStatus> {
-  pruneIfStale();
-  if (session && session.phase !== "done" && session.phase !== "error" && session.phase !== "expired") {
-    if (session.phase === "login" || session.phase === "starting" || session.phase === "harvesting") {
-      return status();
+  const run = async (): Promise<BrowserStatus> => {
+    pruneIfStale();
+    if (session && session.phase !== "done" && session.phase !== "error" && session.phase !== "expired") {
+      if (session.phase === "login" || session.phase === "starting" || session.phase === "harvesting") {
+        return status();
+      }
     }
-  }
-  await closeSession("expired");
+    await closeSession("expired");
 
-  let ctx: BrowserContext;
-  try {
-    ctx = await launchContext();
-  } catch (e) {
-    throw e;
-  }
-
-  const page = ctx.pages()[0] ?? (await ctx.newPage());
-  const s: RemoteSession = {
-    id: crypto.randomUUID(),
-    ctx,
-    page,
-    cdp: null,
-    createdAt: Date.now(),
-    phase: "login",
-    result: null,
-    frameLoop: null,
-    lastFrame: null,
-    width: VIEWPORT.width,
-    height: VIEWPORT.height,
-    stopping: false,
-  };
-  session = s;
-
-  // Screencast first so frames stream while page.goto runs (screenshot would hang).
-  s.frameLoop = startScreencast(s);
-  startPoller(s);
-
-  void (async () => {
+    let launched: { browser: Browser; ctx: BrowserContext };
     try {
-      await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
-    } catch {
-      /* SPA/network slow — frames still stream; user can retry Close */
+      launched = await launchSession();
+    } catch (e) {
+      throw e;
     }
-  })();
-  // region is consumed when harvest finishes via auth.region fallback; keep param for API symmetry
-  void region;
-  return status();
+
+    const page = launched.ctx.pages()[0] ?? (await launched.ctx.newPage());
+    const now = Date.now();
+    const s: RemoteSession = {
+      id: crypto.randomUUID(),
+      browser: launched.browser,
+      ctx: launched.ctx,
+      page,
+      cdp: null,
+      createdAt: now,
+      phase: "login",
+      result: null,
+      frameLoop: null,
+      lastFrame: null,
+      lastFrameAt: now,
+      width: VIEWPORT.width,
+      height: VIEWPORT.height,
+      stopping: false,
+    };
+    session = s;
+
+    page.on("console", (msg) => {
+      if (msg.type() === "error") console.warn(`[remote-browser] console: ${msg.text().slice(0, 200)}`);
+    });
+    page.on("pageerror", (err) => {
+      console.warn(`[remote-browser] pageerror: ${String(err).slice(0, 200)}`);
+    });
+
+    // Screencast first so frames stream while page.goto runs (screenshot would hang).
+    s.frameLoop = startScreencast(s);
+    startPoller(s);
+
+    void (async () => {
+      try {
+        await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
+        // Prime one frame after first paint even if screencast is quiet.
+        await new Promise((r) => setTimeout(r, 800));
+        if (!s.stopping && session === s && !s.lastFrame) {
+          try {
+            s.lastFrame = Buffer.from(
+              await Promise.race([
+                page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 3000 }),
+                new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("shot timeout")), 3500)),
+              ])
+            );
+            s.lastFrameAt = Date.now();
+          } catch {
+            /* still navigating */
+          }
+        }
+      } catch {
+        /* SPA/network slow — frames still stream; user can retry Close */
+      }
+    })();
+    // region is consumed when harvest finishes via auth.region fallback; keep param for API symmetry
+    void region;
+    return status();
+  };
+
+  // Serialize starts so concurrent requests don't race the single session slot.
+  const next = startLock.then(run, run);
+  startLock = next.catch(() => {});
+  return next;
 }
 
 export function status(): BrowserStatus {
@@ -315,12 +393,14 @@ export function status(): BrowserStatus {
   if (!session) {
     return { active: false, phase: "expired", width: VIEWPORT.width, height: VIEWPORT.height };
   }
+  const url = session.page.url();
   return {
     active: true,
     phase: session.phase,
     width: session.width,
     height: session.height,
     ...(session.error ? { error: session.error } : {}),
+    ...(url ? { url } : {}),
   };
 }
 
