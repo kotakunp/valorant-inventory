@@ -49,24 +49,14 @@ function KnifeIcon() {
   );
 }
 
-/** Valorant Points — blue hex currency mark */
-function VpIcon() {
-  return (
-    <svg className="sc-wallet-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-      <path d="M8 1 L14.5 4.5 L14.5 11.5 L8 15 L1.5 11.5 L1.5 4.5 Z" fill="none" stroke="#1ce8d2" strokeWidth="1.6" />
-      <path d="M8 4.2 L11.5 6.2 L11.5 9.8 L8 11.8 L4.5 9.8 L4.5 6.2 Z" fill="#1ce8d2" />
-    </svg>
-  );
-}
+/** Official currency display icons (valorant-api.com currencies) */
+const VP_ICON =
+  "https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png";
+const RP_ICON =
+  "https://media.valorant-api.com/currencies/e59aa87c-4cbf-517a-5983-6e81511be9b7/displayicon.png";
 
-/** Radianite Points — gold/yellow diamond currency mark */
-function RpIcon() {
-  return (
-    <svg className="sc-wallet-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-      <path d="M8 1.5 L14.5 8 L8 14.5 L1.5 8 Z" fill="none" stroke="#f5c542" strokeWidth="1.6" />
-      <path d="M8 4.5 L11.5 8 L8 11.5 L4.5 8 Z" fill="#f5c542" />
-    </svg>
-  );
+function CurrencyIcon({ src, alt }: { src: string; alt: string }) {
+  return <img className="sc-wallet-icon" src={imgUrl(src) ?? undefined} alt={alt} />;
 }
 
 function Medallion({ label, tier, badge }: { label: string; tier: number | null; badge?: RankBadge | null }) {
@@ -258,13 +248,13 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, onTo
               <div className="sc-wallet">
                 {payload.wallet.vp != null && (
                   <span className="sc-chip">
-                    <VpIcon />
+                    <CurrencyIcon src={VP_ICON} alt="VP" />
                     {fmt(payload.wallet.vp)}
                   </span>
                 )}
                 {payload.wallet.rp != null && (
                   <span className="sc-chip">
-                    <RpIcon />
+                    <CurrencyIcon src={RP_ICON} alt="RP" />
                     {fmt(payload.wallet.rp)}
                   </span>
                 )}
