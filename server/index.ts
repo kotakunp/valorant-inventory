@@ -142,9 +142,13 @@ app.get("/api/login/captcha-challenge", async (_req, res) => {
 // ---- remote browser (hosted AUTO LOGIN) ----
 app.post("/api/browser/start", async (req, res) => {
   const { region } = req.body ?? {};
-  if (!rateLimit(`browser:${req.ip}`, 3, 60_000)) {
-    res.status(429).json({ error: "Too many browser attempts — wait a minute." });
-    return;
+  // Reattaching to a live session must not burn the rate limit (page reload / retry).
+  const existing = remoteStatus();
+  if (!existing.active) {
+    if (!rateLimit(`browser:${req.ip}`, 8, 60_000)) {
+      res.status(429).json({ error: "Too many browser attempts — wait a minute." });
+      return;
+    }
   }
   try {
     const st = await startRemoteBrowser(normalizeRegion(region) ?? "na");

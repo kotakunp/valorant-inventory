@@ -37,6 +37,8 @@ export interface BrowserStatus {
   height: number;
   error?: string;
   url?: string;
+  frames?: number;
+  frameAgeMs?: number;
 }
 
 interface RemoteSession {
@@ -52,6 +54,7 @@ interface RemoteSession {
   frameLoop: Promise<void> | null;
   lastFrame: Buffer | null;
   lastFrameAt: number;
+  frameCount: number;
   width: number;
   height: number;
   stopping: boolean;
@@ -214,20 +217,24 @@ function profileDir(): string {
 
 /**
  * Continuous frame capture — always on.
- * CDP screencast alone freezes after the first frame on nix chromium (ack/nav issues);
- * a timeout-guarded screenshot loop keeps the stream alive during navigation.
+ * Screencast alone freezes after the first frame on nix chromium.
+ * Every tick: try CDP captureScreenshot, then Playwright screenshot; never trust screencast alone.
  */
 async function startCaptureLoop(s: RemoteSession): Promise<void> {
-  let useCdp = false;
   try {
     const cdp = await s.page.context().newCDPSession(s.page);
     s.cdp = cdp;
     cdp.on("Page.screencastFrame", (params: { data: string; sessionId: number }) => {
       if (s.stopping || session !== s) return;
+      // Screencast is a bonus; only accept it if we haven't had a forced shot recently.
+      if (Date.now() - s.lastFrameAt < 400) {
+        void cdp.send("Page.screencastFrameAck", { sessionId: params.sessionId }).catch(() => {});
+        return;
+      }
       try {
         s.lastFrame = Buffer.from(params.data, "base64");
         s.lastFrameAt = Date.now();
-        useCdp = true;
+        s.frameCount += 1;
       } catch {
         /* bad frame */
       }
@@ -246,20 +253,37 @@ async function startCaptureLoop(s: RemoteSession): Promise<void> {
   }
 
   while (!s.stopping && session === s) {
-    // If screencast went quiet (>1.5s), take a timed screenshot so frames never freeze.
-    if (Date.now() - s.lastFrameAt > 1500 || !useCdp) {
+    let got: Buffer | null = null;
+    // Prefer CDP captureScreenshot — more reliable than page.screenshot during busy SPA.
+    if (s.cdp) {
       try {
-        const buf = await Promise.race([
-          s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 2000 }),
-          new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("shot timeout")), 2500)),
-        ]);
-        s.lastFrame = Buffer.from(buf);
-        s.lastFrameAt = Date.now();
+        const shot = (await Promise.race([
+          s.cdp.send("Page.captureScreenshot", { format: "jpeg", quality: FRAME_JPEG_QUALITY }),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("cdp shot timeout")), 2000)),
+        ])) as { data: string };
+        got = Buffer.from(shot.data, "base64");
       } catch {
-        /* navigating / busy */
+        /* fall through */
       }
     }
-    await new Promise((r) => setTimeout(r, 250));
+    if (!got) {
+      try {
+        got = Buffer.from(
+          await Promise.race([
+            s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 2000 }),
+            new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("shot timeout")), 2500)),
+          ])
+        );
+      } catch {
+        /* navigating */
+      }
+    }
+    if (got) {
+      s.lastFrame = got;
+      s.lastFrameAt = Date.now();
+      s.frameCount += 1;
+    }
+    await new Promise((r) => setTimeout(r, 300));
   }
 }
 
@@ -338,6 +362,7 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
       frameLoop: null,
       lastFrame: null,
       lastFrameAt: now,
+      frameCount: 0,
       width: VIEWPORT.width,
       height: VIEWPORT.height,
       stopping: false,
@@ -399,6 +424,8 @@ export function status(): BrowserStatus {
     phase: session.phase,
     width: session.width,
     height: session.height,
+    frames: session.frameCount,
+    frameAgeMs: Date.now() - session.lastFrameAt,
     ...(session.error ? { error: session.error } : {}),
     ...(url ? { url } : {}),
   };
