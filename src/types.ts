@@ -16,6 +16,8 @@ export interface SkinItem {
   variantCount: number;
   isKnife: boolean;
   equipped: boolean;
+  /** valorant-api content tier rank (0 Select … 4 Ultra); null when unknown. */
+  contentTierRank?: number | null;
   /** Owned chromas (index 0 = base). Empty when catalog has none. */
   chromas: ChromaOption[];
   defaultChromaId: string | null;

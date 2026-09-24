@@ -596,7 +596,7 @@ export default function App() {
                     key={i.id}
                     type="button"
                     className={`skin-cell${on ? " on" : ""}${i.equipped ? " eq" : ""}`}
-                    style={{ "--rarity": rarityColor(i.price, i.levelCount) } as CSSProperties}
+                    style={{ "--rarity": rarityColor(i.price, i.levelCount, i.contentTierRank ?? null) } as CSSProperties}
                     onClick={() => toggle(kind, i.id)}
                     title={`${i.name} · ${i.weaponName}${i.price != null ? ` · ${fmt(i.price)} VP` : ""}${i.equipped ? " · equipped" : ""}`}
                     aria-pressed={on}
@@ -625,7 +625,13 @@ export default function App() {
                 <label
                   key={i.id}
                   className={"chip" + (on ? " on" : "")}
-                  style={{ "--rarity": rarityColor(i.price, "levelCount" in i ? i.levelCount : 0) } as CSSProperties}
+                  style={{
+                    "--rarity": rarityColor(
+                      i.price,
+                      "levelCount" in i ? i.levelCount : 0,
+                      "contentTierRank" in i ? (i as SkinItem).contentTierRank ?? null : null
+                    ),
+                  } as CSSProperties}
                 >
                   <input type="checkbox" checked={on} onChange={() => toggle(kind, i.id)} />
                   {icon ? (

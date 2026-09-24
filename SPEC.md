@@ -62,10 +62,10 @@ Every item is a **checkbox** (selection panels; skin tiles also toggle on click 
 | Item | Default checked when |
 |---|---|
 | Skin | VP price ≥ **1775** (Premium+ / purple and above) |
-| Skin, no price (battlepass/free) | **unchecked** |
+| Skin, no price | **content tier ≥ Premium** (valorant-api `contentTierUuid`: Premium/Exclusive/Ultra); else unchecked |
 | Card / Title / Buddy | has VP price → checked; battlepass/free → unchecked |
 | Any item | **equipped** on the account → checked regardless |
-| Fallback if storefront/prices fail | skin with ≥ 5 levels → checked, else unchecked |
+| Fallback if storefront/prices/tier fail | skin with ≥ 5 levels → checked, else unchecked |
 
 - Bulk helpers: **Select all premium**, **Clear all**, per-section select-all.
 - Selection = in-memory UI state only; nothing persisted.
@@ -76,17 +76,17 @@ Every item is a **checkbox** (selection panels; skin tiles also toggle on click 
 ## 7. Image output spec
 
 - **Base canvas: 1280 × 720** CSS px, exported with `pixelRatio: 2` → **2560 × 1440 PNG (1440p, 16:9)**.
-- **Pagination:** selected skins chunked by grid capacity; density auto-picks the *smallest* density keeping pages ≤ 3:
+- **Pagination:** one **stack cell per gun** (all skins of a gun layered in one slot); knives always on the full-width bottom row (not paginated). Density auto-picks the *smallest* density keeping pages ≤ 3:
 
-  | Density | Grid (center zone) | Capacity/page |
+  | Density | Grid (center zone) | Capacity/page (gun cells) |
   |---|---|---|
   | Comfort | 4 cols × 5 rows | 20 |
   | Standard | 5 cols × 5 rows | 25 |
   | Dense | 8 cols × 5 rows | 40 |
 
-  - ≤ 20 selected → exactly 1 image. Above that: pick the first (largest-tile) density with ≤ 3 pages; illustration: ~21–40 → 2 pages, ~41–60 → 2–3 pages, up to 120 → 3 pages.
-  - \> 120 → Dense 3 pages, footer note `showing 120 / N`.
-- One layout template for all pages; only the skin chunk differs (header/ranks/card rail/footer repeat). Filenames `showcase-<riotid>-p1.png`…
+  - ≤ 20 distinct guns → exactly 1 image. Above that: pick the first (largest-tile) density with ≤ 3 pages.
+  - \> 120 gun cells → Dense 3 pages, footer note `showing … / N`.
+- One layout template for all pages; only the gun-cell chunk differs (header/ranks/card rail/footer/knife row repeat). Filenames `showcase-<riotid>-p1.png`…
 - Export after `document.fonts.ready` + all `<img>` decoded; images served same-origin via `/img` proxy (no canvas tainting). No inventory data in any URL.
 
 ## 8. Layout spec (1280 × 720) — "official client look"
@@ -98,10 +98,10 @@ Every item is a **checkbox** (selection panels; skin tiles also toggle on click 
 │ HEADER   [RIOT ID #TAG]   LV.207   ·   NA   ·  <equipped title>    │
 ├──────────────┬─────────────────────────────────────┬───────────────┤
 │ RANK / STATS │  COLLECTION GRID                    │ PLAYER CARD   │
-│ ◎ PEAK       │  rarity-bordered tiles (purple/gold │ tall art      │
-│   Diamond 2  │ /red), LV.x + variant tags, red     │ panel         │
-│ ◎ CURRENT    │  checkmark when equipped            │               │
-│   Immortal 1 │  ── KNIVES ROW (highlighted) ──     │ buddy strip   │
+│ ◎ PEAK       │  one cell per gun — skins stacked   │ tall art      │
+│   Diamond 2  │  as layered art (hover → front),    │ panel         │
+│ ◎ CURRENT    │  thin outline on transparent PNGs   │               │
+│   Immortal 1 │  ── MELEE bottom row (full width) ──│ buddy strip   │
 │ VP 1,234     │                                     │ +N counter    │
 │ RP 400       │                                     │               │
 ├──────────────┴─────────────────────────────────────┴───────────────┤
@@ -112,7 +112,8 @@ Every item is a **checkbox** (selection panels; skin tiles also toggle on click 
 - **No empty slots:** zero-item zones/rows omitted, grid reflows.
 - **Rank medallions (MVP):** styled circular badge, tier name + tier color (real tier icons = phase 2).
 - **FM / PROOF:** optional footer segments, each behind an **include-checkbox** (default off) with short text input when enabled (free-form, not API data).
-- Knives in a highlighted row under the grid; > 8 selected knives overflow into the grid.
+- **Knives:** always a dedicated full-width bottom strip (stacked skins); never overflow into the gun grid.
+- **Stacking:** same gun's skins are layered in one cell; hover raises that skin's `z-index` + brightens. Thin light outline via multi-`drop-shadow` on the art.
 - Page indicator `1/2` bottom-right when multi-page.
 
 ## 9. API surface

@@ -264,6 +264,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     const isKnife =
       entry.category.toLowerCase().includes("knife") || /knife|melee/i.test(entry.weaponName);
 
+    const tierUuid = typeof entry.skin.contentTierUuid === "string" ? entry.skin.contentTierUuid.toLowerCase() : "";
     bySkinUuid.set(skinUuid, {
       id: skinUuid,
       name: entry.skin.displayName ?? "Unknown skin",
@@ -274,6 +275,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
       variantCount: chromas.length || (variantsPerSkin.get(skinUuid) ?? 0),
       isKnife,
       equipped: equippedSkins.has(skinUuid),
+      contentTierRank: tierUuid ? catalog.contentTiers.get(tierUuid) ?? null : null,
       chromas,
       defaultChromaId,
     });

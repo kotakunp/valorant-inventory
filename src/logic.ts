@@ -4,12 +4,18 @@ import { selKey } from "./types";
 export const PREMIUM_PRICE = 1775;
 export const MAX_GRID_ITEMS = 120;
 
+/** Content-tier ranks ≥ this are "premium" (Premium Edition=2, Exclusive=3, Ultra=4). */
+export const PREMIUM_TIER = 2;
+
 /**
- * Premium skin: VP ≥ 1775, or no price (battlepass/free) with ≥ 5 levels —
- * same rule as defaultChecked so footer counts match selection.
+ * Premium skin: VP ≥ 1775 when priced; else content tier ≥ Premium (storefront often
+ * omits prices); else no price + ≥ 5 levels. Shared with defaultChecked/footer count.
  */
-export function isPremiumSkin(s: Pick<SkinItem, "price" | "levelCount">): boolean {
+export function isPremiumSkin(
+  s: Pick<SkinItem, "price" | "levelCount" | "contentTierRank">
+): boolean {
   if (s.price != null) return s.price >= PREMIUM_PRICE;
+  if (s.contentTierRank != null) return s.contentTierRank >= PREMIUM_TIER;
   return s.levelCount >= 5;
 }
 
@@ -112,11 +118,22 @@ export function collectionValue(payload: ShowcasePayload, sel: Selection): numbe
   return total;
 }
 
-export function rarityColor(price: number | null, levelCount = 0): string {
-  if (price == null) return isPremiumSkin({ price, levelCount }) ? "#a866ff" : "#4a5560";
-  if (price >= 2475) return "#e8c860";
-  if (price >= PREMIUM_PRICE) return "#a866ff";
-  return "#7fa3c8";
+export function rarityColor(
+  price: number | null,
+  levelCount = 0,
+  contentTierRank: number | null = null
+): string {
+  if (price != null) {
+    if (price >= 2475) return "#e8c860";
+    if (price >= PREMIUM_PRICE) return "#a866ff";
+    return "#7fa3c8";
+  }
+  if (contentTierRank != null) {
+    if (contentTierRank >= 4) return "#e8c860";
+    if (contentTierRank >= PREMIUM_TIER) return "#a866ff";
+    return "#7fa3c8";
+  }
+  return isPremiumSkin({ price, levelCount, contentTierRank }) ? "#a866ff" : "#4a5560";
 }
 
 /** Episode 5+ competitive tiers (Ascendant inserted): from = first tier index of that rank. */
@@ -151,62 +168,35 @@ export type Density = (typeof DENSITIES)[number];
 
 export interface Pages {
   density: Density;
+  /** Non-knife skins, chunked by gun *cells* (one cell per gun group). */
   gridPages: SkinItem[][];
+  /** All selected knives — always rendered on the full-width bottom row. */
+  knifeItems: SkinItem[];
   totalSelected: number;
   truncated: number;
 }
 
-/** Chunk gun-ordered groups into pages of `cap`, preferring not to split a gun across a boundary. */
-function chunkByGunGroups(groups: SkinItem[][], cap: number): SkinItem[][] {
-  const pages: SkinItem[][] = [];
-  let cur: SkinItem[] = [];
-  for (const g of groups) {
-    let i = 0;
-    while (i < g.length) {
-      const space = cap - cur.length;
-      if (space <= 0) {
-        pages.push(cur);
-        cur = [];
-        continue;
-      }
-      // Whole group fits on a fresh page but not the remainder of this one → break early.
-      if (cur.length > 0 && g.length - i > space && g.length - i <= cap) {
-        pages.push(cur);
-        cur = [];
-        continue;
-      }
-      const take = Math.min(space, g.length - i);
-      cur.push(...g.slice(i, i + take));
-      i += take;
-    }
-  }
-  if (cur.length > 0) pages.push(cur);
-  return pages;
-}
-
 export function paginate(selected: SkinItem[]): Pages {
   const total = selected.length;
-  const density = DENSITIES.find((d) => Math.ceil(total / d.capacity) <= 3) ?? DENSITIES[2];
+  const knifeItems = selected.filter((s) => s.isKnife);
+  const gunsOnly = selected.filter((s) => !s.isKnife);
+  // One stack cell per gun — capacity is cells, not individual skins.
+  const groups = groupByGun(gunsOnly);
+  const density = DENSITIES.find((d) => Math.ceil(groups.length / d.capacity) <= 3) ?? DENSITIES[2];
   const cap = density.capacity;
-  const maxItems = cap * 3;
+  const maxCells = cap * 3;
 
-  let groups = groupByGun(selected).map((g) => g.items);
-  const count = (gs: SkinItem[][]) => gs.reduce((n, g) => n + g.length, 0);
   let truncated = 0;
-  while (count(groups) > maxItems && groups.length > 0) {
-    const last = groups[groups.length - 1];
-    if (count(groups) - last.length >= maxItems) {
-      truncated += last.length;
-      groups.pop();
-    } else {
-      const overflow = count(groups) - maxItems;
-      truncated += overflow;
-      groups[groups.length - 1] = last.slice(0, last.length - overflow);
-      break;
-    }
+  let kept = groups;
+  if (groups.length > maxCells) {
+    truncated = groups.slice(maxCells).reduce((n, g) => n + g.items.length, 0);
+    kept = groups.slice(0, maxCells);
   }
 
-  const gridPages = chunkByGunGroups(groups, cap);
+  const gridPages: SkinItem[][] = [];
+  for (let i = 0; i < kept.length; i += cap) {
+    gridPages.push(kept.slice(i, i + cap).flatMap((g) => g.items));
+  }
   if (gridPages.length === 0) gridPages.push([]);
-  return { density, gridPages, totalSelected: total, truncated };
+  return { density, gridPages, knifeItems, totalSelected: total, truncated };
 }

@@ -23,6 +23,8 @@ export interface Catalog {
   buddies: Map<string, { name: string; icon: string | null }>;
   /** tier index → official badge (latest competitivetiers table). */
   rankTiers: Map<number, RankTierInfo>;
+  /** contentTierUuid → rank (0 Select … 4 Ultra). */
+  contentTiers: Map<string, number>;
 }
 
 let cache: { at: number; data: Catalog } | null = null;
@@ -58,19 +60,31 @@ function indexRankTiers(raw: any): Map<number, RankTierInfo> {
   return out;
 }
 
+/** contentTierUuid → rank (0 Select … 4 Ultra). */
+function indexContentTiers(raw: any): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const t of raw?.data ?? []) {
+    const id = typeof t?.uuid === "string" ? t.uuid.toLowerCase() : "";
+    if (id && typeof t?.rank === "number") out.set(id, t.rank);
+  }
+  return out;
+}
+
 export async function getCatalog(): Promise<Catalog> {
   if (cache && Date.now() - cache.at < CATALOG_TTL_MS) return cache.data;
-  const [weapons, cards, titles, buddies, ranks] = await Promise.all([
+  const [weapons, cards, titles, buddies, ranks, contentTiers] = await Promise.all([
     getJson("https://valorant-api.com/v1/weapons"),
     getJson("https://valorant-api.com/v1/playercards"),
     getJson("https://valorant-api.com/v1/playertitles"),
     getJson("https://valorant-api.com/v1/buddies"),
     getJson("https://valorant-api.com/v1/competitivetiers").catch(() => null),
+    getJson("https://valorant-api.com/v1/contenttiers").catch(() => null),
   ]);
   const data: Catalog = {
     skins: new Map(), chromaToSkin: new Map(),
     cards: new Map(), titles: new Map(), buddies: new Map(),
     rankTiers: indexRankTiers(ranks),
+    contentTiers: indexContentTiers(contentTiers),
   };
   const lc = (s: unknown) => (typeof s === "string" ? s.toLowerCase() : "");
   for (const w of weapons.data ?? []) {

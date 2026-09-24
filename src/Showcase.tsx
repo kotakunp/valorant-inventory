@@ -80,7 +80,7 @@ function Medallion({ label, tier, badge }: { label: string; tier: number | null;
 export function Showcase({ payload, pages, page, selection, chromaSel = {}, footer, onToggleSkin, onPickChroma }: Props) {
   const isOn = (kind: ItemKind, id: string) => !!selection[selKey(kind, id)];
   const checkedSkins = payload.skins.filter((s) => isOn("skin", s.id));
-  // Shared premium rule (price ≥ 1775 or level-heuristic when price is null) — matches selection.
+  // Shared premium rule (price / content tier / level fallback) — matches selection.
   const premCount = checkedSkins.filter((s) => isPremiumSkin(s)).length;
   const knifeCount = checkedSkins.filter((s) => s.isKnife).length;
   const checkedCards = payload.cards.filter((c) => isOn("card", c.id));
@@ -91,8 +91,10 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
   const value = collectionValue(payload, selection);
   const pageCount = pages.gridPages.length;
   const gridItems = pages.gridPages[page] ?? [];
+  const knifeItems = pages.knifeItems ?? [];
   const date = payload.generatedAt.slice(0, 10);
   const guns = groupByGun(gridItems);
+  const knives = groupByGun(knifeItems);
 
   const activeChroma = (s: SkinItem) => {
     const id = chromaSel[s.id] ?? s.defaultChromaId ?? s.chromas[0]?.id;
@@ -101,28 +103,27 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
 
   const tileIcon = (s: SkinItem) => activeChroma(s)?.icon ?? s.icon;
 
-  const tile = (s: SkinItem) => {
+  /** One layered skin inside a gun stack — hover raises it via CSS z-index. */
+  const stackItem = (s: SkinItem, index: number) => {
     const chroma = activeChroma(s);
     const showPicker = !!onPickChroma && s.chromas.length > 1;
-    const rarity = rarityColor(s.price, s.levelCount);
+    const rarity = rarityColor(s.price, s.levelCount, s.contentTierRank ?? null);
     return (
       <div
         key={s.id}
-        className={`sc-tile${s.equipped ? " equipped" : ""}`}
-        style={{ borderColor: rarity, ["--rarity" as string]: rarity }}
+        className={`sc-stack-item${s.equipped ? " equipped" : ""}${onToggleSkin ? " clickable" : ""}`}
+        style={{ zIndex: index + 1, ["--rarity" as string]: rarity }}
         onClick={onToggleSkin ? () => onToggleSkin(s.id) : undefined}
         title={s.name}
       >
         <span className="sc-tile-gem" style={{ background: rarity, boxShadow: `0 0 8px ${rarity}` }} />
         {s.equipped && <span className="sc-check">✓</span>}
-        <div className="sc-tile-art">
-          {tileIcon(s) ? (
-            <img src={imgUrl(tileIcon(s))!} alt="" />
-          ) : (
-            <span className="sc-fallback">{s.weaponName}</span>
-          )}
-        </div>
-        <div className="sc-tile-name">{s.name}</div>
+        {tileIcon(s) ? (
+          <img className="sc-stack-art" src={imgUrl(tileIcon(s))!} alt="" />
+        ) : (
+          <span className="sc-fallback">{s.weaponName}</span>
+        )}
+        <span className="sc-stack-name">{s.name}</span>
         {showPicker && (
           <div
             className="sc-chromas"
@@ -151,6 +152,18 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
     );
   };
 
+  const gunSection = (gun: { id: string; label: string; items: SkinItem[] }) => (
+    <section className="sc-cat" key={gun.id}>
+      <div className="sc-cat-head">
+        <CatMark />
+        <span className="sc-cat-name">{gun.label}</span>
+        <span className="sc-cat-rule" aria-hidden="true" />
+        {gun.items.length > 1 && <span className="sc-stack-count">{gun.items.length}</span>}
+      </div>
+      <div className="sc-stack">{gun.items.map((s, i) => stackItem(s, i))}</div>
+    </section>
+  );
+
   return (
     <div className="sc-root">
       <div className="sc-wedge" />
@@ -177,22 +190,26 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
 
         <main className={`sc-center density-${pages.density.name}`}>
           <div className="sc-cats">
-            {guns.map((gun) => (
-              <section className="sc-cat" key={gun.id}>
-                <div className="sc-cat-head">
-                  <CatMark />
-                  <span className="sc-cat-name">{gun.label}</span>
-                  <span className="sc-cat-rule" aria-hidden="true" />
-                </div>
-                <div className="sc-cat-tiles">{gun.items.map(tile)}</div>
-              </section>
-            ))}
-            {guns.length === 0 && gridItems.length === 0 && (
+            {guns.map(gunSection)}
+            {guns.length === 0 && gridItems.length === 0 && knifeItems.length === 0 && (
               <div className="sc-empty">
                 {pages.totalSelected === 0 ? "NO SKINS SELECTED" : pageCount > 1 ? "SEE PAGE 1" : "NO SKINS"}
               </div>
             )}
           </div>
+          {knifeItems.length > 0 && (
+            <div className="sc-knife-row">
+              <div className="sc-cat-head sc-cat-head--sm">
+                <KnifeIcon />
+                <span className="sc-cat-name">MELEE</span>
+                <span className="sc-cat-rule" aria-hidden="true" />
+                <span className="sc-stack-count">{knifeItems.length}</span>
+              </div>
+              <div className="sc-stack sc-stack--knife">
+                {knives.flatMap((g) => g.items).map((s, i) => stackItem(s, i))}
+              </div>
+            </div>
+          )}
         </main>
 
         <aside className="sc-right">
