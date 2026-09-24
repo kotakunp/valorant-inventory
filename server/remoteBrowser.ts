@@ -259,13 +259,17 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
   // while the login page loads.
   s.frameLoop = captureLoop(s);
 
-  try {
-    await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
-  } catch {
-    /* still try — SPA may be loading */
-  }
-  s.phase = "login";
-  startPoller(s);
+  // Do not block /api/browser/start on page.goto — return the session, then finish loading.
+  void (async () => {
+    try {
+      await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
+    } catch {
+      /* still try — SPA may be loading */
+    }
+    if (session !== s || s.stopping) return;
+    s.phase = "login";
+    startPoller(s);
+  })();
   // region is consumed when harvest finishes via auth.region fallback; keep param for API symmetry
   void region;
   return status();
