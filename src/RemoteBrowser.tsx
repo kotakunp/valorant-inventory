@@ -24,6 +24,7 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
   const [frameSrc, setFrameSrc] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pollEpoch, setPollEpoch] = useState(0);
   const imgRef = useRef<HTMLImageElement>(null);
   const startedRef = useRef(false);
   const startFailedRef = useRef(false);
@@ -66,6 +67,8 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
       startFailedRef.current = false;
       setStatus(json);
       pollEnabledRef.current = true;
+      // Kick the frame/status loop only after start succeeds (mount-time tick exits early).
+      setPollEpoch((n) => n + 1);
     } catch {
       const msg = "Network error starting remote browser.";
       setErr(msg);
@@ -81,8 +84,9 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
     void start();
   }, [start]);
 
-  // Frame + status poll loop (only after a successful start)
+  // Frame + status poll loop — runs when pollEpoch changes (after a successful start)
   useEffect(() => {
+    if (pollEpoch === 0 || startFailedRef.current || !pollEnabledRef.current) return;
     let dead = false;
     let frameSeq = 0;
     const tick = async () => {
@@ -130,7 +134,7 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
     return () => {
       dead = true;
     };
-  }, [onDone]);
+  }, [onDone, pollEpoch]);
 
   const toPageXY = (e: MouseEvent<HTMLImageElement> | WheelEvent<HTMLImageElement>) => {
     const img = imgRef.current;
@@ -185,6 +189,7 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
     startedRef.current = false;
     startFailedRef.current = false;
     pollEnabledRef.current = false;
+    setPollEpoch(0);
     setStatus({ active: false, phase: "expired", width: 0, height: 0 });
     setFrameSrc(null);
     setErr("Remote browser closed.");
@@ -202,6 +207,7 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
             startedRef.current = false;
             startFailedRef.current = false;
             pollEnabledRef.current = false;
+            setPollEpoch(0);
             void start();
           }}
         >

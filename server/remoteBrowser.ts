@@ -314,44 +314,52 @@ export async function sendInput(input: RemoteInput): Promise<void> {
   if (!session || (session.phase !== "login" && session.phase !== "starting")) {
     throw new AuthFlowError("No active remote browser session.", 404);
   }
-  const page = session.page;
-  switch (input.type) {
-    case "mousemove":
-      await page.mouse.move(input.x, input.y);
-      break;
-    case "mousedown":
-      await page.mouse.move(input.x, input.y);
-      await page.mouse.down({ button: input.button ?? "left" });
-      break;
-    case "mouseup":
-      await page.mouse.move(input.x, input.y);
-      await page.mouse.up({ button: input.button ?? "left" });
-      break;
-    case "click":
-      await page.mouse.click(input.x, input.y, { button: input.button ?? "left" });
-      break;
-    case "wheel":
-      await page.mouse.move(input.x, input.y);
-      await page.mouse.wheel(input.deltaX, input.deltaY);
-      break;
-    case "keydown":
-      await page.keyboard.down(input.key);
-      break;
-    case "keyup":
-      await page.keyboard.up(input.key);
-      break;
-    case "type":
-      await page.keyboard.type(input.text, { delay: 20 });
-      break;
-    case "press":
-      await page.keyboard.press(input.key);
-      break;
-    case "scroll":
-      await page.mouse.move(input.x, input.y);
-      await page.mouse.wheel(0, input.y);
-      break;
-    default:
-      break;
+  try {
+    const page = session.page;
+    switch (input.type) {
+      case "mousemove":
+        await page.mouse.move(input.x, input.y);
+        break;
+      case "mousedown":
+        await page.mouse.move(input.x, input.y);
+        await page.mouse.down({ button: input.button ?? "left" });
+        break;
+      case "mouseup":
+        await page.mouse.move(input.x, input.y);
+        await page.mouse.up({ button: input.button ?? "left" });
+        break;
+      case "click":
+        await page.mouse.click(input.x, input.y, { button: input.button ?? "left" });
+        break;
+      case "wheel":
+        await page.mouse.move(input.x, input.y);
+        await page.mouse.wheel(input.deltaX, input.deltaY);
+        break;
+      case "keydown":
+        await page.keyboard.down(input.key);
+        break;
+      case "keyup":
+        await page.keyboard.up(input.key);
+        break;
+      case "type":
+        await page.keyboard.type(input.text, { delay: 20 });
+        break;
+      case "press":
+        await page.keyboard.press(input.key);
+        break;
+      case "scroll":
+        await page.mouse.move(input.x, input.y);
+        await page.mouse.wheel(0, input.y);
+        break;
+      default:
+        break;
+    }
+  } catch (e) {
+    if (e instanceof AuthFlowError) throw e;
+    throw new AuthFlowError(
+      e instanceof Error ? `Remote input failed: ${e.message.slice(0, 160)}` : "Remote input failed.",
+      502
+    );
   }
 }
 
