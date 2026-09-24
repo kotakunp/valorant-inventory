@@ -212,8 +212,13 @@ function profileDir(): string {
   return path.join(os.homedir(), ".valorant-store", "remote-profile");
 }
 
-/** CDP screencast — keeps streaming during page.goto (page.screenshot hangs on navigate). */
-async function startScreencast(s: RemoteSession): Promise<void> {
+/**
+ * Continuous frame capture — always on.
+ * CDP screencast alone freezes after the first frame on nix chromium (ack/nav issues);
+ * a timeout-guarded screenshot loop keeps the stream alive during navigation.
+ */
+async function startCaptureLoop(s: RemoteSession): Promise<void> {
+  let useCdp = false;
   try {
     const cdp = await s.page.context().newCDPSession(s.page);
     s.cdp = cdp;
@@ -222,6 +227,7 @@ async function startScreencast(s: RemoteSession): Promise<void> {
       try {
         s.lastFrame = Buffer.from(params.data, "base64");
         s.lastFrameAt = Date.now();
+        useCdp = true;
       } catch {
         /* bad frame */
       }
@@ -235,31 +241,25 @@ async function startScreencast(s: RemoteSession): Promise<void> {
       maxHeight: VIEWPORT.height,
       everyNthFrame: 1,
     });
-    // Watchdog: if screencast never delivers a frame, fall back to timed screenshots.
-    await new Promise((r) => setTimeout(r, 2500));
-    if (!s.stopping && session === s && Date.now() - s.lastFrameAt > 2000) {
-      await captureFallbackLoop(s);
-    }
   } catch {
     s.cdp = null;
-    await captureFallbackLoop(s);
   }
-}
 
-/** Fallback if CDP screencast unavailable — screenshot with hard timeout so navigation cannot freeze it. */
-async function captureFallbackLoop(s: RemoteSession): Promise<void> {
   while (!s.stopping && session === s) {
-    try {
-      const buf = await Promise.race([
-        s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 2000 }),
-        new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("shot timeout")), 2500)),
-      ]);
-      s.lastFrame = Buffer.from(buf);
-      s.lastFrameAt = Date.now();
-    } catch {
-      /* navigating */
+    // If screencast went quiet (>1.5s), take a timed screenshot so frames never freeze.
+    if (Date.now() - s.lastFrameAt > 1500 || !useCdp) {
+      try {
+        const buf = await Promise.race([
+          s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 2000 }),
+          new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("shot timeout")), 2500)),
+        ]);
+        s.lastFrame = Buffer.from(buf);
+        s.lastFrameAt = Date.now();
+      } catch {
+        /* navigating / busy */
+      }
     }
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 250));
   }
 }
 
@@ -351,27 +351,27 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
       console.warn(`[remote-browser] pageerror: ${String(err).slice(0, 200)}`);
     });
 
-    // Screencast first so frames stream while page.goto runs (screenshot would hang).
-    s.frameLoop = startScreencast(s);
+    // Continuous capture: screencast + timed screenshot fallback so frames never freeze.
+    s.frameLoop = startCaptureLoop(s);
     startPoller(s);
 
     void (async () => {
       try {
         await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
-        // Prime one frame after first paint even if screencast is quiet.
-        await new Promise((r) => setTimeout(r, 800));
-        if (!s.stopping && session === s && !s.lastFrame) {
-          try {
-            s.lastFrame = Buffer.from(
-              await Promise.race([
-                page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 3000 }),
-                new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("shot timeout")), 3500)),
-              ])
-            );
-            s.lastFrameAt = Date.now();
-          } catch {
-            /* still navigating */
+        // Give the SPA a moment; if still spinning, reload once (flaky edge caches).
+        await new Promise((r) => setTimeout(r, 6000));
+        if (s.stopping || session !== s) return;
+        try {
+          const ready = await page.evaluate(() => document.readyState);
+          const hasForm = await page.evaluate(
+            () => !!document.querySelector('input[type="email"], input[type="text"], input[name*="login"], form')
+          );
+          if (ready !== "complete" || !hasForm) {
+            console.warn(`[remote-browser] login SPA thin (ready=${ready}, form=${hasForm}) — reloading`);
+            await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
           }
+        } catch {
+          /* evaluate/page busy */
         }
       } catch {
         /* SPA/network slow — frames still stream; user can retry Close */
