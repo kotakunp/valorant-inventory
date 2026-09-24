@@ -53,6 +53,17 @@ describe("loadout categories", () => {
     const flat = WEAPON_CATEGORIES.flatMap((c) => c.guns);
     expect([...flat]).toEqual([...LOADOUT_GUNS]);
   });
+  it("showcase uses exactly 4 columns (smg+shot, sniper+heavy merged)", () => {
+    expect(WEAPON_CATEGORIES).toHaveLength(4);
+    expect(WEAPON_CATEGORIES.map((c) => c.id)).toEqual([
+      "sidearms",
+      "smgs-shotguns",
+      "rifles",
+      "snipers-heavies",
+    ]);
+    expect(WEAPON_CATEGORIES[1].guns).toEqual(["Stinger", "Spectre", "Bucky", "Judge"]);
+    expect(WEAPON_CATEGORIES[3].guns).toEqual(["Marshal", "Outlaw", "Operator", "Ares", "Odin"]);
+  });
 });
 
 describe("buildLoadoutSlots", () => {

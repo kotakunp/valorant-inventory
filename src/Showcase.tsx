@@ -125,7 +125,7 @@ export function Showcase({
   const slots = pages.gridPages[page] ?? [];
   const knifeItems = pages.knifeItems ?? [];
 
-  /** Category columns: SIDEARMS | SMGS | … | HEAVIES | OTHER (unknown guns). */
+  /** Exactly 4 category columns (+ OTHER for unknown guns). */
   const catColumns: { id: string; label: string; guns: GunGroup[] }[] = (() => {
     const official = new Set(LOADOUT_GUNS.map((w) => w.toUpperCase()));
     const used = new Set<string>();

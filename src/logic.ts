@@ -42,18 +42,19 @@ export const WEAPON_ORDER = [
   "Odin",
 ] as const;
 
-/** Loadout categories as shown in VALORANT collection/arsenal (sidearms → … → heavies). */
+/**
+ * Showcase column groups (exactly 4 + optional OTHER).
+ * Flat gun list still follows official loadout order.
+ */
 export const WEAPON_CATEGORIES = [
   { id: "sidearms", label: "SIDEARMS", guns: ["Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff"] },
-  { id: "smgs", label: "SMGS", guns: ["Stinger", "Spectre"] },
-  { id: "shotguns", label: "SHOTGUNS", guns: ["Bucky", "Judge"] },
+  { id: "smgs-shotguns", label: "SMGS · SHOTGUNS", guns: ["Stinger", "Spectre", "Bucky", "Judge"] },
   { id: "rifles", label: "RIFLES", guns: ["Bulldog", "Guardian", "Phantom", "Vandal"] },
-  { id: "snipers", label: "SNIPERS", guns: ["Marshal", "Outlaw", "Operator"] },
-  { id: "heavies", label: "HEAVIES", guns: ["Ares", "Odin"] },
+  { id: "snipers-heavies", label: "SNIPERS · HEAVIES", guns: ["Marshal", "Outlaw", "Operator", "Ares", "Odin"] },
 ] as const;
 
 /** Flat gun list in official loadout category order (excludes melee). */
-export const LOADOUT_GUNS: readonly string[] = WEAPON_CATEGORIES.flatMap((c) => c.guns);
+export const LOADOUT_GUNS: readonly string[] = WEAPON_ORDER;
 
 const ORDER_KEYS = [...WEAPON_ORDER.map((w) => w.toUpperCase()), "MELEE"];
 

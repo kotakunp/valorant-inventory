@@ -76,7 +76,7 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 ## 7. Image output spec
 
 - **Base canvas: 1280 × 720** CSS px, exported with `pixelRatio: 2` → **2560 × 1440 PNG (1440p, 16:9)**.
-- **Pagination:** center zone is **category columns** (SIDEARMS | SMGS | SHOTGUNS | RIFLES | SNIPERS | HEAVIES, each a vertical stack of gun slots in official order; unknown guns → OTHER). Always every official gun (19); knives on the full-width bottom row (not paginated). Removing the last skin of a gun keeps an **empty slot**. Density only applies if unknown guns overflow (fewest pages 1 → 2 → 3, then dense):
+- **Pagination:** center zone is **exactly 4 category columns** — SIDEARMS | SMGS · SHOTGUNS | RIFLES | SNIPERS · HEAVIES (guns stack top→bottom in official order within each column; unknown guns → OTHER). Always every official gun (19); knives on the full-width bottom row (not paginated). Removing the last skin of a gun keeps an **empty slot**. Density only applies if unknown guns overflow (fewest pages 1 → 2 → 3, then dense):
 
   | Density | Fallback chunk (flat slots) | Capacity/page |
   |---|---|---|
@@ -98,8 +98,8 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 │ HEADER   [RIOT ID #TAG]   LV.207   ·   NA   ·  <equipped title>    │
 ├─────────────────────────────────────────────┬───────────────────────┤
 │ COLLECTION COLUMNS                         │ PLAYER CARD           │
-│ SIDEARMS│SMGS│SHOTGUNS│RIFLES│…│HEAVIES    │ tall art panel        │
-│ guns stack down each category column       │ PEAK / CURRENT RANK   │
+│ SIDEARMS│SMGS·SHOTS│RIFLES│SNIPERS·HEAVIES │ tall art panel        │
+│ guns stack down each column                │ PEAK / CURRENT RANK   │
 │ — stacked skins, empty = blank slot        │ VP / RP               │
 │ click skin → menu (chroma/front/remove)    │ PREM:n  KNIFE:n       │
 │ ── MELEE bottom row (always) ──            │ buddies +N            │
@@ -108,7 +108,7 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Category columns:** one column per VAL category (guns fill top→bottom in each column), not row-major grid fill.
+- **Category columns:** exactly 4 columns (SMGs+shotguns merged; snipers+heavies merged) — guns fill top→bottom, not row-major grid fill.
 - **Empty slots always rendered** for official guns (and empty MELEE strip) — matches VALORANT loadout.
 - **Rank medallions (MVP):** styled circular badge, tier name + tier color (real tier icons = phase 2).
 - **Right rail only:** card + ranks + wallet + PREM/KNIFE + buddies under the player card; skins grid takes full remaining width (no left rail). No footer bar.
