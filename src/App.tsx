@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, type FormEvent, type CSSProperties } from "react";
 import { toPng } from "html-to-image";
-import type { ItemKind, Region, Selection, ShowcasePayload } from "./types";
+import type { ChromaSelection, ItemKind, Region, Selection, ShowcasePayload } from "./types";
 import { selKey } from "./types";
 import { buildSelection, paginate, rarityColor } from "./logic";
 import type { AnyItem } from "./logic";
@@ -64,6 +64,7 @@ export default function App() {
   const [form, setForm] = useState({ region: "na" as Region, accessToken: "", entitlementsToken: "", puuid: "" });
   const [data, setData] = useState<ShowcasePayload | null>(null);
   const [selection, setSelection] = useState<Selection>({});
+  const [chromaSel, setChromaSel] = useState<ChromaSelection>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<LoadKind | null>(null);
   const [fm, setFm] = useState({ on: false, text: "" });
@@ -134,6 +135,22 @@ export default function App() {
   const footerOpts = { fm: fm.on, fmText: fm.text, proof: proof.on, proofText: proof.text };
   const img = (u: string | null) => (u ? `/img/${encodeURIComponent(u)}` : undefined);
 
+  function defaultChromaMap(payload: ShowcasePayload): ChromaSelection {
+    const out: ChromaSelection = {};
+    for (const s of payload.skins) {
+      const id = s.defaultChromaId ?? s.chromas[0]?.id;
+      if (id) out[s.id] = id;
+    }
+    return out;
+  }
+
+  function applyData(json: ShowcasePayload) {
+    setData(json);
+    setSelection(buildSelection(json));
+    setChromaSel(defaultChromaMap(json));
+    setPage(0);
+  }
+
   useEffect(() => {
     if (data || !captchaNeeded) return; // widget only loads when Riot challenges us
     let dead = false;
@@ -200,6 +217,7 @@ export default function App() {
       }
       setData(json);
       setSelection(buildSelection(json));
+      setChromaSel(defaultChromaMap(json));
       setPage(0);
     } catch {
       setError("Network error — is the server running on port 3001?");
@@ -210,6 +228,9 @@ export default function App() {
 
   const toggle = (kind: ItemKind, id: string) =>
     setSelection((s) => ({ ...s, [selKey(kind, id)]: !s[selKey(kind, id)] }));
+
+  const pickChroma = (skinId: string, chromaId: string) =>
+    setChromaSel((s) => ({ ...s, [skinId]: chromaId }));
 
   const setSection = (kind: ItemKind, mode: "all" | "none" | "premium") => {
     if (!data) return;
@@ -311,9 +332,7 @@ export default function App() {
   }
 
   function applyShowcase(json: ShowcasePayload) {
-    setData(json);
-    setSelection(buildSelection(json));
-    setPage(0);
+    applyData(json);
   }
 
   async function submitLogin(e: FormEvent) {
@@ -520,6 +539,8 @@ export default function App() {
         {items.map((i) => {
           const on = !!selection[selKey(kind, i.id)];
           const icon = "icon" in i ? i.icon : null;
+          const skinChromas = kind === "skin" && on ? (i as import("./types").SkinItem).chromas ?? [] : [];
+          const activeChromaId = kind === "skin" ? chromaSel[i.id] : undefined;
           return (
             <label
               key={i.id}
@@ -527,13 +548,56 @@ export default function App() {
               style={{ "--rarity": rarityColor(i.price) } as CSSProperties}
             >
               <input type="checkbox" checked={on} onChange={() => toggle(kind, i.id)} />
-              {icon && <img src={img(icon)} width={16} height={16} alt="" style={{ display: "block", borderRadius: 2 }} />}
+              {(() => {
+                let showIcon = icon;
+                if (kind === "skin" && skinChromas.length) {
+                  const s = i as import("./types").SkinItem;
+                  const ch = s.chromas.find((c) => c.id === (activeChromaId ?? s.defaultChromaId));
+                  if (ch?.icon) showIcon = ch.icon;
+                }
+                return showIcon ? (
+                  <img src={img(showIcon)} width={16} height={16} alt="" style={{ display: "block", borderRadius: 2 }} />
+                ) : null;
+              })()}
               <span className="chip-name" title={i.name}>{i.name}</span>
               {i.price != null && <span className="price">{i.price}</span>}
             </label>
           );
         })}
       </div>
+      {kind === "skin" &&
+        (() => {
+          const withChromas = (items as import("./types").SkinItem[]).filter(
+            (s) => selection[selKey("skin", s.id)] && s.chromas.length > 1
+          );
+          if (!withChromas.length) return null;
+          return (
+            <div className="chroma-panel">
+              <div className="chroma-panel-label">CHROMA — selected skins</div>
+              {withChromas.map((s) => {
+                const active = chromaSel[s.id] ?? s.defaultChromaId ?? s.chromas[0]?.id;
+                return (
+                  <div key={s.id} className="chroma-row">
+                    <span className="chroma-skin" title={s.name}>{s.name}</span>
+                    <span className="chroma-dots">
+                      {s.chromas.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className={"chroma-dot" + (active === c.id ? " on" : "")}
+                          title={c.name}
+                          onClick={() => pickChroma(s.id, c.id)}
+                        >
+                          {c.icon ? <img src={img(c.icon)} alt="" /> : c.name.slice(0, 1)}
+                        </button>
+                      ))}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       {items.length === 0 && (
         <p className="note">
           No items in this category.{" "}
@@ -858,6 +922,7 @@ export default function App() {
           onClick={() => {
             setData(null);
             setSelection({});
+            setChromaSel({});
             setError(null);
             setLoading(null);
             setForm({ region: form.region, accessToken: "", entitlementsToken: "", puuid: "" });
@@ -947,8 +1012,10 @@ export default function App() {
                 pages={pages}
                 page={page}
                 selection={selection}
+                chromaSel={chromaSel}
                 footer={footerOpts}
                 onToggleSkin={(id) => toggle("skin", id)}
+                onPickChroma={pickChroma}
               />
             </div>
           </div>

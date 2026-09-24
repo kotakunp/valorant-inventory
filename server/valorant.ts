@@ -1,4 +1,4 @@
-import type { Region, ShowcasePayload, SkinItem, CardItem, TitleItem, BuddyItem } from "../src/types";
+import type { ChromaOption, Region, ShowcasePayload, SkinItem, CardItem, TitleItem, BuddyItem } from "../src/types";
 import { getCatalog, getClientVersion } from "./catalog";
 
 export class UpstreamError extends Error {
@@ -193,37 +193,81 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
   );
 
   const variantsPerSkin = new Map<string, number>();
+  const ownedChromaIds = new Set<string>();
   for (const id of parseEntitlements(entVariants, ITEM_TYPE.variants)) {
-    const skinId = catalog.chromaToSkin.get(id) ?? (catalog.skins.has(id) ? id : undefined);
+    ownedChromaIds.add(id);
+    const skinId = catalog.chromaToSkin.get(id);
     if (skinId) variantsPerSkin.set(skinId, (variantsPerSkin.get(skinId) ?? 0) + 1);
   }
 
+  const equippedChromaBySkin = new Map<string, string>();
+  for (const g of loadoutBody?.Guns ?? []) {
+    const skinId = typeof g?.SkinID === "string" ? g.SkinID.toLowerCase() : "";
+    const chromaId = typeof g?.ChromaID === "string" ? g.ChromaID.toLowerCase() : "";
+    if (skinId && chromaId) equippedChromaBySkin.set(skinId, chromaId);
+  }
+
   const rawSkinIds = uniq(parseEntitlements(entSkins, ITEM_TYPE.skins));
-  const skins: SkinItem[] = [];
+  const bySkinUuid = new Map<string, SkinItem>();
   let catalogMissed = 0;
-  for (const id of rawSkinIds) {
-    const entry = catalog.skins.get(id);
+  for (const rawId of rawSkinIds) {
+    const entry = catalog.skins.get(rawId);
     if (!entry) {
       catalogMissed++;
       continue;
     }
-    if (entry.skin.uuid === entry.defaultSkinUuid) continue;
+    const skinUuid = String(entry.skin.uuid ?? "").toLowerCase();
+    if (!skinUuid || skinUuid === entry.defaultSkinUuid) continue;
+    if (bySkinUuid.has(skinUuid)) continue;
+
     const levels: any[] = entry.skin.levels ?? [];
-    const icon = (levels.length ? levels[levels.length - 1]?.displayIcon : null) ?? entry.skin.displayIcon ?? null;
+    const chromasRaw: any[] = entry.skin.chromas ?? [];
+    const chromas: ChromaOption[] = chromasRaw
+      .map((ch: any, idx: number) => {
+        const id = typeof ch?.uuid === "string" ? ch.uuid.toLowerCase() : "";
+        if (!id) return null;
+        // Base chroma ships with the skin; extras require a variant entitlement.
+        const owned = idx === 0 || ownedChromaIds.has(id);
+        if (!owned) return null;
+        return {
+          id,
+          name: (typeof ch?.displayName === "string" && ch.displayName.trim()
+            ? ch.displayName
+            : idx === 0
+              ? "Default"
+              : `Variant ${idx + 1}`
+          ).trim(),
+          icon: typeof ch?.displayIcon === "string" ? ch.displayIcon : null,
+        } satisfies ChromaOption;
+      })
+      .filter((c): c is ChromaOption => c !== null);
+
+    const equippedChroma = equippedChromaBySkin.get(skinUuid);
+    const defaultChromaId =
+      (equippedChroma && chromas.some((c) => c.id === equippedChroma) && equippedChroma) ||
+      chromas[0]?.id ||
+      null;
+    const baseIcon =
+      (levels.length ? levels[levels.length - 1]?.displayIcon : null) ?? entry.skin.displayIcon ?? null;
+    const activeChroma = chromas.find((c) => c.id === defaultChromaId);
     const isKnife =
       entry.category.toLowerCase().includes("knife") || /knife|melee/i.test(entry.weaponName);
-    skins.push({
-      id,
+
+    bySkinUuid.set(skinUuid, {
+      id: skinUuid,
       name: entry.skin.displayName ?? "Unknown skin",
       weaponName: entry.weaponName,
-      icon,
-      price: pricesAvailable ? priceMap!.get(id) ?? null : null,
+      icon: activeChroma?.icon ?? baseIcon,
+      price: pricesAvailable ? priceMap!.get(skinUuid) ?? null : null,
       levelCount: levels.length,
-      variantCount: variantsPerSkin.get(id) ?? 0,
+      variantCount: chromas.length || (variantsPerSkin.get(skinUuid) ?? 0),
       isKnife,
-      equipped: equippedSkins.has(id),
+      equipped: equippedSkins.has(skinUuid),
+      chromas,
+      defaultChromaId,
     });
   }
+  const skins = [...bySkinUuid.values()];
   skins.sort((a, b) => (b.price ?? -1) - (a.price ?? -1) || a.name.localeCompare(b.name));
   // Counts only — no tokens/puuid — to diagnose empty joins after cookie login.
   console.log(

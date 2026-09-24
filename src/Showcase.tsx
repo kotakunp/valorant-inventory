@@ -1,4 +1,4 @@
-import type { ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
+import type { ChromaSelection, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
 import { selKey } from "./types";
 import type { Pages } from "./logic";
 import { rarityColor, tierInfo, collectionValue } from "./logic";
@@ -14,8 +14,10 @@ interface Props {
   pages: Pages;
   page: number;
   selection: Selection;
+  chromaSel?: ChromaSelection;
   footer: { fm: boolean; fmText: string; proof: boolean; proofText: string };
   onToggleSkin?: (id: string) => void;
+  onPickChroma?: (skinId: string, chromaId: string) => void;
 }
 
 function Medallion({ label, tier }: { label: string; tier: number | null }) {
@@ -30,7 +32,7 @@ function Medallion({ label, tier }: { label: string; tier: number | null }) {
   );
 }
 
-export function Showcase({ payload, pages, page, selection, footer, onToggleSkin }: Props) {
+export function Showcase({ payload, pages, page, selection, chromaSel = {}, footer, onToggleSkin, onPickChroma }: Props) {
   const isOn = (kind: ItemKind, id: string) => !!selection[selKey(kind, id)];
   const checkedSkins = payload.skins.filter((s) => isOn("skin", s.id));
   const premCount = checkedSkins.filter((s) => !s.isKnife && (s.price ?? 0) >= 1775).length;
@@ -45,22 +47,61 @@ export function Showcase({ payload, pages, page, selection, footer, onToggleSkin
   const gridItems = pages.gridPages[page] ?? [];
   const date = payload.generatedAt.slice(0, 10);
 
-  const tile = (s: SkinItem) => (
-    <div
-      key={s.id}
-      className={`sc-tile${s.equipped ? " equipped" : ""}`}
-      style={{ borderColor: rarityColor(s.price) }}
-      onClick={onToggleSkin ? () => onToggleSkin(s.id) : undefined}
-      title={s.name}
-    >
-      {s.equipped && <span className="sc-check">✓</span>}
-      {s.icon ? <img src={imgUrl(s.icon)!} alt="" /> : <span className="sc-fallback">{s.weaponName}</span>}
-      <div className="sc-tile-foot">
-        <span className="sc-tile-name">{s.name}</span>
-        {s.variantCount > 1 && <span className="sc-tile-tag">×{s.variantCount}</span>}
+  const activeChroma = (s: SkinItem) => {
+    const id = chromaSel[s.id] ?? s.defaultChromaId ?? s.chromas[0]?.id;
+    return s.chromas.find((c) => c.id === id) ?? null;
+  };
+
+  const tileIcon = (s: SkinItem) => activeChroma(s)?.icon ?? s.icon;
+
+  const tile = (s: SkinItem) => {
+    const chroma = activeChroma(s);
+    const showPicker = !!onPickChroma && s.chromas.length > 1;
+    return (
+      <div
+        key={s.id}
+        className={`sc-tile${s.equipped ? " equipped" : ""}`}
+        style={{ borderColor: rarityColor(s.price) }}
+        onClick={onToggleSkin ? () => onToggleSkin(s.id) : undefined}
+        title={s.name}
+      >
+        {s.equipped && <span className="sc-check">✓</span>}
+        {tileIcon(s) ? (
+          <img src={imgUrl(tileIcon(s))!} alt="" />
+        ) : (
+          <span className="sc-fallback">{s.weaponName}</span>
+        )}
+        <div className="sc-tile-foot">
+          <span className="sc-tile-name">{s.name}</span>
+          {s.chromas.length > 1 && <span className="sc-tile-tag">×{s.chromas.length}</span>}
+        </div>
+        {showPicker && (
+          <div
+            className="sc-chromas"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="group"
+            aria-label={`Chroma for ${s.name}`}
+          >
+            {s.chromas.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={"sc-chroma" + (chroma?.id === c.id ? " on" : "")}
+                title={c.name}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPickChroma(s.id, c.id);
+                }}
+              >
+                {c.icon ? <img src={imgUrl(c.icon)!} alt="" /> : <span>{c.name.slice(0, 1)}</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="sc-root">

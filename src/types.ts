@@ -1,5 +1,11 @@
 export type Region = "na" | "latam" | "br" | "eu" | "ap" | "kr";
 
+export interface ChromaOption {
+  id: string;
+  name: string;
+  icon: string | null;
+}
+
 export interface SkinItem {
   id: string;
   name: string;
@@ -10,6 +16,9 @@ export interface SkinItem {
   variantCount: number;
   isKnife: boolean;
   equipped: boolean;
+  /** Owned chromas (index 0 = base). Empty when catalog has none. */
+  chromas: ChromaOption[];
+  defaultChromaId: string | null;
 }
 
 export interface CardItem {
@@ -54,5 +63,7 @@ export interface ShowcasePayload {
 
 export type ItemKind = "skin" | "card" | "title" | "buddy";
 export type Selection = Record<string, boolean>;
+/** skinId → chosen chroma id (UI state only). */
+export type ChromaSelection = Record<string, string>;
 
 export const selKey = (kind: ItemKind, id: string): string => `${kind}:${id}`;

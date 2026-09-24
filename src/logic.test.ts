@@ -4,7 +4,8 @@ import type { CardItem, ShowcasePayload, SkinItem } from "./types";
 
 const skin = (over: Partial<SkinItem> = {}): SkinItem => ({
   id: over.id ?? "s1", name: "X", weaponName: "Vandal", icon: null, price: null,
-  levelCount: 1, variantCount: 0, isKnife: false, equipped: false, ...over,
+  levelCount: 1, variantCount: 0, isKnife: false, equipped: false,
+  chromas: [], defaultChromaId: null, ...over,
 });
 const card = (over: Partial<CardItem> = {}): CardItem =>
   ({ id: "c1", name: "Card", icon: null, price: null, equipped: false, ...over });

@@ -74,6 +74,27 @@ input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); }
 .chip .chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
 .chip.on { border-color: var(--rarity, var(--accent)); }
 .chip .price { color: var(--muted); font-size: 10px; }
+.chroma-panel {
+  margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 6px; max-height: 140px; overflow-y: auto;
+}
+.chroma-panel-label {
+  font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+}
+.chroma-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.chroma-skin {
+  flex: 1; min-width: 0; font-size: 11px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chroma-dots { display: flex; gap: 4px; flex-shrink: 0; }
+.chroma-dot {
+  width: 22px; height: 22px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--line); background: #0c141d;
+  overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: var(--muted);
+}
+.chroma-dot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.chroma-dot.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .preview-area { flex: 1; min-width: 0; }
 .preview-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .pager { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
@@ -163,6 +184,20 @@ input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); }
   flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted);
   font-size: 16px; letter-spacing: 0.2em; border: 1px dashed var(--line); border-radius: 4px;
 }
+.sc-chromas {
+  position: absolute; left: 0; right: 0; bottom: 20px;
+  display: flex; justify-content: center; gap: 3px; padding: 0 4px;
+  opacity: 0; transition: opacity 0.12s ease; pointer-events: none;
+}
+.sc-tile:hover .sc-chromas, .sc-tile:focus-within .sc-chromas { opacity: 1; pointer-events: auto; }
+.sc-chroma {
+  width: 18px; height: 18px; padding: 0; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(0, 0, 0, 0.55);
+  overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.sc-chroma img { width: 100%; height: 100%; object-fit: cover; max-width: none; max-height: none; filter: none; }
+.sc-chroma span { font-size: 8px; color: var(--text); }
+.sc-chroma.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .sc-knives { display: flex; flex-direction: column; gap: 6px; }
 .sc-knife-row { display: flex; gap: 8px; }
 .sc-knife-row .sc-tile { flex: 1; height: 74px; border-color: #e8c860; }
