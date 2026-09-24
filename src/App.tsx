@@ -674,6 +674,7 @@ export default function App() {
     return (
       <div className="app">
         <div className="app-header">
+          <span className="brand-mark" aria-hidden="true" />
           <h1>REMOTE LOGIN</h1>
           <span className="sub">Riot&apos;s real page — captcha + 2FA work here · cookies stay on the server</span>
         </div>
@@ -699,9 +700,10 @@ export default function App() {
       <div className="gate">
         <div className="gate-card">
           <div className="gate-brand">
-            <span className="gate-logo">
-              ACCOUNT <em>SHOWCASE</em>
-            </span>
+            <div className="gate-logo-row">
+              <span className="brand-mark brand-mark--lg" aria-hidden="true" />
+              <span className="gate-logo">COLLECTION</span>
+            </div>
             <span className="gate-tagline">
               VALORANT inventory → 1440p share image · no links, no storage
             </span>
@@ -995,9 +997,9 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="topbar-brand">
-          SHOW<span>CASE</span>
-        </span>
+        <span className="brand-mark" aria-hidden="true" />
+        <span className="topbar-div" aria-hidden="true" />
+        <span className="topbar-brand">COLLECTION</span>
         <div className="topbar-id">
           <span className="topbar-name">
             {data.gameName}
