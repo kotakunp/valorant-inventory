@@ -255,13 +255,16 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
   };
   session = s;
 
+  // Capture frames immediately (about:blank) so the UI is never stuck on "No frame yet"
+  // while the login page loads.
+  s.frameLoop = captureLoop(s);
+
   try {
     await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
   } catch {
     /* still try — SPA may be loading */
   }
   s.phase = "login";
-  s.frameLoop = captureLoop(s);
   startPoller(s);
   // region is consumed when harvest finishes via auth.region fallback; keep param for API symmetry
   void region;
