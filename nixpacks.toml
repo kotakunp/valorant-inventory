@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "chromium", "xvfb"]
+nixPkgs = ["nodejs_20", "chromium", "xorg.xvfb"]
 
 [phases.install]
 cmds = ["npm ci"]
