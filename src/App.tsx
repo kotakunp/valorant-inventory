@@ -266,10 +266,7 @@ export default function App() {
       );
       return;
     }
-    if (captchaNeeded && captchaSolver && !token && captchaStatus === "ready") {
-      // solver path B does not need a widget token; only block if widget rendered without solve
-      // (server auto-solves when no captcha is sent — so allow empty token)
-    }
+
     setError(null);
     setLoading(true);
     try {
