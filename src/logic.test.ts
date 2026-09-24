@@ -51,25 +51,31 @@ describe("paginate", () => {
   const stackOf = (gun: string, n: number) =>
     Array.from({ length: n }, (_, i) => skin({ id: `${gun}-${i}`, weaponName: gun }));
 
-  it("single page for <= 20 gun cells (comfort)", () => {
-    const p = paginate(uniqueGuns(20));
+  it("single page for <= 8 gun cells (comfort, square 4×2)", () => {
+    const p = paginate(uniqueGuns(8));
     expect(p.density.name).toBe("comfort");
     expect(p.gridPages.length).toBe(1);
   });
-  it("two pages at 21 guns", () => {
-    const p = paginate(uniqueGuns(21));
+  it("two pages at 9 guns", () => {
+    const p = paginate(uniqueGuns(9));
     expect(p.density.name).toBe("comfort");
     expect(p.gridPages.length).toBe(2);
   });
+  it("three pages still comfort at 24 guns", () => {
+    const p = paginate(uniqueGuns(24));
+    expect(p.density.name).toBe("comfort");
+    expect(p.gridPages.length).toBe(3);
+  });
   it("bumps density to stay within 3 pages", () => {
-    const p = paginate(uniqueGuns(80));
-    expect(p.density.name).toBe("dense");
+    const p = paginate(uniqueGuns(25));
+    expect(p.density.name).toBe("standard");
     expect(p.gridPages.length).toBe(2);
   });
-  it("truncates gun cells beyond 3 pages with note", () => {
-    const p = paginate(uniqueGuns(130));
+  it("truncates gun cells beyond 3 dense pages with note", () => {
+    const p = paginate(uniqueGuns(100));
+    expect(p.density.name).toBe("dense");
     expect(p.gridPages.length).toBe(3);
-    expect(p.truncated).toBe(10);
+    expect(p.truncated).toBe(4);
   });
   it("stacks many skins of one gun into a single cell (no extra pages)", () => {
     const p = paginate(stackOf("Vandal", 40));

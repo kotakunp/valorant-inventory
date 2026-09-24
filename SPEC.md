@@ -76,16 +76,16 @@ Every item is a **checkbox** (selection panels; skin tiles also toggle on click 
 ## 7. Image output spec
 
 - **Base canvas: 1280 × 720** CSS px, exported with `pixelRatio: 2` → **2560 × 1440 PNG (1440p, 16:9)**.
-- **Pagination:** one **stack cell per gun** (all skins of a gun layered in one slot); knives always on the full-width bottom row (not paginated). Density auto-picks the *smallest* density keeping pages ≤ 3:
+- **Pagination:** one **stack cell per gun** (all skins of a gun layered in one slot); knives always on the full-width bottom row (not paginated). Density picks the *smallest* layout keeping pages ≤ 3. Cells are **square** (fixed cols×rows) so stacked skins have room to fan without clipping:
 
   | Density | Grid (center zone) | Capacity/page (gun cells) |
   |---|---|---|
-  | Comfort | 4 cols × 5 rows | 20 |
-  | Standard | 5 cols × 5 rows | 25 |
-  | Dense | 8 cols × 5 rows | 40 |
+  | Comfort | 4 cols × 2 rows (large squares) | 8 |
+  | Standard | 6 cols × 3 rows | 18 |
+  | Dense | 8 cols × 4 rows | 32 |
 
-  - ≤ 20 distinct guns → exactly 1 image. Above that: pick the first (largest-tile) density with ≤ 3 pages.
-  - \> 120 gun cells → Dense 3 pages, footer note `showing … / N`.
+  - ≤ 8 distinct guns → exactly 1 image. More guns → first density that fits in ≤ 3 pages.
+  - \> 96 gun cells → Dense 3 pages, footer note `showing … / N`.
 - One layout template for all pages; only the gun-cell chunk differs (header/ranks/card rail/footer/knife row repeat). Filenames `showcase-<riotid>-p1.png`…
 - Export after `document.fonts.ready` + all `<img>` decoded; images served same-origin via `/img` proxy (no canvas tainting). No inventory data in any URL.
 

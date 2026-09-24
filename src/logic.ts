@@ -159,9 +159,9 @@ export function tierInfo(tier: number | null): { name: string; color: string } {
 }
 
 export const DENSITIES = [
-  { name: "comfort", cols: 4, rows: 5, capacity: 20 },
-  { name: "standard", cols: 5, rows: 5, capacity: 25 },
-  { name: "dense", cols: 8, rows: 5, capacity: 40 },
+  { name: "comfort", cols: 4, rows: 2, capacity: 8 },
+  { name: "standard", cols: 6, rows: 3, capacity: 18 },
+  { name: "dense", cols: 8, rows: 4, capacity: 32 },
 ] as const;
 
 export type Density = (typeof DENSITIES)[number];

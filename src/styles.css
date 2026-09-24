@@ -867,15 +867,24 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-cats {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-auto-rows: minmax(0, 1fr);
-  gap: 10px 12px;
+  gap: 8px 10px;
   min-height: 0;
   overflow: hidden;
-  align-content: stretch;
 }
-.density-standard .sc-cats { grid-template-columns: repeat(5, 1fr); }
-.density-dense .sc-cats { grid-template-columns: repeat(8, 1fr); gap: 6px 8px; }
+/* Square cells: fixed cols×rows per density so stacks get height for fan + hover */
+.density-comfort .sc-cats {
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+}
+.density-standard .sc-cats {
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+}
+.density-dense .sc-cats {
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 6px 8px;
+}
 .sc-cat {
   min-width: 0;
   min-height: 0;
@@ -930,13 +939,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   justify-content: center;
   cursor: default;
   transition: transform 0.12s ease, filter 0.12s ease;
-  /* Layer hit-testing: only the art receives pointer events, so exposed
-     edges of lower layers stay hoverable. Events bubble to this node. */
+  /* Only the art is a hit target — exposed edges of lower layers stay hoverable.
+     Events bubble to this node for click/chroma. */
   pointer-events: none;
-  /* Vertical fan — each layer peeks above/below the one on top */
+  /* Diagonal fan centered on i=2 so layers peek without leaving the cell */
   transform: translate(
-    calc((var(--i, 0) - 2) * 3%),
-    calc((var(--i, 0) - 2) * 11%)
+    calc((var(--i, 2) - 2) * 7%),
+    calc((var(--i, 2) - 2) * 8%)
   );
 }
 .sc-stack-item.clickable { cursor: pointer; }
@@ -949,14 +958,21 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-stack-item:nth-child(7) { --i: 6; }
 .sc-stack-item:nth-child(8) { --i: 7; }
 .sc-stack-item:nth-child(n + 9) { --i: 8; }
+/* Deep stacks: tighter step so the fan still fits the square cell */
+.sc-stack:has(> .sc-stack-item:nth-child(n + 6)) .sc-stack-item {
+  transform: translate(
+    calc((var(--i, 2) - 2) * 4%),
+    calc((var(--i, 2) - 2) * 5%)
+  );
+}
 .sc-stack-item:hover {
   z-index: 40 !important;
-  transform: translate(0, -6%) scale(1.05);
+  transform: translate(0, -5%) scale(1.08);
   filter: brightness(1.15);
 }
 .sc-stack-art {
-  max-width: 88%;
-  max-height: 72%;
+  max-width: 78%;
+  max-height: 58%;
   object-fit: contain;
   pointer-events: auto;
   /* thin light outline so transparent PNGs read against dark bg */
