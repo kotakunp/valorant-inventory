@@ -199,10 +199,14 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
     setErr("Remote browser closed.");
   };
 
-  if (err && (startFailedRef.current || status?.phase !== "login") && status?.phase !== "starting" && status?.phase !== "harvesting") {
+  if (
+    status?.phase === "error" ||
+    (err && (startFailedRef.current || status?.phase !== "login") && status?.phase !== "starting" && status?.phase !== "harvesting")
+  ) {
+    const message = status?.error ?? err ?? "Remote browser failed.";
     return (
       <div className="remote-browser">
-        <p className="note" style={{ marginTop: 0, whiteSpace: "pre-wrap" }}>{err}</p>
+        <p className="note" style={{ marginTop: 0, whiteSpace: "pre-wrap" }}>{message}</p>
         <button
           className="btn ghost"
           type="button"
@@ -212,6 +216,7 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
             startFailedRef.current = false;
             pollEnabledRef.current = false;
             setPollEpoch(0);
+            setStatus(null);
             void start();
           }}
         >
@@ -256,9 +261,9 @@ export function RemoteBrowserPanel({ region, onDone }: Props) {
         </button>
         <span className="note" style={{ margin: 0 }}>
           Status: {status?.phase ?? "…"}
-        {typeof status?.frames === "number" && ` · frames:${status.frames}`}
-        {typeof status?.frameAgeMs === "number" && status.frameAgeMs > 5000 && ` · stale:${Math.round(status.frameAgeMs / 1000)}s`}
-        {status?.captureErr ? ` · ${status.captureErr}` : ""}
+          {typeof status?.frames === "number" && ` · frames:${status.frames}`}
+          {typeof status?.frameAgeMs === "number" && status.frameAgeMs > 5000 && ` · stale:${Math.round(status.frameAgeMs / 1000)}s`}
+          {status?.captureErr ? ` · ${status.captureErr}` : ""}
         </span>
       </div>
       {err && <div className="error" style={{ marginTop: 8 }}>{err}</div>}

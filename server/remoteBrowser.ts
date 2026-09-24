@@ -21,6 +21,8 @@ const VIEWPORT = { width: 1280, height: 800 };
 // Realistic UA — headless default UA trips Riot/Akamai loaders.
 const UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+// Playwright already injects a long --disable-features list; a second one
+// overrides it and destabilizes the renderer. Do NOT add --disable-features here.
 const LAUNCH_ARGS = [
   "--no-sandbox",
   "--disable-dev-shm-usage",
@@ -29,8 +31,6 @@ const LAUNCH_ARGS = [
   "--disable-background-timer-throttling",
   "--disable-renderer-backgrounding",
   "--disable-backgrounding-occluded-windows",
-  "--disable-features=IsolateOrigins,site-per-process",
-  "--js-flags=--max-old-space-size=256",
 ];
 
 /** Hide automation fingerprints before any page script runs. */
@@ -115,6 +115,15 @@ async function closeSession(phase: BrowserPhase = "expired"): Promise<void> {
     await s.browser.close();
   } catch {
     /* already closed */
+  }
+  // Relaunch paths leave orphan chromium processes that pin the old profile.
+  try {
+    const out = await import("node:child_process").then((m) =>
+      m.execSync("pkill -f playwright_chromiumdev_profile || true", { stdio: "ignore", timeout: 3000 })
+    );
+    void out;
+  } catch {
+    /* best-effort */
   }
 }
 
@@ -368,6 +377,20 @@ async function maybeRelaunch(s: RemoteSession): Promise<void> {
   if (s.relaunchCount >= MAX_RELAUNCHES) {
     s.phase = "error";
     s.error = "Chromium crashed repeatedly on this server. Close and try again, or paste the ssid cookie.";
+    s.stopping = true;
+    console.warn("[remote-browser] giving up after max relaunches");
+    // Keep session object so status() can surface the error; tear down browsers only.
+    try {
+      await s.ctx.close().catch(() => {});
+    } catch {
+      /* ignore */
+    }
+    try {
+      await s.browser.close().catch(() => {});
+    } catch {
+      /* ignore */
+    }
+    s.cdp = null;
     return;
   }
   s.relaunching = true;
@@ -379,6 +402,15 @@ async function maybeRelaunch(s: RemoteSession): Promise<void> {
     } catch {
       /* already dead */
     }
+    // Sweep orphans from prior launches before starting a new browser.
+    await import("node:child_process").then(
+      (m) =>
+        new Promise<void>((resolve) => {
+          const p = m.spawn("pkill", ["-f", "playwright_chromiumdev_profile"], { stdio: "ignore" });
+          p.on("close", () => resolve());
+          setTimeout(resolve, 2000);
+        })
+    ).catch(() => {});
     if (s.stopping || session !== s) return;
 
     const launched = await launchSession();
@@ -402,6 +434,19 @@ async function maybeRelaunch(s: RemoteSession): Promise<void> {
   } catch (e) {
     s.phase = "error";
     s.error = `Chromium crashed and could not restart: ${errText(e)}`;
+    s.stopping = true;
+    console.warn("[remote-browser] relaunch failed:", s.error);
+    try {
+      await s.ctx.close().catch(() => {});
+    } catch {
+      /* ignore */
+    }
+    try {
+      await s.browser.close().catch(() => {});
+    } catch {
+      /* ignore */
+    }
+    s.cdp = null;
   } finally {
     s.relaunching = false;
   }
@@ -548,7 +593,7 @@ export function status(): BrowserStatus {
     url = "";
   }
   return {
-    active: true,
+    active: session.phase !== "error",
     phase: session.phase,
     width: session.width,
     height: session.height,
