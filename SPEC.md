@@ -96,22 +96,21 @@ Every item is a **checkbox** (selection panels; skin tiles also toggle on click 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │ HEADER   [RIOT ID #TAG]   LV.207   ·   NA   ·  <equipped title>    │
-├──────────────┬─────────────────────────────────────┬───────────────┤
-│ RANK / STATS │  COLLECTION GRID                    │ PLAYER CARD   │
-│ ◎ PEAK       │  one cell per gun — skins stacked   │ tall art      │
-│   Diamond 2  │  as layered art (hover → front),    │ panel         │
-│ ◎ CURRENT    │  thin outline on transparent PNGs   │ PREM:n KNIFE:n│
-│   Immortal 1 │  ── MELEE bottom row (full width) ──│ buddy strip   │
-│ VP 1,234     │                                     │ +N counter    │
-│ RP 400       │                                     │               │
-├──────────────┴─────────────────────────────────────┴───────────────┤
+├─────────────────────────────────────────────┬───────────────────────┤
+│ COLLECTION GRID                            │ PLAYER CARD           │
+│ one cell per gun — skins stacked           │ tall art panel        │
+│ as layered art (hover → front),            │ PEAK / CURRENT RANK   │
+│ thin outline on transparent PNGs           │ VP / RP               │
+│ ── MELEE bottom row (full width) ──        │ PREM:n  KNIFE:n       │
+│                                            │ buddies +N            │
+├────────────────────────────────────────────┴───────────────────────┤
 │ FOOTER  COLLECTION:n,xxx VP   [FM] [PROOF]  DATE                   │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
 - **No empty slots:** zero-item zones/rows omitted, grid reflows.
 - **Rank medallions (MVP):** styled circular badge, tier name + tier color (real tier icons = phase 2).
-- **PREM / KNIFE counts:** under the player card (right rail), not in the footer — footer is a single meta line so the grid gets full height.
+- **Right rail only:** card + ranks + wallet + PREM/KNIFE + buddies under the player card; skins grid takes full remaining width (no left rail).
 - **FM / PROOF:** optional footer segments, each behind an **include-checkbox** (default off) with short text input when enabled (free-form, not API data).
 - **Knives:** always a dedicated full-width bottom strip (stacked skins); never overflow into the gun grid.
 - **Stacking:** same gun's skins are layered in one cell; hover raises that skin's `z-index` + brightens. Thin light outline via multi-`drop-shadow` on the art.

@@ -178,17 +178,6 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
       </header>
 
       <div className="sc-body">
-        <aside className="sc-left">
-          <Medallion label="PEAK RANK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
-          <Medallion label="CURRENT RANK" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
-          {(payload.wallet.vp != null || payload.wallet.rp != null) && (
-            <div className="sc-wallet">
-              {payload.wallet.vp != null && <span className="sc-chip">◆ {fmt(payload.wallet.vp)} VP</span>}
-              {payload.wallet.rp != null && <span className="sc-chip">✦ {fmt(payload.wallet.rp)} RP</span>}
-            </div>
-          )}
-        </aside>
-
         <main className={`sc-center density-${pages.density.name}`}>
           <div className="sc-cats">
             {guns.map(gunSection)}
@@ -235,17 +224,27 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
               {checkedCards.length > 1 && <div className="sc-more">+{checkedCards.length - 1} MORE</div>}
             </div>
           )}
-          <div className="sc-stats">
-            <div className="sc-stat">
-              <CrownIcon />
-              <span className="sc-stat-label">PREMIUM</span>
-              <span className="sc-stat-val">{premCount}</span>
-            </div>
-            <div className="sc-stat-div" aria-hidden="true" />
-            <div className="sc-stat">
-              <KnifeIcon />
-              <span className="sc-stat-label">KNIFE</span>
-              <span className="sc-stat-val">{knifeCount}</span>
+          <div className="sc-rail-info">
+            <Medallion label="PEAK RANK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
+            <Medallion label="CURRENT RANK" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
+            {(payload.wallet.vp != null || payload.wallet.rp != null) && (
+              <div className="sc-wallet">
+                {payload.wallet.vp != null && <span className="sc-chip">◆ {fmt(payload.wallet.vp)} VP</span>}
+                {payload.wallet.rp != null && <span className="sc-chip">✦ {fmt(payload.wallet.rp)} RP</span>}
+              </div>
+            )}
+            <div className="sc-stats">
+              <div className="sc-stat">
+                <CrownIcon />
+                <span className="sc-stat-label">PREMIUM</span>
+                <span className="sc-stat-val">{premCount}</span>
+              </div>
+              <div className="sc-stat-div" aria-hidden="true" />
+              <div className="sc-stat">
+                <KnifeIcon />
+                <span className="sc-stat-label">KNIFE</span>
+                <span className="sc-stat-val">{knifeCount}</span>
+              </div>
             </div>
           </div>
           {checkedBuddies.length > 0 && (

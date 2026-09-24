@@ -769,7 +769,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-badge--region { border-color: var(--accent); color: var(--accent); }
 
-/* body: rank rail | collection | card rail */
+/* body: collection grid | info rail (card + ranks + stats) */
 .sc-body {
   position: relative;
   z-index: 1;
@@ -779,30 +779,24 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   padding: 8px 28px 4px;
   min-height: 0;
 }
-.sc-left {
-  width: 148px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex-shrink: 0;
-}
 .sc-rank-panel {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 10px 8px 14px;
+  padding: 8px 6px 10px;
   clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  flex-shrink: 0;
 }
 .sc-medal-label {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   color: var(--accent);
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .sc-rank-caret {
   width: 0;
@@ -812,8 +806,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   border-top: 5px solid var(--accent);
 }
 .sc-medal-badge {
-  width: 96px;
-  height: 96px;
+  width: 72px;
+  height: 72px;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -829,29 +823,29 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-medal-fallback {
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 13px;
   text-align: center;
   line-height: 1.15;
   letter-spacing: 0.04em;
-  padding: 0 8px;
+  padding: 0 6px;
 }
 .sc-medal-name {
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 13px;
   text-align: center;
   line-height: 1.1;
   letter-spacing: 0.06em;
-  margin-top: 6px;
+  margin-top: 4px;
   color: #fff;
 }
-.sc-wallet { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.sc-wallet { display: flex; flex-direction: column; gap: 5px; margin-top: 0; flex-shrink: 0; }
 .sc-chip {
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   color: #d7dee4;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 4px 8px;
+  padding: 3px 7px;
   border-radius: 2px;
 }
 
@@ -1148,7 +1142,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-chroma span { font-size: 8px; color: var(--text); }
 .sc-chroma.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 
-/* right rail: player card — official largeArt aspect 268×640 (≈0.419) */
+/* right rail: player card + ranks/stats under it — official largeArt aspect 268×640 */
 .sc-right {
   width: 184px;
   display: flex;
@@ -1156,6 +1150,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   gap: 10px;
   flex-shrink: 0;
   align-items: stretch;
+  overflow: hidden;
+}
+.sc-rail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 .sc-card-panel {
   position: relative;
