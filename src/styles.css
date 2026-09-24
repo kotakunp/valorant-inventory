@@ -1076,18 +1076,19 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   object-fit: contain;
   pointer-events: auto;
   flex-shrink: 0;
-  filter: drop-shadow(1px 0 0 rgba(232, 236, 240, 0.55))
-    drop-shadow(-1px 0 0 rgba(232, 236, 240, 0.55))
-    drop-shadow(0 1px 0 rgba(232, 236, 240, 0.55))
-    drop-shadow(0 -1px 0 rgba(232, 236, 240, 0.55))
+  filter: drop-shadow(1px 0 0 var(--rarity, rgba(232, 236, 240, 0.7)))
+    drop-shadow(-1px 0 0 var(--rarity, rgba(232, 236, 240, 0.7)))
+    drop-shadow(0 1px 0 var(--rarity, rgba(232, 236, 240, 0.7)))
+    drop-shadow(0 -1px 0 var(--rarity, rgba(232, 236, 240, 0.7)))
     drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7));
   transition: filter 0.12s ease, transform 0.12s ease;
 }
 .sc-stack-item:hover .sc-stack-art {
-  filter: drop-shadow(1px 0 0 rgba(255, 255, 255, 0.85))
-    drop-shadow(-1px 0 0 rgba(255, 255, 255, 0.85))
-    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.85))
-    drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.85))
+  filter: drop-shadow(1px 0 0 var(--rarity, #fff))
+    drop-shadow(-1px 0 0 var(--rarity, #fff))
+    drop-shadow(0 1px 0 var(--rarity, #fff))
+    drop-shadow(0 -1px 0 var(--rarity, #fff))
+    drop-shadow(0 0 6px var(--rarity, transparent))
     drop-shadow(0 4px 10px rgba(0, 0, 0, 0.75));
   transform: scale(1.06);
 }
@@ -1339,7 +1340,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sc-stack-item.menu-open .sc-stack-art {
   filter: brightness(1.12)
-    drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 2px rgba(0, 0, 0, 0.85));
+    drop-shadow(0 0 1px var(--rarity, #fff)) drop-shadow(0 0 3px var(--rarity, transparent))
+    drop-shadow(0 0 2px rgba(0, 0, 0, 0.85));
 }
 /* When menu is open, keep the open item un-fanned so the menu sits on the cell */
 .sc-stack-item.menu-open {
