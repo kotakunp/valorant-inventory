@@ -4,6 +4,15 @@ import { selKey } from "./types";
 export const PREMIUM_PRICE = 1775;
 export const MAX_GRID_ITEMS = 120;
 
+/**
+ * Premium skin: VP ≥ 1775, or no price (battlepass/free) with ≥ 5 levels —
+ * same rule as defaultChecked so footer counts match selection.
+ */
+export function isPremiumSkin(s: Pick<SkinItem, "price" | "levelCount">): boolean {
+  if (s.price != null) return s.price >= PREMIUM_PRICE;
+  return s.levelCount >= 5;
+}
+
 /** Official VALORANT loadout order (melee handled separately via isKnife). */
 export const WEAPON_ORDER = [
   "Classic",
@@ -75,9 +84,8 @@ export type AnyItem = SkinItem | CardItem | TitleItem | BuddyItem;
 export function defaultChecked(kind: ItemKind, item: AnyItem, pricesAvailable: boolean): boolean {
   void pricesAvailable; // price-map coverage is partial; null price always uses the level heuristic for skins
   if (item.equipped) return true;
-  if (item.price != null) return kind === "skin" ? item.price >= PREMIUM_PRICE : true;
-  if (kind === "skin") return (item as SkinItem).levelCount >= 5;
-  return false;
+  if (kind === "skin") return isPremiumSkin(item as SkinItem);
+  return item.price != null;
 }
 
 export function buildSelection(payload: ShowcasePayload): Selection {
@@ -104,8 +112,8 @@ export function collectionValue(payload: ShowcasePayload, sel: Selection): numbe
   return total;
 }
 
-export function rarityColor(price: number | null): string {
-  if (price == null) return "#4a5560";
+export function rarityColor(price: number | null, levelCount = 0): string {
+  if (price == null) return isPremiumSkin({ price, levelCount }) ? "#a866ff" : "#4a5560";
   if (price >= 2475) return "#e8c860";
   if (price >= PREMIUM_PRICE) return "#a866ff";
   return "#7fa3c8";

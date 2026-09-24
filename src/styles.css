@@ -756,15 +756,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: linear-gradient(90deg, var(--accent), rgba(255, 70, 85, 0.05));
   clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
 }
-.sc-name {
-  font-family: var(--font-display);
-  font-size: 26px;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  color: #cfd6dc;
-  white-space: nowrap;
-}
-.sc-tag { color: var(--accent); font-size: 20px; margin-left: 2px; }
 .sc-badge {
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.04);
@@ -777,15 +768,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   white-space: nowrap;
 }
 .sc-badge--region { border-color: var(--accent); color: var(--accent); }
-.sc-header-title {
-  color: var(--muted);
-  font-size: 13px;
-  font-style: italic;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* body: rank rail | collection | card rail */
 .sc-body {
@@ -1085,18 +1067,60 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   object-position: center top;
   display: block;
 }
-.sc-card-label {
+/* VALORANT profile identity: title + Riot ID + level over card art */
+.sc-card-identity {
   position: absolute;
-  bottom: 0;
   left: 0;
   right: 0;
-  padding: 18px 8px 7px;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.2em;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
-  color: #cfd6dc;
+  bottom: 0;
   z-index: 1;
+  padding: 36px 8px 12px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.55) 40%,
+    rgba(0, 0, 0, 0.92) 100%
+  );
+  text-align: center;
+  pointer-events: none;
+}
+.sc-card-title {
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: rgba(236, 232, 225, 0.78);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sc-card-user {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sc-card-tag {
+  color: var(--accent);
+  font-size: 15px;
+  margin-left: 1px;
+}
+.sc-card-level {
+  display: inline-block;
+  margin-top: 7px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #d7dee4;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2px 7px;
+  border-radius: 2px;
 }
 .sc-more { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; }
 .sc-card-panel .sc-more {

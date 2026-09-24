@@ -1,7 +1,7 @@
 import type { ChromaSelection, RankBadge, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
 import { selKey } from "./types";
 import type { Pages } from "./logic";
-import { rarityColor, tierInfo, collectionValue, groupByGun } from "./logic";
+import { rarityColor, tierInfo, collectionValue, groupByGun, isPremiumSkin } from "./logic";
 
 export const CANVAS_W = 1280;
 export const CANVAS_H = 720;
@@ -80,7 +80,8 @@ function Medallion({ label, tier, badge }: { label: string; tier: number | null;
 export function Showcase({ payload, pages, page, selection, chromaSel = {}, footer, onToggleSkin, onPickChroma }: Props) {
   const isOn = (kind: ItemKind, id: string) => !!selection[selKey(kind, id)];
   const checkedSkins = payload.skins.filter((s) => isOn("skin", s.id));
-  const premCount = checkedSkins.filter((s) => !s.isKnife && (s.price ?? 0) >= 1775).length;
+  // Shared premium rule (price ≥ 1775 or level-heuristic when price is null) — matches selection.
+  const premCount = checkedSkins.filter((s) => isPremiumSkin(s)).length;
   const knifeCount = checkedSkins.filter((s) => s.isKnife).length;
   const checkedCards = payload.cards.filter((c) => isOn("card", c.id));
   const checkedTitles = payload.titles.filter((t) => isOn("title", t.id));
@@ -103,7 +104,7 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
   const tile = (s: SkinItem) => {
     const chroma = activeChroma(s);
     const showPicker = !!onPickChroma && s.chromas.length > 1;
-    const rarity = rarityColor(s.price);
+    const rarity = rarityColor(s.price, s.levelCount);
     return (
       <div
         key={s.id}
@@ -158,13 +159,8 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
         <span className="sc-header-div" aria-hidden="true" />
         <div className="sc-title">COLLECTION</div>
         <div className="sc-header-rule" aria-hidden="true" />
-        <div className="sc-name">
-          {payload.gameName}
-          {payload.tagLine && <span className="sc-tag">#{payload.tagLine}</span>}
-        </div>
         {payload.accountLevel != null && <span className="sc-badge">LV. {payload.accountLevel}</span>}
         <span className="sc-badge sc-badge--region">{payload.region.toUpperCase()}</span>
-        {title && <span className="sc-header-title">“{title.text}”</span>}
       </header>
 
       <div className="sc-body">
@@ -203,7 +199,17 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
           {card && (
             <div className="sc-card-panel">
               {card.icon ? <img src={imgUrl(card.icon)!} alt="" /> : <div className="sc-fallback">{card.name}</div>}
-              <div className="sc-card-label">PLAYER CARD</div>
+              {/* VALORANT profile-style identity over the card art */}
+              <div className="sc-card-identity">
+                {title && <div className="sc-card-title">{title.text}</div>}
+                <div className="sc-card-user">
+                  {payload.gameName}
+                  {payload.tagLine && <span className="sc-card-tag">#{payload.tagLine}</span>}
+                </div>
+                {payload.accountLevel != null && (
+                  <div className="sc-card-level">LV. {payload.accountLevel}</div>
+                )}
+              </div>
               {checkedCards.length > 1 && <div className="sc-more">+{checkedCards.length - 1} MORE</div>}
             </div>
           )}

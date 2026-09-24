@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, paginate, rarityColor, tierInfo } from "./logic";
+import { buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, isPremiumSkin, paginate, rarityColor, tierInfo } from "./logic";
 import type { CardItem, ShowcasePayload, SkinItem } from "./types";
 
 const skin = (over: Partial<SkinItem> = {}): SkinItem => ({
@@ -106,9 +106,17 @@ describe("presentation helpers", () => {
   });
   it("rarity colors by price", () => {
     expect(rarityColor(null)).toBe("#4a5560");
+    expect(rarityColor(null, 5)).toBe("#a866ff"); // level-heuristic premium
+    expect(rarityColor(null, 4)).toBe("#4a5560");
     expect(rarityColor(875)).toBe("#7fa3c8");
     expect(rarityColor(1775)).toBe("#a866ff");
     expect(rarityColor(2475)).toBe("#e8c860");
+  });
+  it("isPremiumSkin matches selection + footer rule", () => {
+    expect(isPremiumSkin({ price: 1775, levelCount: 1 })).toBe(true);
+    expect(isPremiumSkin({ price: 875, levelCount: 5 })).toBe(false);
+    expect(isPremiumSkin({ price: null, levelCount: 5 })).toBe(true);
+    expect(isPremiumSkin({ price: null, levelCount: 4 })).toBe(false);
   });
   it("selection + collection value", () => {
     const payload = {

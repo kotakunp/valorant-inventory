@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, type FormEvent, type CSSPropertie
 import { toPng } from "html-to-image";
 import type { ChromaSelection, ItemKind, Region, Selection, ShowcasePayload, SkinItem } from "./types";
 import { selKey } from "./types";
-import { buildSelection, groupByGun, paginate, rarityColor } from "./logic";
+import { buildSelection, groupByGun, isPremiumSkin, paginate, rarityColor } from "./logic";
 import type { AnyItem } from "./logic";
 import { makeState, parseCallback, RSO_STATE_KEY, RSO_REGION_KEY } from "./rso";
 import { SITEKEY, loadHcaptcha, widgetToken, resetCaptcha, renderCaptcha, fetchCaptchaChallenge } from "./captcha";
@@ -258,7 +258,7 @@ export default function App() {
             : mode === "none"
               ? false
               : kind === "skin"
-                ? (it.price ?? -1) >= 1775
+                ? isPremiumSkin(it as SkinItem)
                 : it.price != null;
       }
       return next;
@@ -596,7 +596,7 @@ export default function App() {
                     key={i.id}
                     type="button"
                     className={`skin-cell${on ? " on" : ""}${i.equipped ? " eq" : ""}`}
-                    style={{ "--rarity": rarityColor(i.price) } as CSSProperties}
+                    style={{ "--rarity": rarityColor(i.price, i.levelCount) } as CSSProperties}
                     onClick={() => toggle(kind, i.id)}
                     title={`${i.name} · ${i.weaponName}${i.price != null ? ` · ${fmt(i.price)} VP` : ""}${i.equipped ? " · equipped" : ""}`}
                     aria-pressed={on}
@@ -625,7 +625,7 @@ export default function App() {
                 <label
                   key={i.id}
                   className={"chip" + (on ? " on" : "")}
-                  style={{ "--rarity": rarityColor(i.price) } as CSSProperties}
+                  style={{ "--rarity": rarityColor(i.price, "levelCount" in i ? i.levelCount : 0) } as CSSProperties}
                 >
                   <input type="checkbox" checked={on} onChange={() => toggle(kind, i.id)} />
                   {icon ? (
