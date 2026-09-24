@@ -227,7 +227,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
   skins.sort((a, b) => (b.price ?? -1) - (a.price ?? -1) || a.name.localeCompare(b.name));
   // Counts only — no tokens/puuid — to diagnose empty joins after cookie login.
   console.log(
-    `[showcase] shard=${shard} region=${input.region} entSkins=${rawSkinIds.length} joined=${skins.length} catalogMiss=${catalogMissed} prices=${priceMap?.size ?? 0} pricesAvailable=${pricesAvailable}`
+    `[showcase] shard=${shard} region=${input.region} entSkins=${rawSkinIds.length} joined=${skins.length} catalogMiss=${catalogMissed} catalogSkins=${catalog.skins.size} sampleMiss=${rawSkinIds.find((id) => !catalog.skins.has(id))?.slice(0, 13) ?? "-"} prices=${priceMap?.size ?? 0} pricesAvailable=${pricesAvailable}`
   );
 
   const equippedCardId: string | null = loadoutBody?.Identity?.PlayerCardID?.toLowerCase?.() ?? null;

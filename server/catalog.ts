@@ -38,26 +38,48 @@ export async function getCatalog(): Promise<Catalog> {
     skins: new Map(), chromaToSkin: new Map(),
     cards: new Map(), titles: new Map(), buddies: new Map(),
   };
+  const lc = (s: unknown) => (typeof s === "string" ? s.toLowerCase() : "");
   for (const w of weapons.data ?? []) {
     for (const skin of w.skins ?? []) {
-      data.skins.set(skin.uuid, {
-        weaponUuid: w.uuid, weaponName: w.displayName,
-        category: w.category ?? "", defaultSkinUuid: w.defaultSkinUuid ?? null, skin,
-      });
-      for (const ch of skin.chromas ?? []) data.chromaToSkin.set(ch.uuid, skin.uuid);
+      const skinUuid = lc(skin.uuid);
+      if (!skinUuid) continue;
+      const entry: SkinIndexEntry = {
+        weaponUuid: lc(w.uuid), weaponName: w.displayName,
+        category: w.category ?? "", defaultSkinUuid: lc(w.defaultSkinUuid) || null, skin,
+      };
+      data.skins.set(skinUuid, entry);
+      // Entitlements have returned skin UUIDs, level UUIDs, and chroma UUIDs at times —
+      // index every id that can appear as ItemID so joins don't drop the whole inventory.
+      for (const lvl of skin.levels ?? []) {
+        const l = lc(lvl.uuid);
+        if (l) data.skins.set(l, entry);
+      }
+      for (const ch of skin.chromas ?? []) {
+        const c = lc(ch.uuid);
+        if (c) {
+          data.skins.set(c, entry);
+          data.chromaToSkin.set(c, skinUuid);
+        }
+      }
     }
   }
   for (const c of cards.data ?? []) {
-    data.cards.set(c.uuid, { name: c.displayName, icon: c.displayIcon ?? c.largeArt ?? null });
+    const id = lc(c.uuid);
+    if (id) data.cards.set(id, { name: c.displayName, icon: c.displayIcon ?? c.largeArt ?? null });
   }
   for (const t of titles.data ?? []) {
-    data.titles.set(t.uuid, { name: t.displayName, text: t.titleText ?? t.displayName });
+    const id = lc(t.uuid);
+    if (id) data.titles.set(id, { name: t.displayName, text: t.titleText ?? t.displayName });
   }
   for (const b of buddies.data ?? []) {
     const entry = { name: b.displayName, icon: b.displayIcon ?? b.levels?.[0]?.displayIcon ?? null };
-    data.buddies.set(b.uuid, entry);
+    const root = lc(b.uuid);
+    if (root) data.buddies.set(root, entry);
     // entitlements return buddy *level* uuids, not the root buddy uuid
-    for (const lvl of b.levels ?? []) data.buddies.set(lvl.uuid, entry);
+    for (const lvl of b.levels ?? []) {
+      const id = lc(lvl.uuid);
+      if (id) data.buddies.set(id, entry);
+    }
   }
   cache = { at: Date.now(), data };
   return data;
