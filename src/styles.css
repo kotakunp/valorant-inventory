@@ -933,8 +933,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   cursor: default;
   transition: transform 0.12s ease;
   pointer-events: none;
-  /* Horizontal deck fan — cells are wide/short, so peel left/right */
-  transform: translateX(calc((var(--i, 2) - 2) * 13%));
+  /* Vertical deck fan — each card peeks top/bottom so edges stay hoverable */
+  transform: translateY(calc((var(--i, 2) - 2) * 14%));
 }
 .sc-stack-item.clickable { cursor: pointer; }
 .sc-stack-item:nth-child(1) { --i: 0; }
@@ -947,7 +947,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-stack-item:nth-child(8) { --i: 7; }
 .sc-stack-item:nth-child(n + 9) { --i: 8; }
 .sc-stack:has(> .sc-stack-item:nth-child(n + 6)) .sc-stack-item {
-  transform: translateX(calc((var(--i, 2) - 2) * 7%));
+  transform: translateY(calc((var(--i, 2) - 2) * 7%));
 }
 .sc-stack-item:hover { z-index: 40 !important; }
 
