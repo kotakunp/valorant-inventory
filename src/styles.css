@@ -940,8 +940,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   cursor: default;
   transition: transform 0.12s ease;
   pointer-events: none;
-  /* Vertical deck fan — each card peeks top/bottom so edges stay hoverable */
-  transform: translateY(calc((var(--i, 2) - 2) * 14%));
+  /* Fan centered on stack size: middle item sits at 0, singles don't shift */
+  transform: translateY(calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * 14%));
 }
 .sc-stack-item.clickable { cursor: pointer; }
 .sc-stack-item:nth-child(1) { --i: 0; }
@@ -953,10 +953,38 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-stack-item:nth-child(7) { --i: 6; }
 .sc-stack-item:nth-child(8) { --i: 7; }
 .sc-stack-item:nth-child(n + 9) { --i: 8; }
-.sc-stack:has(> .sc-stack-item:nth-child(n + 6)) .sc-stack-item {
-  transform: translateY(calc((var(--i, 2) - 2) * 7%));
+.sc-stack.is-stacked .sc-stack-item {
+  transform: translateY(calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * 9%));
 }
 .sc-stack-item:hover { z-index: 40 !important; }
+
+/* Name bar pinned to the slot bottom — not inside the fanned items */
+.sc-stack-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  padding: 14px 6px 5px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.85));
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+}
+.sc-stack:hover .sc-stack-label,
+.sc-stack-label--show,
+.sc-stack:has(.sc-stack-item.equipped) .sc-stack-label {
+  opacity: 1;
+}
 
 /* Hitbox = the img itself (frame is display:contents — no extra box) */
 .sc-stack-frame {
@@ -1000,29 +1028,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: transparent;
   border: none;
 }
-.sc-stack-name {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 14px 6px 5px;
-  font-family: var(--font-display);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: #fff;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.85));
-  opacity: 0;
-  transition: opacity 0.1s ease;
-  pointer-events: none;
-  z-index: 2;
-}
-.sc-stack-item:hover .sc-stack-name,
-.sc-stack-item.equipped .sc-stack-name { opacity: 1; }
 .sc-stack-item .sc-fallback { pointer-events: auto; }
 
 /* knives: one cell each, side-by-side — no overlap */
@@ -1058,7 +1063,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   height: 78%;
   max-width: 92%;
 }
-.sc-knife-cell .sc-stack-name {
+.sc-knife-cell .sc-stack-label {
   opacity: 1;
   font-size: 9px;
   padding: 10px 4px 4px;
@@ -1315,7 +1320,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* density: fit more gun cells in fixed canvas */
 .density-dense .sc-cat-name { font-size: 13px; }
 .density-dense .sc-cat-head { margin-bottom: 4px; }
-.density-dense .sc-stack-name { font-size: 9px; }
+.density-dense .sc-stack-label { font-size: 9px; }
 .density-comfort .sc-cat-name { font-size: 16px; }
 
 /* ===== password login + MFA ===== */

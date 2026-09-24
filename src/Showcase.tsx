@@ -124,7 +124,6 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
         ) : (
           <span className="sc-fallback">{s.weaponName}</span>
         )}
-        <span className="sc-stack-name">{s.name}</span>
         {showPicker && (
           <div
             className="sc-chromas"
@@ -161,7 +160,15 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
         <span className="sc-cat-rule" aria-hidden="true" />
         {gun.items.length > 1 && <span className="sc-stack-count">{gun.items.length}</span>}
       </div>
-      <div className="sc-stack">{gun.items.map((s, i) => stackItem(s, i))}</div>
+      <div
+        className={`sc-stack${gun.items.length > 1 ? " is-stacked" : ""}`}
+        style={{ ["--n" as string]: gun.items.length }}
+      >
+        {gun.items.map((s, i) => stackItem(s, i))}
+        <div className="sc-stack-label">
+          {(gun.items.find((s) => s.equipped) ?? gun.items[0])?.name}
+        </div>
+      </div>
     </section>
   );
 
@@ -195,10 +202,13 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
                 <span className="sc-cat-rule" aria-hidden="true" />
                 <span className="sc-stack-count">{knifeItems.length}</span>
               </div>
-              <div className="sc-knife-strip">
+                <div className="sc-knife-strip">
                 {knives.flatMap((g) => g.items).map((s) => (
                   <div className="sc-knife-cell" key={s.id}>
-                    {stackItem(s, 0)}
+                    <div className="sc-stack" style={{ ["--n" as string]: 1 }}>
+                      {stackItem(s, 0)}
+                      <div className="sc-stack-label sc-stack-label--show">{s.name}</div>
+                    </div>
                   </div>
                 ))}
               </div>
