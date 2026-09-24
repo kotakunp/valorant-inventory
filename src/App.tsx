@@ -12,6 +12,10 @@ import { RemoteBrowserPanel } from "./RemoteBrowser";
 const REGIONS: Region[] = ["na", "eu", "ap", "kr", "latam", "br"];
 const fmt = (n: number) => n.toLocaleString("en-US");
 
+const qs = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+const IS_REMOTE_POPUP = qs.get("remote") === "1";
+const POPUP_REGION = ((qs.get("region") as Region) || "na") satisfies Region;
+
 export default function App() {
   const [form, setForm] = useState({ region: "na" as Region, accessToken: "", entitlementsToken: "", puuid: "" });
   const [data, setData] = useState<ShowcasePayload | null>(null);
@@ -43,6 +47,7 @@ export default function App() {
   });
   const [cookieInput, setCookieInput] = useState("");
   const [remoteOpen, setRemoteOpen] = useState(false);
+  const remoteWinRef = useRef<Window | null>(null);
   const captchaDivRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
 
@@ -59,6 +64,18 @@ export default function App() {
       if (parsed.kind === "error") setError(parsed.message);
       else void exchangeRsoCode(parsed.code);
     }
+
+    // Popup child → opener: deliver showcase when remote login finishes.
+    const onMsg = (ev: MessageEvent) => {
+      if (ev.origin !== window.location.origin) return;
+      if (ev.data?.type === "valorant-showcase" && ev.data.payload) {
+        applyShowcase(ev.data.payload as ShowcasePayload);
+        setRemoteOpen(false);
+        setError(null);
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -350,7 +367,7 @@ export default function App() {
     setError(null);
     setLoading(true);
     try {
-      // Prefer local Chrome harvest/window; on hosted VPS that fails → open remote browser.
+      // Prefer local Chrome harvest/window; on hosted VPS that fails → open remote browser popup.
       const res = await fetch("/api/login/auto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -358,17 +375,32 @@ export default function App() {
       });
       const json = (await res.json().catch(() => ({}))) as ShowcasePayload & { error?: string };
       if (!res.ok || json.error) {
-        // Headless VPS / no Chrome → remote interactive browser on the server
-        setRemoteOpen(true);
-        setError(null);
+        openRemotePopup();
         return;
       }
       applyShowcase(json);
     } catch {
-      setRemoteOpen(true);
+      openRemotePopup();
     } finally {
       setLoading(false);
     }
+  }
+
+  function openRemotePopup() {
+    setError(null);
+    const url = `${window.location.origin}/?remote=1&region=${form.region}`;
+    const win = window.open(
+      url,
+      "valorant-remote-login",
+      "width=960,height=720,noopener=no,menubar=no,toolbar=no,location=no,status=no"
+    );
+    if (win) {
+      remoteWinRef.current = win;
+      setRemoteOpen(false);
+      setError("Remote login popup opened — finish signing in there; this page will update automatically.");
+      return;
+    }
+    setRemoteOpen(true);
   }
 
   async function submitCookies(e?: { preventDefault(): void }) {
@@ -433,6 +465,29 @@ export default function App() {
       {items.length === 0 && <p className="note">No items in this category.</p>}
     </div>
   );
+
+  if (IS_REMOTE_POPUP) {
+    return (
+      <div className="app">
+        <div className="app-header">
+          <h1>REMOTE LOGIN</h1>
+          <span className="sub">Riot&apos;s real page — captcha + 2FA work here · cookies stay on the server</span>
+        </div>
+        <RemoteBrowserPanel
+          region={POPUP_REGION}
+          onDone={(json) => {
+            if (window.opener && !window.opener.closed) {
+              window.opener.postMessage({ type: "valorant-showcase", payload: json }, window.location.origin);
+              window.close();
+            } else {
+              applyShowcase(json);
+            }
+          }}
+        />
+        {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
+      </div>
+    );
+  }
 
   if (!data || !pages) {
     return (
@@ -572,7 +627,7 @@ export default function App() {
             with no copying. Riot&apos;s real page handles captcha and 2FA; your password never
             touches this app. On the hosted site this falls back to a remote browser below.
           </p>
-          {remoteOpen && (
+          {remoteOpen && !IS_REMOTE_POPUP && (
             <>
               <div className="or-divider">remote browser (hosted — log in on Riot&apos;s page here)</div>
               <RemoteBrowserPanel

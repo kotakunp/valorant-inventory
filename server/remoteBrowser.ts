@@ -33,6 +33,7 @@ interface RemoteSession {
   id: string;
   ctx: BrowserContext;
   page: Page;
+  cdp: import("playwright-core").CDPSession | null;
   createdAt: number;
   phase: BrowserPhase;
   error?: string;
@@ -59,6 +60,11 @@ async function closeSession(phase: BrowserPhase = "expired"): Promise<void> {
   if (!s) return;
   s.stopping = true;
   s.phase = phase;
+  try {
+    await s.cdp?.send("Page.stopScreencast").catch(() => {});
+  } catch {
+    /* ignore */
+  }
   try {
     await s.ctx.close();
   } catch {
@@ -167,13 +173,45 @@ function profileDir(): string {
   return path.join(os.homedir(), ".valorant-store", "remote-profile");
 }
 
-async function captureLoop(s: RemoteSession): Promise<void> {
+/** CDP screencast — keeps streaming during page.goto (page.screenshot hangs on navigate). */
+async function startScreencast(s: RemoteSession): Promise<void> {
+  try {
+    const cdp = await s.page.context().newCDPSession(s.page);
+    s.cdp = cdp;
+    cdp.on("Page.screencastFrame", (params: { data: string; sessionId: number }) => {
+      if (s.stopping || session !== s) return;
+      try {
+        s.lastFrame = Buffer.from(params.data, "base64");
+      } catch {
+        /* bad frame */
+      }
+      void cdp.send("Page.screencastFrameAck", { sessionId: params.sessionId }).catch(() => {});
+    });
+    await cdp.send("Page.enable");
+    await cdp.send("Page.startScreencast", {
+      format: "jpeg",
+      quality: FRAME_JPEG_QUALITY,
+      maxWidth: VIEWPORT.width,
+      maxHeight: VIEWPORT.height,
+      everyNthFrame: 1,
+    });
+  } catch {
+    s.cdp = null;
+    await captureFallbackLoop(s);
+  }
+}
+
+/** Fallback if CDP screencast unavailable — screenshot with hard timeout so navigation cannot freeze it. */
+async function captureFallbackLoop(s: RemoteSession): Promise<void> {
   while (!s.stopping && session === s) {
     try {
-      const buf = await s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY });
+      const buf = await Promise.race([
+        s.page.screenshot({ type: "jpeg", quality: FRAME_JPEG_QUALITY, timeout: 2000 }),
+        new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error("shot timeout")), 2500)),
+      ]);
       s.lastFrame = Buffer.from(buf);
     } catch {
-      /* page navigating/closing */
+      /* navigating */
     }
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -244,6 +282,7 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
     id: crypto.randomUUID(),
     ctx,
     page,
+    cdp: null,
     createdAt: Date.now(),
     phase: "login",
     result: null,
@@ -255,10 +294,8 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
   };
   session = s;
 
-  // Capture + harvest immediately; load the login page in the background.
-  // Phase is "login" from the start so the UI is not stuck on "starting"
-  // while account.riotgames.com is slow/blocked from the VPS.
-  s.frameLoop = captureLoop(s);
+  // Screencast first so frames stream while page.goto runs (screenshot would hang).
+  s.frameLoop = startScreencast(s);
   startPoller(s);
 
   void (async () => {
