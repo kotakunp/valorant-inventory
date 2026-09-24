@@ -172,9 +172,6 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, onTo
         style={{ ["--n" as string]: gun.items.length }}
       >
         {gun.items.map((s, i) => stackItem(s, i))}
-        <div className="sc-stack-label">
-          {(gun.items.find((s) => s.equipped) ?? gun.items[0])?.name}
-        </div>
       </div>
     </section>
   );
@@ -212,7 +209,6 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, onTo
                   <div className="sc-knife-cell" key={s.id}>
                     <div className="sc-stack" style={{ ["--n" as string]: 1 }}>
                       {stackItem(s, 0)}
-                      <div className="sc-stack-label sc-stack-label--show">{s.name}</div>
                     </div>
                   </div>
                 ))}
