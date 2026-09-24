@@ -119,7 +119,9 @@ export function Showcase({ payload, pages, page, selection, chromaSel = {}, foot
         <span className="sc-tile-gem" style={{ background: rarity, boxShadow: `0 0 8px ${rarity}` }} />
         {s.equipped && <span className="sc-check">✓</span>}
         {tileIcon(s) ? (
-          <img className="sc-stack-art" src={imgUrl(tileIcon(s))!} alt="" />
+          <span className="sc-stack-frame">
+            <img className="sc-stack-art" src={imgUrl(tileIcon(s))!} alt="" />
+          </span>
         ) : (
           <span className="sc-fallback">{s.weaponName}</span>
         )}

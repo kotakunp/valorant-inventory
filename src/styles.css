@@ -871,14 +871,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   min-height: 0;
   overflow: hidden;
 }
-/* Square cells: fixed cols×rows per density so stacks get height for fan + hover */
 .density-comfort .sc-cats {
   grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(2, 1fr);
+  grid-template-rows: repeat(4, 1fr);
 }
 .density-standard .sc-cats {
-  grid-template-columns: repeat(6, 1fr);
-  grid-template-rows: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(4, 1fr);
 }
 .density-dense .sc-cats {
   grid-template-columns: repeat(8, 1fr);
@@ -930,6 +929,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   border: 1px solid rgba(255, 255, 255, 0.08);
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
   overflow: hidden;
+  container-type: size;
 }
 .sc-stack-item {
   position: absolute;
@@ -939,13 +939,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   justify-content: center;
   cursor: default;
   transition: transform 0.12s ease, filter 0.12s ease;
-  /* Only the art is a hit target — exposed edges of lower layers stay hoverable.
-     Events bubble to this node for click/chroma. */
+  /* Only the frame/art is a hit target — exposed edges of lower layers stay hoverable. */
   pointer-events: none;
   /* Diagonal fan centered on i=2 so layers peek without leaving the cell */
   transform: translate(
-    calc((var(--i, 2) - 2) * 7%),
-    calc((var(--i, 2) - 2) * 8%)
+    calc((var(--i, 2) - 2) * 6%),
+    calc((var(--i, 2) - 2) * 7%)
   );
 }
 .sc-stack-item.clickable { cursor: pointer; }
@@ -958,21 +957,33 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-stack-item:nth-child(7) { --i: 6; }
 .sc-stack-item:nth-child(8) { --i: 7; }
 .sc-stack-item:nth-child(n + 9) { --i: 8; }
-/* Deep stacks: tighter step so the fan still fits the square cell */
+/* Deep stacks: tighter step so the fan still fits the cell */
 .sc-stack:has(> .sc-stack-item:nth-child(n + 6)) .sc-stack-item {
   transform: translate(
-    calc((var(--i, 2) - 2) * 4%),
-    calc((var(--i, 2) - 2) * 5%)
+    calc((var(--i, 2) - 2) * 3.5%),
+    calc((var(--i, 2) - 2) * 4.5%)
   );
 }
 .sc-stack-item:hover {
   z-index: 40 !important;
-  transform: translate(0, -5%) scale(1.08);
+  transform: translate(0, -4%) scale(1.06);
   filter: brightness(1.15);
 }
+/* Square image frame — same footprint for every skin in a cell */
+.sc-stack-frame {
+  width: min(78cqw, 78cqh);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  flex-shrink: 0;
+}
 .sc-stack-art {
-  max-width: 78%;
-  max-height: 58%;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   object-fit: contain;
   pointer-events: auto;
   /* thin light outline so transparent PNGs read against dark bg */
@@ -988,6 +999,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
     drop-shadow(0 1px 0 rgba(255, 255, 255, 0.85))
     drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.85))
     drop-shadow(0 4px 10px rgba(0, 0, 0, 0.75));
+}
+.sc-stack-item .sc-fallback {
+  pointer-events: auto;
+  width: min(78cqw, 78cqh);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .sc-stack-name {
   position: absolute;
@@ -1036,6 +1055,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   border: 1px solid rgba(255, 255, 255, 0.08);
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
   overflow: hidden;
+  container-type: size;
 }
 .sc-knife-cell .sc-stack-item {
   transform: none;
@@ -1043,9 +1063,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-knife-cell .sc-stack-item:hover {
   transform: scale(1.06);
 }
-.sc-knife-cell .sc-stack-art {
-  max-height: 68%;
-  max-width: 92%;
+.sc-knife-cell .sc-stack-frame {
+  width: min(72cqw, 72cqh);
 }
 .sc-knife-cell .sc-stack-name {
   opacity: 1;
