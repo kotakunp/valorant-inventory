@@ -245,7 +245,7 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
     ctx,
     page,
     createdAt: Date.now(),
-    phase: "starting",
+    phase: "login",
     result: null,
     frameLoop: null,
     lastFrame: null,
@@ -255,20 +255,18 @@ export async function startRemoteBrowser(region: Region): Promise<BrowserStatus>
   };
   session = s;
 
-  // Capture frames immediately (about:blank) so the UI is never stuck on "No frame yet"
-  // while the login page loads.
+  // Capture + harvest immediately; load the login page in the background.
+  // Phase is "login" from the start so the UI is not stuck on "starting"
+  // while account.riotgames.com is slow/blocked from the VPS.
   s.frameLoop = captureLoop(s);
+  startPoller(s);
 
-  // Do not block /api/browser/start on page.goto — return the session, then finish loading.
   void (async () => {
     try {
       await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
     } catch {
-      /* still try — SPA may be loading */
+      /* SPA/network slow — frames still stream; user can retry Close */
     }
-    if (session !== s || s.stopping) return;
-    s.phase = "login";
-    startPoller(s);
   })();
   // region is consumed when harvest finishes via auth.region fallback; keep param for API symmetry
   void region;
