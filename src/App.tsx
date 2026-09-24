@@ -596,7 +596,9 @@ export default function App() {
                   onChange={(e) => setCookieInput(e.target.value)}
                 />
                 <p className="cookie-hint">
-                  F12 → Network → <code>auth.riotgames.com</code> → copy the Cookie header · or Application → Cookies → ssid
+                  Recommended: F12 → Network → open <code>auth.riotgames.com</code> → click any
+                  request → Headers → copy the full <strong>cookie</strong> value
+                  (<code>ssid=…; asid=…; tdid=…</code>). ssid alone is often not enough.
                 </p>
               </div>
             </div>

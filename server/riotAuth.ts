@@ -209,10 +209,25 @@ export async function loginWithCookies(raw: string): Promise<AuthResult> {
   try {
     return finishLogin(await reauthForTokens(jar), null);
   } catch (e) {
+    // Node fetch can fail TLS/UA fingerprinting that Chrome passes — retry in
+    // a real headless Chromium before giving up (skipped under vitest).
+    if (e instanceof AuthFlowError && e.status === 401 && !process.env.VITEST) {
+      try {
+        const { reauthViaBrowser } = await import("./browserReauth");
+        return finishLogin(await reauthViaBrowser(pairs), null);
+      } catch {
+        /* fall through to the friendly cookie error below */
+      }
+    }
     if (e instanceof AuthFlowError && e.status === 401) {
+      const names = pairs.map(([n]) => n).join(", ");
+      const hint =
+        pairs.length === 1
+          ? " Tip: paste the full Cookie header from a Network request to auth.riotgames.com (ssid alone is often not enough)."
+          : "";
       throw new AuthFlowError(
         "Riot rejected the cookie — it is probably expired or incomplete. Log in at playvalorant.com again and copy a fresh ssid value." +
-          `\n\nDetail: ${e.message}`,
+          `\n\nDetail: ${e.message}\n[cookies sent: ${names}]${hint}`,
         401
       );
     }
@@ -314,52 +329,22 @@ async function requestEntitlements(accessToken: string): Promise<string> {
   return token;
 }
 
-/** Play-valorant web OAuth seed: establishes the authorization request (asid)
- *  for client play-valorant-web-prod before the GET /authorize reauth.
- *  Without this, /authorize often 303s to the login page even with a fresh ssid. */
-const PLAY_AUTH_COOKIES_BODY = {
-  client_id: "play-valorant-web-prod",
-  nonce: "1",
-  redirect_uri: "https://playvalorant.com/opt_in",
-  response_type: "token id_token",
-  scope: "account openid",
-};
-
 async function reauthForTokens(jar: CookieJar): Promise<{ accessToken: string; idToken: string }> {
   if (!jar.has("ssid")) throw new AuthFlowError("Login session cookie missing — please sign in again.", 401);
-
-  // Seed step (Auth Cookies): POST /api/v1/authorization with the pasted jar so
-  // Riot binds asid/tdid to play-valorant-web-prod, then absorb any refreshed cookies.
-  try {
-    const seed = await fetch(API_AUTHZ, {
-      method: "POST",
-      headers: {
-        ...WEB_HEADERS,
-        "Content-Type": "application/json",
-        Cookie: jar.header(),
-      },
-      body: JSON.stringify(PLAY_AUTH_COOKIES_BODY),
-      redirect: "manual",
-      signal: AbortSignal.timeout(15000),
-    });
-    jar.absorb(seed.headers);
-    // Response body (if any) is JSON status — safe to ignore; we only need Set-Cookie.
-    await seed.text().catch(() => "");
-  } catch {
-    // Seed is best-effort — some sessions still reauth without it.
-  }
 
   let res: Response;
   try {
     res = await fetch(REAUTH_URL, {
+      method: "GET",
       headers: {
-        ...WEB_HEADERS,
-        // The authorize endpoint is an HTML navigation — a browser-style Accept
-        // is required (Accept: application/json → HTTP406, no redirect at all).
+        "User-Agent": WEB_HEADERS["User-Agent"],
+        Referer: WEB_HEADERS.Referer,
+        // No Origin on GET — browsers omit it for top-level navigations; sending
+        // it looks like a CORS probe and can trip Riot's WAF into a login bounce.
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
-        // Browser-like navigation headers — missing Sec-Fetch-* can trip WAFs.
-        "Sec-Fetch-Site": "same-site",
+        // playvalorant.com → auth.riotgames.com is cross-site (different eTLD+1).
+        "Sec-Fetch-Site": "cross-site",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Dest": "document",
         "Sec-Fetch-User": "?1",
