@@ -166,9 +166,8 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
   const pdGet = (p: string, critical = false, label = p) =>
     requestJson(`${pdBase}${p}`, { init: { headers: pdHeaders }, critical, label });
 
-  const [entSkins, entVariants, entCards, entTitles, entBuddies] = await Promise.all([
+  const [entSkins, entCards, entTitles, entBuddies] = await Promise.all([
     pdGet(`/store/v1/entitlements/${puuid}/${ITEM_TYPE.skins}`, true, "Owned skins"),
-    pdGet(`/store/v1/entitlements/${puuid}/${ITEM_TYPE.variants}`, true, "Owned skin variants"),
     pdGet(`/store/v1/entitlements/${puuid}/${ITEM_TYPE.cards}`, true, "Owned player cards"),
     pdGet(`/store/v1/entitlements/${puuid}/${ITEM_TYPE.titles}`, true, "Owned player titles"),
     pdGet(`/store/v1/entitlements/${puuid}/${ITEM_TYPE.buddies}`, true, "Owned buddies"),
@@ -203,14 +202,6 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
       .map((x: string) => x.toLowerCase())
   );
 
-  const variantsPerSkin = new Map<string, number>();
-  const ownedChromaIds = new Set<string>();
-  for (const id of parseEntitlements(entVariants, ITEM_TYPE.variants)) {
-    ownedChromaIds.add(id);
-    const skinId = catalog.chromaToSkin.get(id);
-    if (skinId) variantsPerSkin.set(skinId, (variantsPerSkin.get(skinId) ?? 0) + 1);
-  }
-
   const equippedChromaBySkin = new Map<string, string>();
   for (const g of loadoutBody?.Guns ?? []) {
     const skinId = typeof g?.SkinID === "string" ? g.SkinID.toLowerCase() : "";
@@ -233,13 +224,12 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
 
     const levels: any[] = entry.skin.levels ?? [];
     const chromasRaw: any[] = entry.skin.chromas ?? [];
+    // Full catalog chroma list for owned skins (matches the client's variant
+    // picker — variant entitlements under-return and are display-only here).
     const chromas: ChromaOption[] = chromasRaw
       .map((ch: any, idx: number) => {
         const id = typeof ch?.uuid === "string" ? ch.uuid.toLowerCase() : "";
         if (!id) return null;
-        // Base chroma ships with the skin; extras require a variant entitlement.
-        const owned = idx === 0 || ownedChromaIds.has(id);
-        if (!owned) return null;
         return {
           id,
           name: (typeof ch?.displayName === "string" && ch.displayName.trim()
@@ -272,7 +262,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
       icon: activeChroma?.icon ?? baseIcon,
       price: pricesAvailable ? priceMap!.get(skinUuid) ?? null : null,
       levelCount: levels.length,
-      variantCount: chromas.length || (variantsPerSkin.get(skinUuid) ?? 0),
+      variantCount: chromas.length,
       isKnife,
       equipped: equippedSkins.has(skinUuid),
       contentTierRank: tierUuid ? catalog.contentTiers.get(tierUuid) ?? null : null,

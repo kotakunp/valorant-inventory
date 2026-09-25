@@ -16,7 +16,7 @@
 
 | Source | Provides | Auth |
 |---|---|---|
-| Unofficial Riot **client endpoints** (`pd.{shard}.a.pvp.net`, `auth.riotgames.com`) | Owned skins/variants, cards, titles, buddies; VP/RP wallet; account level; current + peak rank; equipped loadout; VP prices; Riot ID | Pasted `access token` + `entitlements JWT` (per request, never stored) |
+| Unofficial Riot **client endpoints** (`pd.{shard}.a.pvp.net`, `auth.riotgames.com`) | Owned skins, cards, titles, buddies; VP/RP wallet; account level; current + peak rank; equipped loadout; VP prices; Riot ID | Pasted `access token` + `entitlements JWT` (per request, never stored) |
 | **[valorant-api.com](https://valorant-api.com)** (community API, free) | Static catalog: item display names, icons/images | None (server-side cache, 24h TTL) |
 
 **Why not OAuth (RSO):** Riot's official OAuth only exposes identity (`account-v1`) and match/ranked/status APIs. **No inventory endpoint or scope exists** in the official API, and production keys require manual Riot approval. OAuth may be added later *only* as an identity step; inventory will still use the entitlements flow.
@@ -37,14 +37,14 @@ Verified against the unofficial API docs (techchrism) on 2026-09-23:
 
 1. Resolve shard; cache client version (`valorant-api.com/v1/version` → `riotClientVersion`) + static catalog (weapons, playercards, playertitles, buddies; 24h TTL). Buddy catalog indexes both root and **level** UUIDs (entitlements return level ids).
 2. `GET https://auth.riotgames.com/userinfo` → PUUID.
-3. `GET /store/v1/entitlements/{puuid}/{TypeID}` for: skins `e7c63390-…`, variants `3ad1b2b2-…`, cards `3f296c07-…`, titles `de7caa6b-…`, buddies `dd3bf334-…`. Response shape (verified 2026-09-23): **flat** `{ItemTypeID, Entitlements}` — `parseEntitlements` also still accepts legacy `EntitlementsByTypes`.
+3. `GET /store/v1/entitlements/{puuid}/{TypeID}` for: skins `e7c63390-…`, cards `3f296c07-…`, titles `de7caa6b-…`, buddies `dd3bf334-…`. Response shape (verified 2026-09-23): **flat** `{ItemTypeID, Entitlements}` — `parseEntitlements` also still accepts legacy `EntitlementsByTypes`. (Variants are **not** fetched: variant entitlements under-return; chroma lists come from the catalog instead.)
 4. `POST /store/v3/storefront/{puuid}` (body `{}`) → VP price map from daily offers, featured bundles (`BasePrice`), and night-market standard `Cost` (not discount). The old global `GET /store/v1/offers/` is **gone** (404 on every variant). Accessory-store items are Kingdom-Credit priced and excluded from the VP map.
 5. `GET /store/v1/wallet/{puuid}` → VP / RP balances. Currency UUIDs changed: VP `85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741` (legacy `…512d-6e5d…` still checked), Radianite `e59aa87c-4cbf-517a-5983-6e81511be9b7` (legacy `e046853e-…` still checked); Kingdom Credits `85ca954a-…` present but not surfaced.
 6. `GET /account-xp/v1/players/{puuid}` → `Progress.Level`.
 7. `GET /val/mmr/v1/players/{puuid}` → current + peak tier (fields confirmed at implementation time).
 8. `GET /personalization/v3/players/{puuid}/playerloadout` → `Identity.PlayerCardID`, `Identity.PlayerTitleID`, `Identity.AccountLevel`, `Guns[].SkinID` (equipped defaults); **v2 returns 404** (kept as fallback).
 9. `PUT /name-service/v2/players` body `[puuid]` → `[{ GameName, TagLine }]`.
-10. Join owned IDs against static catalog → return **only owned items**: `name, icon, price, variantCount, equipped, isKnife`.
+10. Join owned IDs against static catalog → return **only owned items**: `name, icon, price, variantCount, equipped, isKnife`. Each owned skin carries **all** of its catalog chromas (`chromas`, index 0 = base; display-only — matches the client's variant picker).
 
 **Required headers on every `pd.*` call:** `Authorization: Bearer …`, `X-Riot-Entitlements-JWT: …`, `X-Riot-ClientPlatform` (fixed base64 JSON from docs), `X-Riot-ClientVersion` (cached).
 

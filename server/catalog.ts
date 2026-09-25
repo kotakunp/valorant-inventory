@@ -17,7 +17,6 @@ export interface RankTierInfo {
 
 export interface Catalog {
   skins: Map<string, SkinIndexEntry>;
-  chromaToSkin: Map<string, string>;
   cards: Map<string, { name: string; icon: string | null; avatar: string | null }>;
   titles: Map<string, { name: string; text: string }>;
   buddies: Map<string, { name: string; icon: string | null }>;
@@ -83,7 +82,7 @@ export async function getCatalog(): Promise<Catalog> {
     getJson("https://valorant-api.com/v1/contenttiers").catch(() => null),
   ]);
   const data: Catalog = {
-    skins: new Map(), chromaToSkin: new Map(),
+    skins: new Map(),
     cards: new Map(), titles: new Map(), buddies: new Map(),
     rankTiers: indexRankTiers(ranks),
     contentTiers: indexContentTiers(contentTiers),
@@ -115,10 +114,7 @@ export async function getCatalog(): Promise<Catalog> {
       }
       for (const ch of skin.chromas ?? []) {
         const c = lc(ch.uuid);
-        if (c) {
-          data.skins.set(c, entry);
-          data.chromaToSkin.set(c, skinUuid);
-        }
+        if (c) data.skins.set(c, entry);
       }
     }
   }
