@@ -187,7 +187,6 @@ export function Showcase({
         }
         title={s.name}
       >
-        {s.equipped && <span className="sc-check">✓</span>}
         {tileIcon(s) ? (
           <span className="sc-stack-frame">
             <img className="sc-stack-art" src={imgUrl(tileIcon(s))!} alt="" />

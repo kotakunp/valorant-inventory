@@ -1171,16 +1171,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   z-index: 45;
   pointer-events: none;
 }
-.sc-check {
-  position: absolute;
-  top: 5px;
-  left: 7px;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-  z-index: 45;
-  pointer-events: none;
-}
 .sc-fallback { color: var(--muted); font-size: 11px; padding: 8px; text-align: center; }
 .sc-empty {
   flex: 1;
