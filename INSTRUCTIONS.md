@@ -74,9 +74,9 @@ Must be visible / true:
 
 - **Exactly 4 category columns**; combined columns show **section titles
   mid-column** (SMGS above SMGs, SHOTGUNS above shotguns; SNIPERS then HEAVIES).
-- **All 19 official guns always present**, even empty (dashed outline +
-  dimmed default-weapon render, no `+`/labels); empty MELEE strip always
-  shown. Unknown guns → OTHER column.
+- **All 19 official guns always present**, even empty (dimmed default-weapon
+  render, no border, no `+`/labels); empty MELEE strip always shown. Unknown
+  guns → OTHER column.
 - **Skin stacks**: multiple skins per gun layered in one cell as a **two-axis
   cascade** — front skin centered, rest recede diagonally (left columns
   down-right, right columns down-left), spread bounded so nothing escapes the
