@@ -153,7 +153,7 @@ export default function App() {
     if (!el || typeof ResizeObserver === "undefined") return;
     const fit = () => {
       const w = el.clientWidth;
-      if (w > 0) setFitScale(Math.min(1, Math.max(0.3, (w - 2) / CANVAS_W)));
+      if (w > 0) setFitScale(Math.min(1, Math.max(0.1, (w - 2) / CANVAS_W)));
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -189,7 +189,8 @@ export default function App() {
       items = items.filter(
         (s) => s.name.toLowerCase().includes(q) || s.weaponName.toLowerCase().includes(q)
       );
-    } else if (skinFilter === "selected") {
+    }
+    if (skinFilter === "selected") {
       items = items.filter((s) => selection[selKey("skin", s.id)]);
     } else if (skinFilter === "equipped") {
       items = items.filter((s) => s.equipped);
@@ -1227,7 +1228,7 @@ export default function App() {
               </div>
             )}
             <span className="export-note">
-              Click a skin · menu to remove / front
+              Hover a stack to browse its skins
             </span>
             <div className="zoom-group" role="group" aria-label="Preview zoom">
               <button

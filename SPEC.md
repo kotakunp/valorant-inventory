@@ -57,7 +57,7 @@ Verified against the unofficial API docs (techchrism) on 2026-09-23:
 
 ## 6. Selection rules (checkboxes)
 
-Every item is a **checkbox** (sidebar selection panels). Preview skins **do not toggle on click** — click opens a context menu (name, rarity + VP price, variants, show in front, remove from showcase).
+Every item is a **checkbox** (sidebar selection panels). Preview skins **do not toggle on click** — hover opens a nearby skin spread with large independent hover targets. No click or edit mode is required; variants, front ordering, and removal are available on each row.
 
 | Item | Default checked when |
 |---|---|
@@ -105,7 +105,7 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 │ SIDEARMS│SMGS│SHOTGUNS │RIFLES│SNIPERS│HEAVIES │ tall art panel       │
 │ col1 spans full height (incl. melee band)  │ RANK block            │
 │ section titles sit on their own groups     │  PEAK / CURRENT rows  │
-│ click skin → menu (full contents below)    │ VP / RP wallet row    │
+│ hover stack → spread (outside the canvas)    │ VP / RP wallet row    │
 │ ── MELEE (cols 2–4, ~68px, lighter) ──     │ PREMIUM n · KNIFE n   │
 │                                             │  · BUDDIES +n        │
 ├────────────────────────────────────────────┴───────────────────────┤
@@ -115,12 +115,13 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 
 - **Category columns:** exactly 4 columns (SMGs+shotguns merged; snipers+heavies merged) — guns fill top→bottom, not row-major grid fill.
 - **Sidearms column** spans full center height including the melee band; melee strip sits only under columns 2–4 (~68px tall), rendered on a **lighter** plane than gun cells.
-- **Two-axis stack:** front skin centered in the cell; the rest recede diagonally — direction is deterministic per column (left half cascades `down-right`, right half `down-left` via `stackDirectionForColumn`). Per-skin step (`stackSteps`) shrinks as the stack grows and the whole cascade is bounded by `STACK_SPREAD` (x 0.3 / y 0.24 of the cell) so **no stack ever escapes its cell**; back layers scale down slightly for depth. Order is front-first via `orderStack`: manual "show in front" → equipped → tier score (price / content tier / level) → stable original order. Transforms are inline per item; hover raises `z-index` (130), open menu sits at 150.
-- **Context menu contents:** skin name, rarity label + VP price (`SELECT/PREMIUM/ULTRA/STANDARD` + `1775 VP`), `VARIANT` label with chroma thumbnails, **Show in front / Showing in front ✓**, **Remove from showcase**. Ancestor `overflow`/`clip-path` released while open so choices are visible.
+- **Two-axis stack:** front skin centered in the cell; the rest recede diagonally — direction is deterministic per column (left half cascades `down-right`, right half `down-left` via `stackDirectionForColumn`). Per-skin step (`stackSteps`) shrinks as the stack grows and the whole cascade is bounded by `STACK_SPREAD` (x 0.3 / y 0.24 of the cell) so **no stack ever escapes its cell**; back layers scale down slightly for depth. Order is front-first via `orderStack`: manual "show in front" → equipped → tier score (price / content tier / level) → stable original order. Transforms are inline per item; hovering opens an unscaled spread outside the canvas. Artwork remains stable inside the canvas.
+- **Hover spread:** pointer entry or keyboard focus on a weapon reveals all its selected skins beside the stack. Each row has a fixed large target, name, artwork, variants, front and remove actions. Only artwork scales on hover, never the hit target. A 180ms leave delay bridges the gap to the spread. Long lists scroll; position is clamped within the viewport. Escape, resize, or scrolling outside the spread dismisses it. Touch can tap the same target. No separate inspector or click-to-edit flow. Export instances render no hover targets or portals.
+
 - **Empty slots always rendered** for official guns (and empty MELEE strip) — the official default-weapon render at low opacity (`defaultIcons`), no border, no `+`/labels; matches VALORANT loadout.
 - **Right rail:** player card dominates (official 268:640 art ratio) → single compact **RANK** block (PEAK + CURRENT rows, tier icon + name + color) → wallet as one horizontal VP/RP row → one summary line `PREMIUM n · KNIFE n · BUDDIES +n`. No per-stat cards. Skins grid takes full remaining width (no left rail). No footer bar.
 - **Knives:** always a dedicated full-width bottom strip (each knife its own cell); never overflow into the gun grid.
-- **Stacking:** same gun's skins are layered in one cell; hover raises that skin's `z-index` + brightens. Art outline uses the skin's **rarity color** (`--rarity` set per item from `rarityColor()` → multi-`drop-shadow` on `.sc-stack-art`); hover adds a rarity glow.
+- **Stacking:** same gun's skins are layered in one cell; hover reveals individually hoverable skins in the spread. Art outline uses the skin's **rarity color** (`--rarity` set per item from `rarityColor()` → multi-`drop-shadow` on `.sc-stack-art`); hovering a spread row highlights its artwork without shifting targets.
 - Page indicator `1/2` bottom-right when multi-page.
 
 ## 9. API surface

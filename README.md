@@ -28,7 +28,7 @@ All three must pass (112 tests). Then `git add … && git commit && git push` to
 ```
 src/                      # React frontend (Vite + TS)
   App.tsx                 # state, auth gate, selection sidebar, preview + export Showcases, zoom/toolbar
-  Showcase.tsx            # the showcase renderer (layout, two-axis stack, context menu, right rail, knife row)
+  Showcase.tsx            # the showcase renderer (layout, two-axis stack, hover spread, right rail, knife row)
   logic.ts                # selection rules, rarityColor, WEAPON_CATEGORIES, paginate(), stack layout (stackLayers/orderStack)
   logic.test.ts           # UI-logic tests
   styles.css              # all styles; fixed 1280×720 `.sc-root` canvas
@@ -46,7 +46,7 @@ SPEC.md                   # product + technical spec (UI sections must stay in s
 ### UI invariants (easy to break — read before touching `Showcase.tsx`)
 
 - Export canvas is **fixed 1280×720** — `.sc-root` must never become responsive; preview zoom (Fit/100%/Fullscreen) only scales the editor preview.
-- Preview clicks open the **context menu** (name, rarity + VP, variants, show in front, remove from showcase), they do not toggle selection; toggling lives in the sidebar.
+- Hovering a preview stack opens its skins in a nearby scrollable spread with separate, stable hover targets (variants, front ordering, and removal remain available), they do not toggle selection; toggling lives in the sidebar.
 - `paginate(allSkins, selection)` always emits all 19 official gun slots + the knife row; empty guns render as empty cells (dimmed default-weapon render from `payload.defaultIcons`, no border).
 - Stacks are two-axis: front-first order (`orderStack`: manual front → equipped → tier score → stable) with inline `translate/scale` per layer (`stackLayers`), cascade direction per column (`stackDirectionForColumn`), spread bounded by `STACK_SPREAD` — never CSS-fan transforms.
 - Rarity outline color comes from `--rarity` set per stack item (`rarityColor()` in `logic.ts`).

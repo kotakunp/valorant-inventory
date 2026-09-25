@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { HoverSkins } from "./HoverSkins";
 import type { ChromaSelection, RankBadge, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
 import { selKey } from "./types";
 import type { GunGroup, Pages, StackDirection, StackLayer } from "./logic";
@@ -7,7 +8,6 @@ import {
   LOADOUT_GUNS,
   orderStack,
   rarityColor,
-  rarityLabel,
   stackDirectionForColumn,
   stackLayers,
   tierInfo,
@@ -118,15 +118,34 @@ export function Showcase({
   onBringToFront,
   onPickChroma,
 }: Props) {
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const interactive = !!onRemoveSkin;
-
+  const [hovered, setHovered] = useState<{ gun: string; skin?: string; rect: DOMRect } | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const keepOpen = () => clearTimeout(closeTimer.current);
+  const closeSoon = () => {
+    keepOpen();
+    closeTimer.current = setTimeout(() => setHovered(null), 180);
+  };
+  const openStack = (element: HTMLElement, gun: string, skin?: string) => {
+    keepOpen();
+    setHovered({ gun, skin, rect: element.getBoundingClientRect() });
+  };
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
   useEffect(() => {
-    if (!openMenu) return;
-    const close = () => setOpenMenu(null);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [openMenu]);
+    const close = () => setHovered(null);
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
+    const scroll = (event: Event) => {
+      if (!(event.target instanceof Element) || !event.target.closest(".skin-hover-spread")) close();
+    };
+    window.addEventListener("scroll", scroll, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener("scroll", scroll, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", escape);
+    };
+  }, []);
 
   const isOn = (kind: ItemKind, id: string) => !!selection[selKey(kind, id)];
   const checkedSkins = payload.skins.filter((s) => isOn("skin", s.id));
@@ -187,103 +206,17 @@ export function Showcase({
 
   const tileIcon = (s: SkinItem) => activeChroma(s)?.icon ?? s.icon;
 
-  /** One layered skin — click opens the context menu (not a selection toggle). */
-  const stackItem = (s: SkinItem, index: number, gunId: string, layer: StackLayer, count: number) => {
-    const chroma = activeChroma(s);
-    const menuOpen = interactive && openMenu === s.id;
-    const rarity = rarityColor(s.price, s.levelCount, s.contentTierRank ?? null);
-    const isFront = bringToFront[gunId] === s.id;
-    return (
-      <div
-        key={s.id}
-        className={`sc-stack-item${s.equipped ? " equipped" : ""}${interactive ? " clickable" : ""}${menuOpen ? " menu-open" : ""}`}
-        style={{
-          zIndex: menuOpen ? 150 : count - index + 1,
-          transform: `translate(${layer.dx * 100}%, ${layer.dy * 100}%) scale(${layer.scale})`,
-          ["--rarity" as string]: rarity,
-        }}
-        onClick={
-          interactive
-            ? (e) => {
-                e.stopPropagation();
-                setOpenMenu((cur) => (cur === s.id ? null : s.id));
-              }
-            : undefined
-        }
-        title={s.name}
-      >
-        {tileIcon(s) ? (
-          <span className="sc-stack-frame">
-            <img className="sc-stack-art" src={imgUrl(tileIcon(s))!} alt="" />
-          </span>
-        ) : (
-          <span className="sc-fallback">{s.weaponName}</span>
-        )}
-        {menuOpen && (
-          <div
-            className="sc-skin-menu"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-            role="menu"
-            aria-label={`Options for ${s.name}`}
-          >
-            <div className="sc-skin-menu-title">{s.name}</div>
-            <div className="sc-skin-menu-meta">
-              <span className="sc-skin-menu-rarity" style={{ color: rarity }}>
-                {rarityLabel(s.price, s.levelCount, s.contentTierRank ?? null)}
-              </span>
-              {s.price != null && <span className="sc-skin-menu-price">{fmt(s.price)} VP</span>}
-            </div>
-            {s.chromas.length > 0 && (
-              <div className="sc-skin-menu-group">
-                <div className="sc-skin-menu-label">Variant</div>
-                <div className="sc-chromas sc-chromas--menu">
-                  {s.chromas.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      className={"sc-chroma" + (chroma?.id === c.id ? " on" : "")}
-                      title={c.name}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPickChroma?.(s.id, c.id);
-                      }}
-                    >
-                      {c.icon ? <img src={imgUrl(c.icon)!} alt="" /> : <span>{c.name.slice(0, 1)}</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {onBringToFront && (
-              <button
-                type="button"
-                className={"sc-skin-menu-btn" + (isFront ? " is-front" : "")}
-                onClick={() => {
-                  onBringToFront(gunId, s.id);
-                  setOpenMenu(null);
-                }}
-              >
-                {isFront ? "Showing in front ✓" : "Show in front"}
-              </button>
-            )}
-            {onRemoveSkin && (
-              <button
-                type="button"
-                className="sc-skin-menu-btn sc-skin-menu-btn--danger"
-                onClick={() => {
-                  onRemoveSkin(s.id);
-                  setOpenMenu(null);
-                }}
-              >
-                Remove from showcase
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
+  /** Artwork never changes its hit area or layer order on hover. */
+  const stackItem = (s: SkinItem, index: number, _gunId: string, layer: StackLayer, count: number) => (
+    <div key={s.id} className="sc-stack-item" style={{
+      zIndex: count - index + 1,
+      transform: `translate(${layer.dx * 100}%, ${layer.dy * 100}%) scale(${layer.scale})`,
+      ["--rarity" as string]: rarityColor(s.price, s.levelCount, s.contentTierRank ?? null),
+    }}>
+      {tileIcon(s) ? <span className="sc-stack-frame"><img className="sc-stack-art" src={imgUrl(tileIcon(s))!} alt="" /></span>
+        : <span className="sc-fallback">{s.weaponName}</span>}
+    </div>
+  );
 
   const gunSection = (gun: GunGroup, dir: StackDirection) => {
     const items = orderStack(gun.items, bringToFront[gun.id]);
@@ -291,6 +224,12 @@ export function Showcase({
     const layers = stackLayers(items.length, dir);
     return (
       <section className={`sc-cat${empty ? " sc-cat--empty" : ""}`} key={gun.id}>
+        {interactive && !empty && (
+          <button className="sc-hover-target" aria-label={`Browse ${gun.label}, ${items.length} skins`}
+            onPointerEnter={e => openStack(e.currentTarget, gun.id)} onPointerLeave={closeSoon}
+            onFocus={e => openStack(e.currentTarget, gun.id)} onBlur={closeSoon}
+            onClick={e => openStack(e.currentTarget, gun.id)} />
+        )}
         <div className="sc-cat-head">
           <CatMark />
           <span className="sc-cat-name">{gun.label}</span>
@@ -314,6 +253,15 @@ export function Showcase({
 
   return (
     <div className="sc-root">
+      {interactive && hovered && (
+        <HoverSkins
+          gun={hovered.gun}
+          items={hovered.gun === "MELEE" ? knifeItems.filter(s => s.id === hovered.skin) : orderStack(slots.find(g => g.id === hovered.gun)?.items ?? [], bringToFront[hovered.gun])}
+          rect={hovered.rect} chromas={chromaSel}
+          onEnter={keepOpen} onLeave={closeSoon}
+          onFront={onBringToFront} onRemove={onRemoveSkin} onChroma={onPickChroma}
+        />
+      )}
       <div className="sc-wedge" />
       <header className="sc-header">
         <VLogo />
@@ -354,6 +302,10 @@ export function Showcase({
                 {knifeItems.length > 0 ? (
                   knifeItems.map((s) => (
                     <div className="sc-knife-cell" key={s.id}>
+                      {interactive && <button className="sc-hover-target" aria-label={`Browse ${s.name}`}
+                        onPointerEnter={e => openStack(e.currentTarget, "MELEE", s.id)} onPointerLeave={closeSoon}
+                        onFocus={e => openStack(e.currentTarget, "MELEE", s.id)} onBlur={closeSoon}
+                        onClick={e => openStack(e.currentTarget, "MELEE", s.id)} />}
                       <div className="sc-stack">
                         {stackItem(s, 0, "MELEE", { dx: 0, dy: 0, scale: 1 }, 1)}
                       </div>

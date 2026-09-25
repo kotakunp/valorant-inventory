@@ -52,7 +52,7 @@ renders a pixel-faithful loadout preview they can curate and export.
     (+ per-section *All / Premium / None*).
   - (No FM / PROOF footer-fields panel — removed.)
 - **Preview bar:** download button (with export phase text), page pager
-  `◀ 1/N ▶` when multi-page, hint *"Click a skin · menu to remove / front"*,
+  `◀ 1/N ▶` when multi-page, hint *"Hover a stack to browse its skins"*,
   and **Fit / 100% / Fullscreen** zoom controls (editor-only — the exported
   geometry never changes).
 - **Preview frame:** the live 1280×720 showcase, scaled to fit (or actual
@@ -82,10 +82,14 @@ Must be visible / true:
   down-right, right columns down-left), spread bounded so nothing escapes the
   cell; front order = manual "show in front" → equipped → rarity/price →
   original. **Outline = the skin's rarity color** (gold `#e8c860` / purple
-  `#a866ff` / blue `#7fa3c8`), hover raises + glows.
-- **Click a skin in preview → context menu**: name, rarity label + VP price,
-  `VARIANT` thumbnails, *Show in front / Showing in front ✓*, *Remove from
-  showcase*. Click does NOT toggle selection.
+  `#a866ff` / blue `#7fa3c8`), hover opens an unscaled spread with individually hoverable skins.
+- **Hover a weapon stack → nearby skin spread**: no click required. Every skin
+  has its own large, stationary row; hover highlights the row and enlarges its
+  artwork without moving its pointer target. Long stacks scroll. A short leave
+  delay bridges the gap between stack and spread. Variants, front ordering,
+  and removal are available directly on each row; no inspector or edit mode.
+  Keyboard focus also opens the spread, Escape dismisses it; touch can tap.
+  The spread is outside the scaled canvas and never included in PNG exports.
 - **Melee/knives** on their own full-width bottom strip (lighter plane than
   gun cells), never in the gun grid.
 - Style: `#0a1017` flat canvas, `#ff4655` accent wedge + left bar, Bebas Neue
