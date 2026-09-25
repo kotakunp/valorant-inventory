@@ -230,16 +230,26 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
       .map((ch: any, idx: number) => {
         const id = typeof ch?.uuid === "string" ? ch.uuid.toLowerCase() : "";
         if (!id) return null;
-        return {
-          id,
-          name: (typeof ch?.displayName === "string" && ch.displayName.trim()
+        const name = (
+          typeof ch?.displayName === "string" && ch.displayName.trim()
             ? ch.displayName
             : idx === 0
               ? "Default"
               : `Variant ${idx + 1}`
-          ).trim(),
-          icon: typeof ch?.displayIcon === "string" ? ch.displayIcon : null,
-        } satisfies ChromaOption;
+        )
+          .replace(/\s+/g, " ")
+          .trim();
+        // Variant art: many skins (e.g. Recon Phantom) ship displayIcon only on
+        // the base chroma — variants carry fullRender instead. A null icon makes
+        // every renderer fall back to the default art, so the picker looks
+        // selectable but never changes.
+        const icon =
+          typeof ch?.displayIcon === "string" && ch.displayIcon
+            ? ch.displayIcon
+            : typeof ch?.fullRender === "string" && ch.fullRender
+              ? ch.fullRender
+              : null;
+        return { id, name, icon } satisfies ChromaOption;
       })
       .filter((c): c is ChromaOption => c !== null);
 

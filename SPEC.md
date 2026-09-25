@@ -44,7 +44,7 @@ Verified against the unofficial API docs (techchrism) on 2026-09-23:
 7. `GET /val/mmr/v1/players/{puuid}` → current + peak tier (fields confirmed at implementation time).
 8. `GET /personalization/v3/players/{puuid}/playerloadout` → `Identity.PlayerCardID`, `Identity.PlayerTitleID`, `Identity.AccountLevel`, `Guns[].SkinID` (equipped defaults); **v2 returns 404** (kept as fallback).
 9. `PUT /name-service/v2/players` body `[puuid]` → `[{ GameName, TagLine }]`.
-10. Join owned IDs against static catalog → return **only owned items**: `name, icon, price, variantCount, equipped, isKnife`. Each owned skin carries **all** of its catalog chromas (`chromas`, index 0 = base; display-only — matches the client's variant picker).
+10. Join owned IDs against static catalog → return **only owned items**: `name, icon, price, variantCount, equipped, isKnife`. Each owned skin carries **all** of its catalog chromas (`chromas`, index 0 = base; display-only — matches the client's variant picker). Chroma art resolves `displayIcon` → `fullRender` (65 variant chromas ship no `displayIcon` — e.g. Recon Phantom — and a null icon would silently render the default art).
 
 **Required headers on every `pd.*` call:** `Authorization: Bearer …`, `X-Riot-Entitlements-JWT: …`, `X-Riot-ClientPlatform` (fixed base64 JSON from docs), `X-Riot-ClientVersion` (cached).
 

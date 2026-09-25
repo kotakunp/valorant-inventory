@@ -3,6 +3,7 @@ export type Region = "na" | "latam" | "br" | "eu" | "ap" | "kr";
 export interface ChromaOption {
   id: string;
   name: string;
+  /** displayIcon, falling back to fullRender — many variants ship no displayIcon. */
   icon: string | null;
 }
 
