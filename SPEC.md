@@ -1,6 +1,6 @@
 # VALORANT Account Showcase Generator — Product & Technical Spec
 
-**Status:** MVP draft
+**Status:** living document — keep §6–§8 in sync with `src/Showcase.tsx`, `src/logic.ts`, `src/styles.css` when changing the UI.
 **Repo:** `/Users/kotakunp/web-projects/valorant-store`
 
 ---
@@ -109,14 +109,14 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 ```
 
 - **Category columns:** exactly 4 columns (SMGs+shotguns merged; snipers+heavies merged) — guns fill top→bottom, not row-major grid fill.
-- **Sidearms column** spans full center height including the melee band; melee strip sits only under columns 2–4 and is compact (~52px).
+- **Sidearms column** spans full center height including the melee band; melee strip sits only under columns 2–4 (~68px tall).
 - **Stack fan:** vertical step shrinks as stack size grows so many skins overlap in-cell (no escape).
 - **Context menu:** ancestor `overflow`/`clip-path` released while open so choices are visible.
 - **Empty slots always rendered** for official guns (and empty MELEE strip) — matches VALORANT loadout.
 - **Rank medallions (MVP):** styled circular badge, tier name + tier color (real tier icons = phase 2).
 - **Right rail only:** card + ranks + wallet + PREM/KNIFE + buddies under the player card; skins grid takes full remaining width (no left rail). No footer bar.
 - **Knives:** always a dedicated full-width bottom strip (stacked skins); never overflow into the gun grid.
-- **Stacking:** same gun's skins are layered in one cell; hover raises that skin's `z-index` + brightens. Thin light outline via multi-`drop-shadow` on the art.
+- **Stacking:** same gun's skins are layered in one cell; hover raises that skin's `z-index` + brightens. Art outline uses the skin's **rarity color** (`--rarity` set per item from `rarityColor()` → multi-`drop-shadow` on `.sc-stack-art`); hover adds a rarity glow.
 - Page indicator `1/2` bottom-right when multi-page.
 
 ## 9. API surface

@@ -2,18 +2,60 @@
 
 Generates a **2560×1440 (1440p) 16:9 PNG** of a VALORANT account's premium
 collection — downloadable only, no share links, nothing stored.
-See `SPEC.md` for the full product/technical specification.
+See `SPEC.md` for the full product/technical specification (§6–§8 = UI/layout source of truth).
 
 ## Run
 
 ```bash
 npm install
-npm test          # unit tests (selection defaults, pagination, parsers, RSO helpers)
-npm run build     # typecheck + production bundle → dist/
+npm test          # vitest (selection defaults, pagination, auth parsers) — expect 105 tests green
+npm run build     # tsc --noEmit + production bundle → dist/
 npm start         # serves API + built frontend on http://localhost:3001
 # or for development with hot reload:
 npm run dev       # Express :3001 + Vite :5173 (proxied)
 ```
+
+## Verification loop (before every commit)
+
+```bash
+npx tsc --noEmit && npx vitest run && npm run build
+```
+
+All three must pass (105 tests). Then `git add … && git commit && git push` to `main`.
+
+## Architecture
+
+```
+src/                      # React frontend (Vite + TS)
+  App.tsx                 # state, auth forms, selection, preview + export Showcases
+  Showcase.tsx            # the showcase renderer (layout, stack fan, context menu, knife row)
+  logic.ts                # selection rules, rarityColor, WEAPON_CATEGORIES, paginate()
+  logic.test.ts           # UI-logic tests
+  styles.css              # all styles; fixed 1280×720 `.sc-root` canvas
+  types.ts                # SkinItem, ShowcasePayload, …
+  rso.ts, captcha.ts, RemoteBrowser.tsx
+server/                   # Express (tsx, no build step)
+  index.ts                # routes + /img proxy + static dist/ in production
+  valorant.ts             # Riot pipeline: entitlements/storefront/wallet/MMR → buildShowcase
+  riotAuth.ts, rso.ts     # token-paste / RSO auth
+  browserLogin.ts, chromeCookies.ts, remoteBrowser.ts, captchaSolver.ts
+  *.test.ts               # vitest suite
+SPEC.md                   # product + technical spec (UI sections must stay in sync)
+```
+
+### UI invariants (easy to break — read before touching `Showcase.tsx`)
+
+- Export canvas is **fixed 1280×720** — `.sc-root` must never become responsive.
+- Preview clicks open the skin **context menu** (chromas / show in front / remove), they do not toggle selection; toggling lives in the sidebar checkboxes.
+- `paginate(allSkins, selection)` always emits all 19 official gun slots + the knife row; empty guns render as empty cells.
+- Rarity outline color comes from `--rarity` set per stack item (`rarityColor()` in `logic.ts`).
+- Images load through `/img` proxy (allowlist `media.valorant-api.com`) so the PNG export doesn't taint the canvas.
+
+## Deploy
+
+- Hosted via **Dokploy** with **Nixpacks** (`nixpacks.toml`: nodejs_20 + Chromium for remote-browser login); push to `main`, then redeploy in Dokploy.
+- Production: `npm start` → `NODE_ENV=production tsx server/index.ts` on **:3001**.
+- Config via `.env` (see `.env.example`): `RSO_*`, `PORT`, `CAPMONSTER_API_KEY`.
 
 ## Getting tokens (current mode — no app approval needed)
 
