@@ -54,7 +54,7 @@ function KnifeIcon() {
   );
 }
 
-/** Low-opacity weapon silhouette for empty loadout cells (§10). */
+/** Low-opacity weapon silhouette — fallback when no default render is available. */
 function GunSilhouette() {
   return (
     <svg className="sc-silhouette" viewBox="0 0 72 26" aria-hidden="true" focusable="false">
@@ -64,6 +64,15 @@ function GunSilhouette() {
       />
       <path d="M31 15 H38 L36 24 H33 Z" fill="currentColor" />
     </svg>
+  );
+}
+
+/** Dimmed official default-weapon render for empty loadout cells (fallback: silhouette). */
+function EmptyGunArt({ icon }: { icon?: string }) {
+  return icon ? (
+    <img className="sc-empty-art" src={imgUrl(icon)!} alt="" />
+  ) : (
+    <GunSilhouette />
   );
 }
 
@@ -293,7 +302,7 @@ export function Showcase({
         >
           {empty ? (
             <div className="sc-empty-gun">
-              <GunSilhouette />
+              <EmptyGunArt icon={payload.defaultIcons?.[gun.id]} />
             </div>
           ) : (
             items.map((s, i) => stackItem(s, i, gun.id, layers[i], items.length))
@@ -354,7 +363,7 @@ export function Showcase({
                   <div className="sc-knife-cell sc-knife-cell--empty">
                     <div className="sc-stack sc-stack--empty">
                       <div className="sc-empty-gun">
-                        <GunSilhouette />
+                        <EmptyGunArt icon={payload.defaultIcons?.["MELEE"]} />
                       </div>
                     </div>
                   </div>

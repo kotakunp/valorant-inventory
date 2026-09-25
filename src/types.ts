@@ -63,6 +63,8 @@ export interface ShowcasePayload {
   titles: TitleItem[];
   buddies: BuddyItem[];
   pricesAvailable: boolean;
+  /** Uppercase gun label → official default-weapon render (empty-slot art). */
+  defaultIcons?: Record<string, string>;
   generatedAt: string;
 }
 

@@ -353,6 +353,8 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     wallet: { vp, rp },
     skins, cards, titles, buddies,
     pricesAvailable,
+    // Uppercase gun label → official default-weapon render (empty-slot art).
+    defaultIcons: Object.fromEntries(catalog.weaponIcons),
     generatedAt: new Date().toISOString(),
   };
 }

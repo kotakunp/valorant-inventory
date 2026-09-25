@@ -47,7 +47,7 @@ SPEC.md                   # product + technical spec (UI sections must stay in s
 
 - Export canvas is **fixed 1280×720** — `.sc-root` must never become responsive; preview zoom (Fit/100%/Fullscreen) only scales the editor preview.
 - Preview clicks open the **context menu** (name, rarity + VP, variants, show in front, remove from showcase), they do not toggle selection; toggling lives in the sidebar.
-- `paginate(allSkins, selection)` always emits all 19 official gun slots + the knife row; empty guns render as empty cells (dashed outline + silhouette).
+- `paginate(allSkins, selection)` always emits all 19 official gun slots + the knife row; empty guns render as empty cells (dashed outline + dimmed default-weapon render from `payload.defaultIcons`).
 - Stacks are two-axis: front-first order (`orderStack`: manual front → equipped → tier score → stable) with inline `translate/scale` per layer (`stackLayers`), cascade direction per column (`stackDirectionForColumn`), spread bounded by `STACK_SPREAD` — never CSS-fan transforms.
 - Rarity outline color comes from `--rarity` set per stack item (`rarityColor()` in `logic.ts`).
 - Images load through `/img` proxy (allowlist `media.valorant-api.com`) so the PNG export doesn't taint the canvas; failed image loads abort the export.

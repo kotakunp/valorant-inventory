@@ -1312,6 +1312,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   color: rgba(255, 255, 255, 0.07);
   pointer-events: none;
 }
+.sc-empty-art {
+  width: 90%;
+  height: auto;
+  max-height: 90%;
+  object-fit: contain;
+  opacity: 0.45;
+  pointer-events: none;
+}
 .sc-knife-cell--empty .sc-empty-gun {
   width: 88%;
   height: 56%;

@@ -25,6 +25,8 @@ export interface Catalog {
   rankTiers: Map<number, RankTierInfo>;
   /** contentTierUuid → rank (0 Select … 4 Ultra). */
   contentTiers: Map<string, number>;
+  /** Uppercase weapon displayName → official default-weapon render (displayIcon). */
+  weaponIcons: Map<string, string>;
 }
 
 let cache: { at: number; data: Catalog } | null = null;
@@ -85,9 +87,18 @@ export async function getCatalog(): Promise<Catalog> {
     cards: new Map(), titles: new Map(), buddies: new Map(),
     rankTiers: indexRankTiers(ranks),
     contentTiers: indexContentTiers(contentTiers),
+    weaponIcons: new Map(),
   };
   const lc = (s: unknown) => (typeof s === "string" ? s.toLowerCase() : "");
   for (const w of weapons.data ?? []) {
+    // Official default-weapon render for empty showcase slots (key = uppercase name).
+    const wIcon = typeof w.displayIcon === "string" && w.displayIcon
+      ? w.displayIcon
+      : typeof w.skins?.[0]?.displayIcon === "string" && w.skins[0].displayIcon
+        ? w.skins[0].displayIcon
+        : null;
+    const wKey = typeof w.displayName === "string" ? w.displayName.trim().toUpperCase() : "";
+    if (wKey && wIcon) data.weaponIcons.set(wKey, wIcon);
     for (const skin of w.skins ?? []) {
       const skinUuid = lc(skin.uuid);
       if (!skinUuid) continue;
