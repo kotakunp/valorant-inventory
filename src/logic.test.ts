@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, paginate, rarityColor, tierInfo, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
+import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, orderStack, paginate, rarityColor, rarityLabel, skinTierScore, stackDirectionForColumn, stackLayers, stackSteps, STACK_SPREAD, tierInfo, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
 import type { CardItem, ShowcasePayload, SkinItem } from "./types";
 import { selKey } from "./types";
 
@@ -207,6 +207,95 @@ describe("groupByGun", () => {
   });
   it("keeps unknown weapons after known order", () => {
     expect(groupByGun([s("1", "Vandal"), s("2", "Mystery Gun"), s("3", "Classic")]).map((g) => g.label)).toEqual(["CLASSIC", "VANDAL", "MYSTERY GUN"]);
+  });
+});
+
+describe("stack layout", () => {
+  it("spread stays bounded for 1/2/5/10/15+ skins", () => {
+    for (const n of [1, 2, 5, 10, 15, 30, 80]) {
+      for (const dir of ["down-right", "down-left", "up-right", "up-left"] as const) {
+        const layers = stackLayers(n, dir);
+        expect(layers).toHaveLength(n);
+        for (const l of layers) {
+          expect(Math.abs(l.dx)).toBeLessThanOrEqual(STACK_SPREAD.x + 1e-9);
+          expect(Math.abs(l.dy)).toBeLessThanOrEqual(STACK_SPREAD.y + 1e-9);
+          expect(l.scale).toBeGreaterThan(0.5);
+          expect(l.scale).toBeLessThanOrEqual(1);
+        }
+        // front-first: layer 0 is dead center, deeper layers recede
+        expect(layers[0].dx).toBe(0);
+        expect(layers[0].dy).toBe(0);
+        expect(layers[0].scale).toBe(1);
+        if (n > 1) expect(layers[1].scale).toBeLessThan(1);
+      }
+    }
+  });
+
+  it("single skin has zero step and no offset", () => {
+    expect(stackSteps(1)).toEqual({ x: 0, y: 0 });
+    expect(stackLayers(1, "down-right")).toEqual([{ dx: 0, dy: 0, scale: 1 }]);
+  });
+
+  it("left/right columns cascade in opposite directions", () => {
+    const left = stackDirectionForColumn(0, 4);
+    const right = stackDirectionForColumn(3, 4);
+    expect(left).toBe("down-right");
+    expect(right).toBe("down-left");
+    const a = stackLayers(5, left);
+    const b = stackLayers(5, right);
+    for (let i = 0; i < 5; i++) {
+      expect(b[i].dx).toBeCloseTo(-a[i].dx, 10);
+      expect(b[i].dy).toBeCloseTo(a[i].dy, 10);
+      expect(b[i].scale).toBeCloseTo(a[i].scale, 10);
+    }
+    // deterministic halves for 4 and 5 columns
+    expect([0, 1, 2, 3].map((c) => stackDirectionForColumn(c, 4))).toEqual([
+      "down-right", "down-right", "down-left", "down-left",
+    ]);
+    expect([0, 1, 2, 3, 4].map((c) => stackDirectionForColumn(c, 5))).toEqual([
+      "down-right", "down-right", "down-right", "down-left", "down-left",
+    ]);
+  });
+
+  it("orderStack: manual front override wins", () => {
+    const items = [
+      skin({ id: "a", price: 2475, equipped: true }),
+      skin({ id: "b", price: 1775 }),
+      skin({ id: "c", price: 875 }),
+    ];
+    expect(orderStack(items, "c").map((s) => s.id)).toEqual(["c", "a", "b"]);
+    expect(orderStack(items, "missing").map((s) => s.id)).toEqual(["a", "b", "c"]);
+    expect(orderStack(items).map((s) => s.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("orderStack: equipped > tier score > stable original order", () => {
+    const items = [
+      skin({ id: "cheap", price: 875 }),
+      skin({ id: "premium", price: 2175 }),
+      skin({ id: "mid", price: 1275 }),
+      skin({ id: "eq", price: 875, equipped: true }),
+    ];
+    expect(orderStack(items).map((s) => s.id)).toEqual(["eq", "premium", "mid", "cheap"]);
+    // stable for equal scores: original order preserved
+    const ties = [skin({ id: "t1", price: null, levelCount: 3 }), skin({ id: "t2", price: null, levelCount: 3 })];
+    expect(orderStack(ties).map((s) => s.id)).toEqual(["t1", "t2"]);
+    // deterministic: same input → same output, and single/empty are returned as-is
+    expect(orderStack([skin({ id: "solo" })]).map((s) => s.id)).toEqual(["solo"]);
+    expect(orderStack([])).toEqual([]);
+  });
+
+  it("skinTierScore: price > content tier > level fallback", () => {
+    expect(skinTierScore({ price: 1775, levelCount: 1, contentTierRank: null })).toBe(1775);
+    expect(skinTierScore({ price: null, levelCount: 1, contentTierRank: 3 })).toBe(1800);
+    expect(skinTierScore({ price: null, levelCount: 5, contentTierRank: null })).toBe(500);
+  });
+
+  it("rarityLabel matches rarityColor buckets", () => {
+    expect(rarityLabel(2475)).toBe("ULTRA");
+    expect(rarityLabel(1775)).toBe("PREMIUM");
+    expect(rarityLabel(875)).toBe("SELECT");
+    expect(rarityLabel(null)).toBe("STANDARD");
+    expect(rarityLabel(null, 5)).toBe("PREMIUM");
   });
 });
 

@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
 import type { ChromaSelection, RankBadge, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
 import { selKey } from "./types";
-import type { GunGroup, Pages } from "./logic";
-import { WEAPON_CATEGORIES, LOADOUT_GUNS, rarityColor, tierInfo, isPremiumSkin } from "./logic";
+import type { GunGroup, Pages, StackDirection, StackLayer } from "./logic";
+import {
+  WEAPON_CATEGORIES,
+  LOADOUT_GUNS,
+  orderStack,
+  rarityColor,
+  rarityLabel,
+  stackDirectionForColumn,
+  stackLayers,
+  tierInfo,
+  isPremiumSkin,
+} from "./logic";
 
 export const CANVAS_W = 1280;
 export const CANVAS_H = 720;
@@ -35,20 +45,24 @@ function CatMark() {
   );
 }
 
-function CrownIcon() {
-  return (
-    <svg viewBox="0 0 20 16" width="18" height="14" aria-hidden="true">
-      <path d="M2 13 L1 4 L6 8 L10 2 L14 8 L19 4 L18 13 Z" fill="#ff4655" />
-      <rect x="2" y="13" width="16" height="2" fill="#ff4655" />
-    </svg>
-  );
-}
-
 function KnifeIcon() {
   return (
     <svg viewBox="0 0 20 16" width="16" height="14" aria-hidden="true">
       <path d="M2 14 L12 2 L18 2 L8 14 Z" fill="#ff4655" />
       <path d="M12 2 L18 2 L16 5 Z" fill="#ece8e1" />
+    </svg>
+  );
+}
+
+/** Low-opacity weapon silhouette for empty loadout cells (§10). */
+function GunSilhouette() {
+  return (
+    <svg className="sc-silhouette" viewBox="0 0 72 26" aria-hidden="true" focusable="false">
+      <path
+        d="M3 10 H40 L46 7 H62 L64 9 H70 V13 H56 L52 15 H42 L38 22 H31 L29 15 H21 L17 22 H10 L13 15 H3 Z"
+        fill="currentColor"
+      />
+      <path d="M31 15 H38 L36 24 H33 Z" fill="currentColor" />
     </svg>
   );
 }
@@ -63,29 +77,23 @@ function CurrencyIcon({ src, alt }: { src: string; alt: string }) {
   return <img className="sc-wallet-icon" src={imgUrl(src) ?? undefined} alt={alt} />;
 }
 
-function Medallion({ label, tier, badge }: { label: string; tier: number | null; badge?: RankBadge | null }) {
+/** One compact row inside the rail's single RANK block (§11). */
+function RankRow({ label, tier, badge }: { label: string; tier: number | null; badge?: RankBadge | null }) {
   const info = tierInfo(tier);
   const name = badge?.name ?? info.name;
   const color = badge?.color ?? info.color;
   const icon = badge?.icon ?? null;
   return (
-    <div className="sc-rank-panel">
-      <div className="sc-medal-label">
-        <span className="sc-rank-caret" aria-hidden="true" />
-        {label}
-      </div>
-      <div className="sc-medal-badge" style={{ borderColor: color }}>
-        {icon ? (
-          <img className="sc-medal-icon" src={imgUrl(icon)!} alt={name} title={name} />
-        ) : (
-          <span className="sc-medal-fallback" style={{ color }}>
-            {name}
-          </span>
-        )}
-      </div>
-      <div className="sc-medal-name" style={{ color }}>
+    <div className="sc-rank-row">
+      <span className="sc-rank-tag">{label}</span>
+      {icon ? (
+        <img className="sc-rank-icon" src={imgUrl(icon)!} alt="" />
+      ) : (
+        <span className="sc-rank-dot" style={{ background: color }} aria-hidden="true" />
+      )}
+      <span className="sc-rank-name" style={{ color }}>
         {name}
-      </div>
+      </span>
     </div>
   );
 }
@@ -128,15 +136,18 @@ export function Showcase({
   /** Exactly 4 category columns (+ OTHER for unknown guns); section titles mid-column when merged. */
   const catColumns: {
     id: string;
+    dir: StackDirection;
     sections: { label: string; guns: GunGroup[] }[];
   }[] = (() => {
     const official = new Set(LOADOUT_GUNS.map((w) => w.toUpperCase()));
     const used = new Set<string>();
     const cols: {
       id: string;
+      dir: StackDirection;
       sections: { label: string; guns: GunGroup[] }[];
     }[] = WEAPON_CATEGORIES.map((cat) => ({
       id: cat.id,
+      dir: "down-right" as StackDirection,
       sections: cat.sections.map((sec) => {
         const ids = sec.guns.map((w) => w.toUpperCase());
         const guns = slots.filter((g) => {
@@ -152,7 +163,11 @@ export function Showcase({
       used.add(g.id);
       return true;
     });
-    if (other.length) cols.push({ id: "other", sections: [{ label: "OTHER", guns: other }] });
+    if (other.length) cols.push({ id: "other", dir: "down-left", sections: [{ label: "OTHER", guns: other }] });
+    // Deterministic two-axis direction per column (§14): left half cascades down-right, right half down-left.
+    cols.forEach((c, i) => {
+      c.dir = stackDirectionForColumn(i, cols.length);
+    });
     return cols;
   })();
 
@@ -164,17 +179,18 @@ export function Showcase({
   const tileIcon = (s: SkinItem) => activeChroma(s)?.icon ?? s.icon;
 
   /** One layered skin — click opens the context menu (not a selection toggle). */
-  const stackItem = (s: SkinItem, index: number, gunId: string) => {
+  const stackItem = (s: SkinItem, index: number, gunId: string, layer: StackLayer, count: number) => {
     const chroma = activeChroma(s);
     const menuOpen = interactive && openMenu === s.id;
     const rarity = rarityColor(s.price, s.levelCount, s.contentTierRank ?? null);
+    const isFront = bringToFront[gunId] === s.id;
     return (
       <div
         key={s.id}
         className={`sc-stack-item${s.equipped ? " equipped" : ""}${interactive ? " clickable" : ""}${menuOpen ? " menu-open" : ""}`}
         style={{
-          zIndex: menuOpen ? 80 : index + 1,
-          ["--i" as string]: index,
+          zIndex: menuOpen ? 150 : count - index + 1,
+          transform: `translate(${layer.dx * 100}%, ${layer.dy * 100}%) scale(${layer.scale})`,
           ["--rarity" as string]: rarity,
         }}
         onClick={
@@ -202,34 +218,44 @@ export function Showcase({
             role="menu"
             aria-label={`Options for ${s.name}`}
           >
-            {s.chromas.length > 1 && onPickChroma && (
-              <div className="sc-skin-menu-row sc-chromas sc-chromas--menu">
-                {s.chromas.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className={"sc-chroma" + (chroma?.id === c.id ? " on" : "")}
-                    title={c.name}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPickChroma(s.id, c.id);
-                    }}
-                  >
-                    {c.icon ? <img src={imgUrl(c.icon)!} alt="" /> : <span>{c.name.slice(0, 1)}</span>}
-                  </button>
-                ))}
+            <div className="sc-skin-menu-title">{s.name}</div>
+            <div className="sc-skin-menu-meta">
+              <span className="sc-skin-menu-rarity" style={{ color: rarity }}>
+                {rarityLabel(s.price, s.levelCount, s.contentTierRank ?? null)}
+              </span>
+              {s.price != null && <span className="sc-skin-menu-price">{fmt(s.price)} VP</span>}
+            </div>
+            {s.chromas.length > 0 && (
+              <div className="sc-skin-menu-group">
+                <div className="sc-skin-menu-label">Variant</div>
+                <div className="sc-chromas sc-chromas--menu">
+                  {s.chromas.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={"sc-chroma" + (chroma?.id === c.id ? " on" : "")}
+                      title={c.name}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPickChroma?.(s.id, c.id);
+                      }}
+                    >
+                      {c.icon ? <img src={imgUrl(c.icon)!} alt="" /> : <span>{c.name.slice(0, 1)}</span>}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {onBringToFront && (
               <button
                 type="button"
-                className="sc-skin-menu-btn"
+                className={"sc-skin-menu-btn" + (isFront ? " is-front" : "")}
                 onClick={() => {
                   onBringToFront(gunId, s.id);
                   setOpenMenu(null);
                 }}
               >
-                Show in front
+                {isFront ? "Showing in front ✓" : "Show in front"}
               </button>
             )}
             {onRemoveSkin && (
@@ -241,7 +267,7 @@ export function Showcase({
                   setOpenMenu(null);
                 }}
               >
-                Remove
+                Remove from showcase
               </button>
             )}
           </div>
@@ -250,17 +276,10 @@ export function Showcase({
     );
   };
 
-  const orderStack = (gun: GunGroup): SkinItem[] => {
-    const front = bringToFront[gun.id];
-    if (!front) return gun.items;
-    const rest = gun.items.filter((s) => s.id !== front);
-    const f = gun.items.find((s) => s.id === front);
-    return f ? [...rest, f] : gun.items;
-  };
-
-  const gunSection = (gun: GunGroup) => {
-    const items = orderStack(gun);
+  const gunSection = (gun: GunGroup, dir: StackDirection) => {
+    const items = orderStack(gun.items, bringToFront[gun.id]);
     const empty = items.length === 0;
+    const layers = stackLayers(items.length, dir);
     return (
       <section className={`sc-cat${empty ? " sc-cat--empty" : ""}`} key={gun.id}>
         <div className="sc-cat-head">
@@ -271,9 +290,14 @@ export function Showcase({
         </div>
         <div
           className={`sc-stack${items.length > 1 ? " is-stacked" : ""}${empty ? " sc-stack--empty" : ""}`}
-          style={{ ["--n" as string]: Math.max(items.length, 1) }}
         >
-          {empty ? <div className="sc-empty-gun" aria-hidden="true" /> : items.map((s, i) => stackItem(s, i, gun.id))}
+          {empty ? (
+            <div className="sc-empty-gun">
+              <GunSilhouette />
+            </div>
+          ) : (
+            items.map((s, i) => stackItem(s, i, gun.id, layers[i], items.length))
+          )}
         </div>
       </section>
     );
@@ -300,7 +324,7 @@ export function Showcase({
                       <span className="sc-cat-col-label">{sec.label}</span>
                       <span className="sc-cat-col-rule" aria-hidden="true" />
                     </div>
-                    <div className="sc-cat-sec-guns">{sec.guns.map(gunSection)}</div>
+                    <div className="sc-cat-sec-guns">{sec.guns.map((g) => gunSection(g, col.dir))}</div>
                   </div>
                 ))}
               </div>
@@ -321,15 +345,17 @@ export function Showcase({
                 {knifeItems.length > 0 ? (
                   knifeItems.map((s) => (
                     <div className="sc-knife-cell" key={s.id}>
-                      <div className="sc-stack" style={{ ["--n" as string]: 1 }}>
-                        {stackItem(s, 0, "MELEE")}
+                      <div className="sc-stack">
+                        {stackItem(s, 0, "MELEE", { dx: 0, dy: 0, scale: 1 }, 1)}
                       </div>
                     </div>
                   ))
                 ) : (
                   <div className="sc-knife-cell sc-knife-cell--empty">
                     <div className="sc-stack sc-stack--empty">
-                      <div className="sc-empty-gun" aria-hidden="true" />
+                      <div className="sc-empty-gun">
+                        <GunSilhouette />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -356,55 +382,34 @@ export function Showcase({
               {checkedCards.length > 1 && <div className="sc-more">+{checkedCards.length - 1} MORE</div>}
             </div>
           )}
-          <div className="sc-rail-info">
-            <div className="sc-ranks">
-              <Medallion label="PEAK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
-              <Medallion label="CURRENT" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
-            </div>
-            {(payload.wallet.vp != null || payload.wallet.rp != null) && (
-              <div className="sc-wallet">
-                {payload.wallet.vp != null && (
-                  <span className="sc-chip">
-                    <CurrencyIcon src={VP_ICON} alt="VP" />
-                    {fmt(payload.wallet.vp)}
-                  </span>
-                )}
-                {payload.wallet.rp != null && (
-                  <span className="sc-chip">
-                    <CurrencyIcon src={RP_ICON} alt="RP" />
-                    {fmt(payload.wallet.rp)}
-                  </span>
-                )}
-              </div>
-            )}
-            <div className="sc-stats">
-              <div className="sc-stat">
-                <CrownIcon />
-                <span className="sc-stat-label">PREMIUM</span>
-                <span className="sc-stat-val">{premCount}</span>
-              </div>
-              <div className="sc-stat-div" aria-hidden="true" />
-              <div className="sc-stat">
-                <KnifeIcon />
-                <span className="sc-stat-label">KNIFE</span>
-                <span className="sc-stat-val">{knifeCount}</span>
-              </div>
-            </div>
+          <div className="sc-rank-block">
+            <div className="sc-rank-block-label">RANK</div>
+            <RankRow label="PEAK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
+            <RankRow label="CURRENT" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
           </div>
-          {checkedBuddies.length > 0 && (
-            <div className="sc-buddies">
-              <div className="sc-cat-head sc-cat-head--sm">
-                <span className="sc-cat-name">BUDDIES</span>
-                <span className="sc-cat-rule" aria-hidden="true" />
-              </div>
-              <div className="sc-buddy-row">
-                {checkedBuddies.slice(0, 6).map((b) =>
-                  b.icon ? <img key={b.id} src={imgUrl(b.icon)!} alt="" /> : null
-                )}
-                {checkedBuddies.length > 6 && <span className="sc-more">+{checkedBuddies.length - 6}</span>}
-              </div>
+          {(payload.wallet.vp != null || payload.wallet.rp != null) && (
+            <div className="sc-wallet">
+              {payload.wallet.vp != null && (
+                <span className="sc-chip">
+                  <CurrencyIcon src={VP_ICON} alt="VP" />
+                  {fmt(payload.wallet.vp)}
+                </span>
+              )}
+              {payload.wallet.rp != null && (
+                <span className="sc-chip">
+                  <CurrencyIcon src={RP_ICON} alt="RP" />
+                  {fmt(payload.wallet.rp)}
+                </span>
+              )}
             </div>
           )}
+          <div className="sc-summary">
+            <span>PREMIUM {premCount}</span>
+            <span aria-hidden="true">·</span>
+            <span>KNIFE {knifeCount}</span>
+            <span aria-hidden="true">·</span>
+            <span>BUDDIES +{checkedBuddies.length}</span>
+          </div>
         </aside>
       </div>
     </div>

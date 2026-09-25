@@ -57,7 +57,7 @@ Verified against the unofficial API docs (techchrism) on 2026-09-23:
 
 ## 6. Selection rules (checkboxes)
 
-Every item is a **checkbox** (sidebar selection panels). Preview skins **do not toggle on click** — click opens a context menu (chromas, show in front, remove).
+Every item is a **checkbox** (sidebar selection panels). Preview skins **do not toggle on click** — click opens a context menu (name, rarity + VP price, variants, show in front, remove from showcase).
 
 | Item | Default checked when |
 |---|---|
@@ -67,9 +67,12 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 | Any item | **equipped** on the account → checked regardless |
 | Fallback if storefront/prices/tier fail | skin with ≥ 5 levels → checked, else unchecked |
 
-- Bulk helpers: **Select all premium**, **Clear all**, per-section select-all.
+- Sidebar **Selection panel**: `x selected` count + **Premium+ / Select all / Clear** (apply to every item kind) + the note "Premium+ and equipped cosmetics were selected automatically." Per-section All/Premium/None remain on cards/titles/buddies.
+- **Skins panel**: search box + `ALL / SELECTED / EQUIPPED` segmented filter + collapsible weapon categories with counts (`VANDAL 3/12`). Skin cell = art-dominant tile: thin rarity outline + brighter flat background + corner diamond marker when selected, subtle accent edge when equipped (tooltip carries the label), no glow.
 - Selection = in-memory UI state only; nothing persisted.
 - **Collection value** footer = Σ VP prices of *checked* items.
+
+**Editor workspace (never exported):** grid split ≈ 75% preview / 25% sidebar. Top bar: `COLLECTION` · `Name#TAG · LV. n · REGION` · `x/y selected` · `density · page i/n` (only when multi-page) · **Switch account** (confirm dialog → clears selection). Preview toolbar: export button (phase labels, §7), pager `◀ 1/N ▶` when multi-page, hint text, and **Fit / 100% / Fullscreen** zoom controls (editor-only — the export canvas stays fixed 1280×720).
 
 **MMR parsing:** current tier = `LatestCompetitiveUpdate.TierAfterUpdate` (fallback: latest season's `CompetitiveTier`); peak tier = max `CompetitiveTier` across all seasons in `QueueSkills.competitive.SeasonalInfoBySeasonID`.
 
@@ -87,35 +90,36 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
   - 19 official slots → Standard (1 page). Unknowns go to an OTHER column (split across pages if > 20).
   - \> 96 slots → Dense 3 pages, note `showing … / N`.
 - One layout template for all pages; only the gun-cell chunk differs (header/ranks/card rail/footer/knife row repeat). Filenames `showcase-<riotid>-p1.png`…
-- Export after `document.fonts.ready` + all `<img>` decoded; images served same-origin via `/img` proxy (no canvas tainting). No inventory data in any URL.
+- Export after `document.fonts.ready` + all `<img>` decoded; images served same-origin via `/img` proxy (no canvas tainting). No inventory data in any URL. Any image that fails to load **aborts the export with a visible error** (fail loudly, never silently skip artwork).
+- **Export feedback phases** on the button: `PREPARING ASSETS…` → `RENDERING 2560 × 1440…` (single page) or `RENDERING i / n…` (multi-page) → `DOWNLOADED ✓` (clears after ~1.5s).
 
 ## 8. Layout spec (1280 × 720) — "official client look"
 
-**Style tokens:** bg `#0F1923` (+ faint noise texture, red diagonal accent wedge), accent `#FF4655`, text `#ECE8E1`, muted `#8B97A0`, panels = dark glass with **diagonally clipped corners** + `1px rgba(255,255,255,.08)` border. Headline font **Bebas Neue** (self-hosted for reliable export), body **Inter**. Labels uppercase/condensed.
+**Style tokens:** bg `#0F1923`, canvas `#0A1017` **flat** (no radial glows/gradients), accent `#FF4655` (top-right wedge + left accent bar), text `#ECE8E1`, muted `#8B97A0`, panels = flat dark planes with **diagonally clipped corners** + `1px rgba(255,255,255,.08)` border. Headline font **Bebas Neue** (self-hosted for reliable export), body **Inter**. Labels uppercase/condensed.
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │ HEADER   [RIOT ID #TAG]   LV.207   ·   NA   ·  <equipped title>    │
 ├─────────────────────────────────────────────┬───────────────────────┤
-│ COLLECTION COLUMNS                         │ PLAYER CARD           │
+│ COLLECTION COLUMNS                         │ PLAYER CARD (dominant)│
 │ SIDEARMS│SMGS│SHOTGUNS │RIFLES│SNIPERS│HEAVIES │ tall art panel       │
-│ col1 spans full height (incl. melee band)  │ PEAK / CURRENT RANK   │
-│ section titles sit on their own groups     │ VP / RP               │
-│ click skin → menu (chroma/front/remove)    │ PREM:n  KNIFE:n       │
-│ ── MELEE (cols 2–4, ~68px) ──              │ buddies +N            │
+│ col1 spans full height (incl. melee band)  │ RANK block            │
+│ section titles sit on their own groups     │  PEAK / CURRENT rows  │
+│ click skin → menu (full contents below)    │ VP / RP wallet row    │
+│ ── MELEE (cols 2–4, ~68px, lighter) ──     │ PREMIUM n · KNIFE n   │
+│                                             │  · BUDDIES +n        │
 ├────────────────────────────────────────────┴───────────────────────┤
 │ (no footer)                                                        │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Category columns:** exactly 4 columns (SMGs+shotguns merged; snipers+heavies merged) — guns fill top→bottom, not row-major grid fill.
-- **Sidearms column** spans full center height including the melee band; melee strip sits only under columns 2–4 (~68px tall).
-- **Stack fan:** vertical step shrinks as stack size grows so many skins overlap in-cell (no escape).
-- **Context menu:** ancestor `overflow`/`clip-path` released while open so choices are visible.
-- **Empty slots always rendered** for official guns (and empty MELEE strip) — matches VALORANT loadout.
-- **Rank medallions (MVP):** styled circular badge, tier name + tier color (real tier icons = phase 2).
-- **Right rail only:** card + ranks + wallet + PREM/KNIFE + buddies under the player card; skins grid takes full remaining width (no left rail). No footer bar.
-- **Knives:** always a dedicated full-width bottom strip (stacked skins); never overflow into the gun grid.
+- **Sidearms column** spans full center height including the melee band; melee strip sits only under columns 2–4 (~68px tall), rendered on a **lighter** plane than gun cells.
+- **Two-axis stack:** front skin centered in the cell; the rest recede diagonally — direction is deterministic per column (left half cascades `down-right`, right half `down-left` via `stackDirectionForColumn`). Per-skin step (`stackSteps`) shrinks as the stack grows and the whole cascade is bounded by `STACK_SPREAD` (x 0.3 / y 0.24 of the cell) so **no stack ever escapes its cell**; back layers scale down slightly for depth. Order is front-first via `orderStack`: manual "show in front" → equipped → tier score (price / content tier / level) → stable original order. Transforms are inline per item; hover raises `z-index` (130), open menu sits at 150.
+- **Context menu contents:** skin name, rarity label + VP price (`SELECT/PREMIUM/ULTRA/STANDARD` + `1775 VP`), `VARIANT` label with chroma thumbnails, **Show in front / Showing in front ✓**, **Remove from showcase**. Ancestor `overflow`/`clip-path` released while open so choices are visible.
+- **Empty slots always rendered** for official guns (and empty MELEE strip) — dashed outline + low-opacity weapon silhouette, no `+`/labels; matches VALORANT loadout.
+- **Right rail:** player card dominates (official 268:640 art ratio) → single compact **RANK** block (PEAK + CURRENT rows, tier icon + name + color) → wallet as one horizontal VP/RP row → one summary line `PREMIUM n · KNIFE n · BUDDIES +n`. No per-stat cards. Skins grid takes full remaining width (no left rail). No footer bar.
+- **Knives:** always a dedicated full-width bottom strip (each knife its own cell); never overflow into the gun grid.
 - **Stacking:** same gun's skins are layered in one cell; hover raises that skin's `z-index` + brightens. Art outline uses the skin's **rarity color** (`--rarity` set per item from `rarityColor()` → multi-`drop-shadow` on `.sc-stack-art`); hover adds a rarity glow.
 - Page indicator `1/2` bottom-right when multi-page.
 
@@ -206,7 +210,7 @@ Flow:
 3. `POST /api/login/cookies {cookies, region}` → forgiving parser (bare value / `ssid=…` / multi-cookie string) → cookie jar → **existing `reauthForTokens`** (GET `/authorize` with cookies → parse `#access_token` from the 301 Location) → `finishLogin` (entitlements + riot-geo auto-region) → `buildShowcase`.
 4. Rate-limited like other auth routes (`login:{ip}`, 5/min); cookies and tokens are request-scoped, never stored or logged; tailored errors ("log in again and copy a fresh ssid").
 
-UX: dedicated form section with a collapsible 30-second how-to. Trade-off vs the future helper: still one manual copy, but zero install, zero password custody, and every anti-bot check is satisfied by the official flow itself.
+UX: the browser-cookie method is the **primary** gate path — `LOAD COLLECTION` submit button, a 4-step collapsible **"Where do I find this?"** how-to, human-readable failure copy with a **Try again** button on cookie errors, and all alternate methods collapsed under **"Other sign-in methods ▾"** (only implemented methods shown; no wording implying Riot OAuth is available before `RSO_CLIENT_ID` is configured). Trade-off vs the future helper: still one manual copy, but zero install, zero password custody, and every anti-bot check is satisfied by the official flow itself.
 
 **Automation (added):** `POST /api/login/auto` (`server/browserLogin.ts`, playwright-core + the user's installed Chrome/Edge, dedicated profile `~/.valorant-store/chrome-profile` — never the user's main browser). **Phase 0** (`server/chromeCookies.ts`, **macOS + Windows**): harvest Riot cookies from the installed Chrome cookie store — copies the `Cookies` DB (+WAL) to a temp dir. macOS: Keychain "Chrome Safe Storage" secret (PBKDF2-SHA1/`saltysalt`/1003 → AES-128-CBC, spaces-IV or embedded-IV, strips the 32-byte SHA-256(host) domain-hash prefix newer Chromium prepends). Windows: `Local State` `os_crypt.encrypted_key` (strip `DPAPI` magic) unwrapped via PowerShell `ProtectedData::Unprotect(CurrentUser)` → AES-256-GCM key for `v10` blobs; cookie DB at `<profile>/Network/Cookies` (legacy `<profile>/Cookies` fallback). `v20` app-bound blobs are skipped with an explicit message. Cookie values live only in request memory, never logged. Phase 1 reuses profile cookies invisibly (headless → `loginWithCookies`); if absent/expired, phase 2 opens a headed window at account.riotgames.com, clears stale cookies, polls ≤5 min for a fresh `ssid` (max 5 mint attempts), then runs the same reauth → `finishLogin` → `buildShowcase` pipeline. Rate-limited `login:{ip}` like the other auth routes; concurrent calls get 409; Keychain denial returns 403 with Always-Allow instructions; captcha/2FA/password are solved by the user on Riot's real page inside the window (same custody model as manual cookie mode). Manual paste remains the fallback. Implementation note: the reauth GET must send a browser-style `Accept: text/html` — `Accept: application/json` yields HTTP 406 with no redirect (no token can ever be extracted).
 

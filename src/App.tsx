@@ -60,6 +60,18 @@ function cookiePasteLooksValid(raw: string): boolean {
   return false;
 }
 
+/** Plain-language hint for common cookie-login failures (§20). */
+function humanizeCookieError(msg: string): string {
+  const m = msg.toLowerCase();
+  if (/expired|invalid|unauthorized|forbidden|401|ssid|cookie/.test(m)) {
+    return (
+      "That cookie didn't work — it may have expired or been copied incompletely. " +
+      "Copy a fresh ssid (the full Cookie header) from auth.riotgames.com and try again."
+    );
+  }
+  return msg;
+}
+
 export default function App() {
   const [form, setForm] = useState({ region: "na" as Region, accessToken: "", entitlementsToken: "", puuid: "" });
   const [data, setData] = useState<ShowcasePayload | null>(null);
@@ -68,10 +80,9 @@ export default function App() {
   const [bringToFront, setBringToFront] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<LoadKind | null>(null);
-  const [fm, setFm] = useState({ on: false, text: "" });
-  const [proof, setProof] = useState({ on: false, text: "" });
   const [page, setPage] = useState(0);
   const [exporting, setExporting] = useState(false);
+  const [exportPhase, setExportPhase] = useState<string | null>(null);
   const [rso, setRso] = useState<{ configured: boolean } | null>(null);
   const [creds, setCreds] = useState({ email: "", password: "", otp: "" });
   const [auth, setAuth] = useState<{ mode: "idle" | "mfa"; sessionId: string; email: string }>({
@@ -92,8 +103,13 @@ export default function App() {
     rqdata: null,
   });
   const [cookieInput, setCookieInput] = useState("");
+  const [cookieFailed, setCookieFailed] = useState(false);
   const [skinQuery, setSkinQuery] = useState("");
-  const [previewScale, setPreviewScale] = useState(0.75);
+  const [skinFilter, setSkinFilter] = useState<"all" | "selected" | "equipped">("all");
+  const [collapsedGuns, setCollapsedGuns] = useState<Record<string, boolean>>({});
+  const [zoom, setZoom] = useState<"fit" | "100">("fit");
+  const [fitScale, setFitScale] = useState(0.75);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [remoteOpen, setRemoteOpen] = useState(false);
   const [remoteCreds, setRemoteCreds] = useState<{ username: string; password: string } | undefined>(() =>
     IS_REMOTE_POPUP ? takeRemoteCreds() : undefined
@@ -137,7 +153,7 @@ export default function App() {
     if (!el || typeof ResizeObserver === "undefined") return;
     const fit = () => {
       const w = el.clientWidth;
-      if (w > 0) setPreviewScale(Math.min(1, Math.max(0.3, (w - 2) / CANVAS_W)));
+      if (w > 0) setFitScale(Math.min(1, Math.max(0.3, (w - 2) / CANVAS_W)));
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -145,10 +161,41 @@ export default function App() {
     return () => ro.disconnect();
   }, [data]);
 
+  // Fullscreen preview (editor-only zoom control — never affects export geometry).
+  useEffect(() => {
+    const onFs = () => setIsFullscreen(document.fullscreenElement === previewAreaRef.current);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void previewAreaRef.current?.requestFullscreen?.().catch(() => undefined);
+  };
+
+  const previewScale = zoom === "fit" ? fitScale : 1;
+
   const pages = useMemo(() => {
     if (!data) return null;
     return paginate(data.skins, selection);
   }, [data, selection]);
+
+  /** Skin grid groups: search / ALL·SELECTED·EQUIPPED filter → official gun groups (§3). */
+  const skinGroups = useMemo(() => {
+    if (!data) return [];
+    const q = skinQuery.trim().toLowerCase();
+    let items = data.skins;
+    if (q) {
+      items = items.filter(
+        (s) => s.name.toLowerCase().includes(q) || s.weaponName.toLowerCase().includes(q)
+      );
+    } else if (skinFilter === "selected") {
+      items = items.filter((s) => selection[selKey("skin", s.id)]);
+    } else if (skinFilter === "equipped") {
+      items = items.filter((s) => s.equipped);
+    }
+    return groupByGun(items);
+  }, [data, skinQuery, skinFilter, selection]);
 
   const img = (u: string | null) => (u ? `/img/${encodeURIComponent(u)}` : undefined);
 
@@ -279,21 +326,32 @@ export default function App() {
     setExporting(true);
     setError(null);
     try {
+      setExportPhase("PREPARING ASSETS…");
       await document.fonts.ready;
       const nodes = Array.from(document.querySelectorAll<HTMLElement>("[data-export-page]"));
       const imgs = Array.from(document.querySelectorAll<HTMLImageElement>("[data-export-page] img"));
+      const failed: string[] = [];
       await Promise.all(
         imgs.map((i) =>
           i.complete && i.naturalWidth > 0
             ? Promise.resolve()
             : new Promise<void>((r) => {
                 i.addEventListener("load", () => r(), { once: true });
-                i.addEventListener("error", () => r(), { once: true });
+                i.addEventListener("error", () => {
+                  failed.push(i.src);
+                  r();
+                }, { once: true });
               })
         )
       );
+      if (failed.length) {
+        throw new Error(`${failed.length} artwork image(s) failed to load — check your connection and try again.`);
+      }
       const slug = `${data.gameName}_${data.tagLine}`.replace(/[^\w-]+/g, "") || "account";
       for (let i = 0; i < nodes.length; i++) {
+        setExportPhase(
+          nodes.length > 1 ? `RENDERING ${i + 1} / ${nodes.length}…` : "RENDERING 2560 × 1440…"
+        );
         const url = await toPng(nodes[i], { pixelRatio: 2, backgroundColor: "#0f1923", width: CANVAS_W, height: CANVAS_H });
         const a = document.createElement("a");
         a.href = url;
@@ -301,9 +359,12 @@ export default function App() {
         a.click();
         await new Promise((r) => setTimeout(r, 400));
       }
+      setExportPhase("DOWNLOADED ✓");
+      await new Promise((r) => setTimeout(r, 1600));
     } catch (e) {
       setError(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
+      setExportPhase(null);
       setExporting(false);
     }
   }
@@ -519,6 +580,7 @@ export default function App() {
       return;
     }
     setError(null);
+    setCookieFailed(false);
     setLoading("cookies");
     try {
       const res = await fetch("/api/login/cookies", {
@@ -528,12 +590,14 @@ export default function App() {
       });
       const json = (await res.json().catch(() => ({}))) as ShowcasePayload & { error?: string };
       if (!res.ok || json.error) {
+        setCookieFailed(true);
         setError(json.error ?? `Cookie connect failed (${res.status})`);
         return;
       }
       applyShowcase(json);
       setCookieInput("");
     } catch {
+      setCookieFailed(true);
       setError("Network error during cookie connect.");
     } finally {
       setLoading(null);
@@ -543,9 +607,6 @@ export default function App() {
   const section = (kind: ItemKind, title: string, items: AnyItem[]) => {
     const selectedCount = items.filter((i) => selection[selKey(kind, i.id)]).length;
     const query = kind === "skin" ? skinQuery.trim().toLowerCase() : "";
-    const visible = query
-      ? items.filter((i) => i.name.toLowerCase().includes(query) || ("weaponName" in i ? i.weaponName.toLowerCase().includes(query) : false))
-      : items;
 
     return (
       <div className="panel" key={kind}>
@@ -555,71 +616,108 @@ export default function App() {
             {selectedCount}/{items.length}
           </span>
         </h3>
-        <div className="bulk">
-          <button className="btn ghost" onClick={() => setSection(kind, "all")}>All</button>
-          <button className="btn ghost" onClick={() => setSection(kind, "premium")}>Premium</button>
-          <button className="btn ghost" onClick={() => setSection(kind, "none")}>None</button>
-        </div>
+        {kind !== "skin" && (
+          <div className="bulk">
+            <button className="btn ghost" onClick={() => setSection(kind, "all")}>All</button>
+            <button className="btn ghost" onClick={() => setSection(kind, "premium")}>Premium</button>
+            <button className="btn ghost" onClick={() => setSection(kind, "none")}>None</button>
+          </div>
+        )}
 
-        {kind === "skin" && items.length > 12 && (
-          <div className="skin-search">
-            <input
-              type="text"
-              placeholder="Filter skins…"
-              value={skinQuery}
-              onChange={(e) => setSkinQuery(e.target.value)}
-              aria-label="Filter skins"
-            />
+        {kind === "skin" && (
+          <div className="skin-tools">
+            <div className="skin-search">
+              <input
+                type="text"
+                placeholder="Search skins…"
+                value={skinQuery}
+                onChange={(e) => setSkinQuery(e.target.value)}
+                aria-label="Search skins"
+              />
+            </div>
+            <div className="seg" role="group" aria-label="Filter skins">
+              {(["all", "selected", "equipped"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className={skinFilter === f ? "on" : ""}
+                  aria-pressed={skinFilter === f}
+                  onClick={() => setSkinFilter(f)}
+                >
+                  {f.toUpperCase()}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
         {kind === "skin" ? (
-          <div className="skin-grid">
-            {visible.length === 0 && (
+          <div className="skin-cats">
+            {skinGroups.length === 0 && (
               <div className="skin-empty">
-                {query ? "No skins match your filter." : "No skins in this category."}
-                {!query && " Try NEW ACCOUNT and connect again (or switch region — inventory is shard-specific)."}
+                {query
+                  ? "No skins match your filter."
+                  : skinFilter !== "all"
+                    ? "No skins in this filter."
+                    : "No skins in this category."}
+                {!query &&
+                  skinFilter === "all" &&
+                  " Try SWITCH ACCOUNT and connect again (or switch region — inventory is shard-specific)."}
               </div>
             )}
-            {(query
-              ? [{ id: "__all", label: "", items: visible as SkinItem[] }]
-              : groupByGun(visible as SkinItem[])
-            ).flatMap((g) => [
-              ...(!query && g.items.length
-                ? [
-                    <div className="skin-gun-label" key={`h-${g.id}`}>
-                      {g.label}
-                    </div>,
-                  ]
-                : []),
-              ...g.items.map((i) => {
-                const on = !!selection[selKey(kind, i.id)];
-                const activeChromaId = chromaSel[i.id];
-                const ch = i.chromas.find((c) => c.id === (activeChromaId ?? i.defaultChromaId)) ?? i.chromas[0];
-                const icon = ch?.icon ?? i.icon;
-                return (
+            {skinGroups.map((g) => {
+              const sel = g.items.filter((i) => selection[selKey("skin", i.id)]).length;
+              const open = !!query || !collapsedGuns[g.id];
+              return (
+                <div className="skin-cat" key={g.id}>
                   <button
-                    key={i.id}
                     type="button"
-                    className={`skin-cell${on ? " on" : ""}${i.equipped ? " eq" : ""}`}
-                    style={{ "--rarity": rarityColor(i.price, i.levelCount, i.contentTierRank ?? null) } as CSSProperties}
-                    onClick={() => toggle(kind, i.id)}
-                    title={`${i.name} · ${i.weaponName}${i.price != null ? ` · ${fmt(i.price)} VP` : ""}${i.equipped ? " · equipped" : ""}`}
-                    aria-pressed={on}
+                    className="skin-cat-head"
+                    aria-expanded={open}
+                    onClick={() => setCollapsedGuns((c) => ({ ...c, [g.id]: !c[g.id] }))}
                   >
-                    {i.price != null && <span className="vp">{i.price}</span>}
-                    <span className="skin-cell-art">
-                      {icon ? <img src={img(icon)} alt="" /> : null}
+                    <span className="skin-cat-caret" aria-hidden="true" data-open={open} />
+                    <span className="skin-cat-name">{g.label}</span>
+                    <span className="skin-cat-count">
+                      {sel}/{g.items.length}
                     </span>
-                    <span className="skin-cell-name">{i.name}</span>
                   </button>
-                );
-              }),
-            ])}
+                  {open && (
+                    <div className="skin-grid">
+                      {g.items.map((i) => {
+                        const on = !!selection[selKey(kind, i.id)];
+                        const activeChromaId = chromaSel[i.id];
+                        const ch =
+                          i.chromas.find((c) => c.id === (activeChromaId ?? i.defaultChromaId)) ??
+                          i.chromas[0];
+                        const icon = ch?.icon ?? i.icon;
+                        return (
+                          <button
+                            key={i.id}
+                            type="button"
+                            className={`skin-cell${on ? " on" : ""}${i.equipped ? " eq" : ""}`}
+                            style={{ "--rarity": rarityColor(i.price, i.levelCount, i.contentTierRank ?? null) } as CSSProperties}
+                            onClick={() => toggle(kind, i.id)}
+                            title={`${i.name} · ${i.weaponName}${i.price != null ? ` · ${fmt(i.price)} VP` : ""}${i.equipped ? " · equipped" : ""}`}
+                            aria-pressed={on}
+                          >
+                            {i.price != null && <span className="vp">{i.price}</span>}
+                            <span className="skin-cell-art">
+                              {icon ? <img src={img(icon)} alt="" /> : null}
+                            </span>
+                            <span className="skin-cell-name">{i.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="chips">
-            {visible.map((i) => {
+            {items.map((i) => {
               const on = !!selection[selKey(kind, i.id)];
               const icon =
                 kind === "card" && "avatar" in i && i.avatar
@@ -648,7 +746,7 @@ export default function App() {
                 </label>
               );
             })}
-            {visible.length === 0 && (
+            {items.length === 0 && (
               <p className="note" style={{ margin: 0 }}>
                 No items in this category.
               </p>
@@ -737,7 +835,16 @@ export default function App() {
             </span>
           </div>
 
-          {error && <div className="error" style={{ marginTop: 0, marginBottom: 14 }}>{error}</div>}
+          {error && (
+            <div className="error" style={{ marginTop: 0, marginBottom: 14 }}>
+              <span>{cookieFailed ? humanizeCookieError(error) : error}</span>
+              {cookieFailed && (
+                <button type="button" className="btn ghost gate-retry" onClick={() => void submitCookies()}>
+                  Try again
+                </button>
+              )}
+            </div>
+          )}
 
           {/* ---- Cookie paste (primary) ---- */}
           <form onSubmit={submitCookies}>
@@ -760,7 +867,13 @@ export default function App() {
                   spellCheck={false}
                   placeholder="Paste ssid value, or ssid=…; asid=…; tdid=…"
                   value={cookieInput}
-                  onChange={(e) => setCookieInput(e.target.value)}
+                  onChange={(e) => {
+                    setCookieInput(e.target.value);
+                    if (cookieFailed) {
+                      setCookieFailed(false);
+                      setError(null);
+                    }
+                  }}
                 />
                 <p className="cookie-hint">
                   Full Cookie header recommended — ssid alone is often not enough.
@@ -768,7 +881,7 @@ export default function App() {
               </div>
             </div>
             <details className="cookie-howto">
-              <summary>How to get it — 30 seconds, official login, no password here</summary>
+              <summary>Where do I find this?</summary>
               <ol>
                 <li>
                   Log in at <strong>playvalorant.com</strong> (or <strong>account.riotgames.com</strong>)
@@ -776,20 +889,19 @@ export default function App() {
                   <em>Remember me</em>.
                 </li>
                 <li>
-                  <strong>Recommended — Network tab:</strong> press <strong>F12</strong> →{" "}
-                  <strong>Network</strong> → open <code>https://auth.riotgames.com/</code> in that tab
-                  (the &quot;An error occurred&quot; page is normal — ignore it) → click the{" "}
-                  <code>auth.riotgames.com</code> request → <strong>Request Headers</strong> → copy the
-                  entire <strong>cookie</strong> value (a long <code>ssid=…; asid=…; tdid=…</code>{" "}
-                  string).
+                  Press <strong>F12</strong> → open the <strong>Network</strong> tab → load{" "}
+                  <code>https://auth.riotgames.com/</code> in it (the &quot;An error occurred&quot; page
+                  is normal — ignore it).
                 </li>
                 <li>
-                  <strong>Or Application tab:</strong> <strong>F12</strong> →{" "}
-                  <strong>Application</strong> (Chrome) / <strong>Storage</strong> (Firefox) →{" "}
-                  <strong>Cookies</strong> → select <strong>auth.riotgames.com</strong> or{" "}
-                  <strong>.riotgames.com</strong> — <em>not</em> <code>playvalorant.com</code> → copy
-                  the <strong>ssid</strong> value. (Firefox may truncate long values; prefer the
-                  Network method.)
+                  Click the <code>auth.riotgames.com</code> request → <strong>Request Headers</strong>{" "}
+                  → copy the entire <strong>cookie</strong> value (a long{" "}
+                  <code>ssid=…; asid=…; tdid=…</code> string).
+                </li>
+                <li>
+                  Paste it above and hit <strong>Load collection</strong>. Full Cookie header
+                  recommended — ssid alone is often not enough. (Application tab → Cookies →{" "}
+                  <strong>.riotgames.com</strong> works too; Firefox may truncate long values.)
                 </li>
               </ol>
               <p className="note" style={{ marginTop: 6 }}>
@@ -798,7 +910,7 @@ export default function App() {
               </p>
             </details>
             <button className="btn btn-block" type="submit" disabled={loading !== null}>
-              {loading === "cookies" ? "CONNECTING…" : "CONNECT WITH COOKIE"}
+              {loading === "cookies" ? "LOADING…" : "LOAD COLLECTION"}
             </button>
           </form>
 
@@ -819,7 +931,7 @@ export default function App() {
 
           {/* ---- Everything else (collapsed) ---- */}
           <details className="other-ways">
-            <summary>Other ways to sign in</summary>
+            <summary>Other sign-in methods ▾</summary>
 
             <div className="form-row" style={{ marginTop: 12 }}>
               <div className="form-col">
@@ -1010,6 +1122,11 @@ export default function App() {
     setLoading(null);
     setPage(0);
     setSkinQuery("");
+    setSkinFilter("all");
+    setCollapsedGuns({});
+    setZoom("fit");
+    setExportPhase(null);
+    setCookieFailed(false);
     setForm({ region: form.region, accessToken: "", entitlementsToken: "", puuid: "" });
     setCreds({ email: "", password: "", otp: "" });
     setAuth({ mode: "idle", sessionId: "", email: "" });
@@ -1023,6 +1140,15 @@ export default function App() {
     widgetIdRef.current = null;
   };
 
+  const switchAccount = () => {
+    if (
+      !window.confirm("Switch account? Your current selection and showcase will be cleared.")
+    ) {
+      return;
+    }
+    resetAccount();
+  };
+
   return (
     <div className="app">
       <header className="topbar">
@@ -1030,34 +1156,46 @@ export default function App() {
         <span className="topbar-div" aria-hidden="true" />
         <span className="topbar-brand">COLLECTION</span>
         <div className="topbar-id">
-          <span className="topbar-name">
+          <div className="topbar-name">
             {data.gameName}
             {data.tagLine && <span className="topbar-tag">#{data.tagLine}</span>}
-          </span>
-          <div className="topbar-meta">
-            {data.accountLevel != null && <span className="pill">LV. {data.accountLevel}</span>}
-            <span className="pill region">{data.region.toUpperCase()}</span>
-            <span>
-              {shownCount}/{pages.totalSelected} skins · {pages.density.name}
+            <span className="topbar-sub">
+              {data.accountLevel != null && <>· LV. {data.accountLevel}</>} · {data.region.toUpperCase()}
             </span>
+          </div>
+          <div className="topbar-meta">
+            <span>
+              {shownCount}/{data.skins.length} selected
+            </span>
+            {pages.gridPages.length > 1 && (
+              <span>
+                · {pages.density.name} · page {page + 1}/{pages.gridPages.length}
+              </span>
+            )}
           </div>
         </div>
         <div className="topbar-actions">
-          <button className="btn ghost" onClick={resetAccount}>New account</button>
+          <button className="btn ghost" onClick={switchAccount}>Switch account</button>
         </div>
       </header>
       {error && <div className="error">{error}</div>}
       <div className="workspace">
         <div className="controls">
           <div className="panel">
-            <h3>Selection</h3>
+            <h3>
+              Selection
+              <span className="count">{pages.totalSelected} selected</span>
+            </h3>
             <div className="bulk">
-              <button className="btn ghost" onClick={() => allSections("premium")}>Select all premium</button>
+              <button className="btn ghost" onClick={() => allSections("premium")}>Premium+</button>
               <button className="btn ghost" onClick={() => allSections("all")}>Select all</button>
-              <button className="btn ghost" onClick={() => allSections("none")}>Clear all</button>
+              <button className="btn ghost" onClick={() => allSections("none")}>Clear</button>
             </div>
+            <p className="note" style={{ marginTop: 0 }}>
+              Premium+ and equipped cosmetics were selected automatically.
+            </p>
             {!data.pricesAvailable && (
-              <p className="note" style={{ marginTop: 0 }}>
+              <p className="note" style={{ marginTop: 6 }}>
                 Price feed unavailable — defaults fall back to the level heuristic.
               </p>
             )}
@@ -1066,35 +1204,15 @@ export default function App() {
           {section("card", "Cards", data.cards)}
           {section("title", "Titles", data.titles)}
           {section("buddy", "Buddies", data.buddies)}
-          <div className="panel">
-            <h3>Footer fields</h3>
-            <div className="footer-opts">
-              <label className="opt">
-                <input type="checkbox" checked={fm.on} onChange={(e) => setFm({ ...fm, on: e.target.checked })} />
-                FM
-              </label>
-              {fm.on && (
-                <input type="text" placeholder="FM note" value={fm.text} onChange={(e) => setFm({ ...fm, text: e.target.value })} />
-              )}
-              <label className="opt">
-                <input type="checkbox" checked={proof.on} onChange={(e) => setProof({ ...proof, on: e.target.checked })} />
-                PROOF
-              </label>
-              {proof.on && (
-                <input type="text" placeholder="proof note" value={proof.text} onChange={(e) => setProof({ ...proof, text: e.target.value })} />
-              )}
-            </div>
-          </div>
         </div>
 
         <div className="preview-area" ref={previewAreaRef}>
           <div className="preview-bar">
             <button className="btn" onClick={exportImages} disabled={exporting}>
-              {exporting
-                ? "EXPORTING…"
-                : pages.gridPages.length > 1
+              {exportPhase ??
+                (pages.gridPages.length > 1
                   ? `DOWNLOAD ${pages.gridPages.length} IMAGES (1440P)`
-                  : "DOWNLOAD IMAGE (1440P)"}
+                  : "DOWNLOAD IMAGE (1440P)")}
             </button>
             {pages.gridPages.length > 1 && (
               <div className="pager">
@@ -1111,23 +1229,46 @@ export default function App() {
             <span className="export-note">
               Click a skin · menu to remove / front
             </span>
+            <div className="zoom-group" role="group" aria-label="Preview zoom">
+              <button
+                type="button"
+                className={zoom === "fit" ? "on" : ""}
+                aria-pressed={zoom === "fit"}
+                onClick={() => setZoom("fit")}
+              >
+                Fit
+              </button>
+              <button
+                type="button"
+                className={zoom === "100" ? "on" : ""}
+                aria-pressed={zoom === "100"}
+                onClick={() => setZoom("100")}
+              >
+                100%
+              </button>
+              <button type="button" className="zoom-fs" onClick={toggleFullscreen}>
+                {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              </button>
+            </div>
           </div>
-          <div
-            className="preview-frame"
-            style={{ width: Math.round(CANVAS_W * previewScale), height: Math.round(CANVAS_H * previewScale) }}
-          >
-            <div className="preview-scale" style={{ transform: `scale(${previewScale})` }}>
-              <Showcase
-                payload={data}
-                pages={pages}
-                page={page}
-                selection={selection}
-                chromaSel={chromaSel}
-                bringToFront={bringToFront}
-                onRemoveSkin={removeSkin}
-                onBringToFront={bringSkinToFront}
-                onPickChroma={pickChroma}
-              />
+          <div className="preview-scroll">
+            <div
+              className="preview-frame"
+              style={{ width: Math.round(CANVAS_W * previewScale), height: Math.round(CANVAS_H * previewScale) }}
+            >
+              <div className="preview-scale" style={{ transform: `scale(${previewScale})` }}>
+                <Showcase
+                  payload={data}
+                  pages={pages}
+                  page={page}
+                  selection={selection}
+                  chromaSel={chromaSel}
+                  bringToFront={bringToFront}
+                  onRemoveSkin={removeSkin}
+                  onBringToFront={bringSkinToFront}
+                  onPickChroma={pickChroma}
+                />
+              </div>
             </div>
           </div>
         </div>

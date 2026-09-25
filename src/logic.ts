@@ -211,6 +211,107 @@ export function tierInfo(tier: number | null): { name: string; color: string } {
   return { name: `${b.name.toUpperCase()} ${tier - b.from + 1}`, color: b.color };
 }
 
+/* ===== Two-axis stack layout (§13–§16) ===== */
+
+export type StackDirection = "down-right" | "down-left" | "up-right" | "up-left";
+
+/** Max spread of a stack inside one cell (fraction of cell size, per axis). */
+export const STACK_SPREAD = { x: 0.3, y: 0.24 } as const;
+
+const DIR_SIGNS: Record<StackDirection, { x: number; y: number }> = {
+  "down-right": { x: 1, y: 1 },
+  "down-left": { x: -1, y: 1 },
+  "up-right": { x: 1, y: -1 },
+  "up-left": { x: -1, y: -1 },
+};
+
+/**
+ * Per-skin step for a stack of `count`, bounded so the whole cascade stays
+ * inside STACK_SPREAD no matter how many skins share the cell.
+ */
+export function stackSteps(count: number): { x: number; y: number } {
+  const n = Math.max(1, Math.floor(count));
+  if (n === 1) return { x: 0, y: 0 };
+  const baseX = n <= 2 ? 0.13 : n <= 4 ? 0.09 : n <= 7 ? 0.06 : 0.045;
+  const baseY = n <= 2 ? 0.07 : n <= 4 ? 0.05 : n <= 7 ? 0.035 : 0.026;
+  const room = 1 / (n - 1);
+  return { x: Math.min(baseX, STACK_SPREAD.x * room), y: Math.min(baseY, STACK_SPREAD.y * room) };
+}
+
+export interface StackLayer {
+  /** Offset from the cell origin as a fraction of cell size (×100 for %). */
+  dx: number;
+  dy: number;
+  scale: number;
+}
+
+/**
+ * Front-first layer list: index 0 = front (cell center), last = deepest behind.
+ * Offsets cascade diagonally along `dir`, bounded by STACK_SPREAD; back layers
+ * scale down slightly for depth.
+ */
+export function stackLayers(count: number, dir: StackDirection): StackLayer[] {
+  const n = Math.max(1, Math.floor(count));
+  const { x, y } = stackSteps(n);
+  const s = DIR_SIGNS[dir];
+  return Array.from({ length: n }, (_, i) => {
+    const dx = s.x * i * x;
+    const dy = s.y * i * y;
+    return {
+      dx: dx === 0 ? 0 : dx,
+      dy: dy === 0 ? 0 : dy,
+      scale: 1 - Math.min(0.04 * i, 0.16),
+    };
+  });
+}
+
+/** Deterministic direction per grid column: left half cascades right, right half cascades left. */
+export function stackDirectionForColumn(col: number, cols: number): StackDirection {
+  const n = Math.max(1, Math.floor(cols));
+  return col < n / 2 ? "down-right" : "down-left";
+}
+
+/** Rarity-ish score for deterministic stack ordering (higher = nearer the front). */
+export function skinTierScore(s: Pick<SkinItem, "price" | "levelCount" | "contentTierRank">): number {
+  if (s.price != null) return s.price;
+  if (s.contentTierRank != null) return s.contentTierRank * 600;
+  return s.levelCount * 100;
+}
+
+/**
+ * Front-first stack order (§15/§16): manual front override → equipped →
+ * tier score → stable original order.
+ */
+export function orderStack(items: SkinItem[], frontId?: string): SkinItem[] {
+  if (items.length <= 1) return items.slice();
+  const front = frontId ? items.find((s) => s.id === frontId) : undefined;
+  const rest = front ? items.filter((s) => s.id !== frontId) : items;
+  const ranked = rest
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => {
+      const eq = (b.s.equipped ? 1 : 0) - (a.s.equipped ? 1 : 0);
+      if (eq !== 0) return eq;
+      const sc = skinTierScore(b.s) - skinTierScore(a.s);
+      if (sc !== 0) return sc;
+      return a.i - b.i;
+    })
+    .map((r) => r.s);
+  return front ? [front, ...ranked] : ranked;
+}
+
+/** Rarity label matching rarityColor buckets (menu + docs wording). */
+export function rarityLabel(
+  price: number | null,
+  levelCount = 0,
+  contentTierRank: number | null = null
+): string {
+  const c = rarityColor(price, levelCount, contentTierRank);
+  if (c === "#e8c860") return "ULTRA";
+  if (c === "#a866ff") return "PREMIUM";
+  if (c === "#7fa3c8") return "SELECT";
+  return "STANDARD";
+}
+
 export const DENSITIES = [
   { name: "comfort", cols: 4, rows: 4, capacity: 16 },
   { name: "standard", cols: 5, rows: 4, capacity: 20 },

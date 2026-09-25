@@ -123,6 +123,18 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   font-size: 13px;
   white-space: pre-wrap;
   word-break: break-word;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.error > span { white-space: pre-wrap; word-break: break-word; min-width: 0; }
+.gate-retry {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .note { color: var(--muted); font-size: 12px; margin-top: 10px; line-height: 1.55; }
@@ -326,6 +338,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   letter-spacing: 0.04em;
 }
 .topbar-tag { color: var(--accent); font-size: 22px; margin-left: 4px; }
+.topbar-sub {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-left: 10px;
+  white-space: nowrap;
+}
 .topbar-meta {
   display: flex;
   gap: 8px;
@@ -337,19 +358,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.topbar-meta .pill {
-  border: 1px solid var(--line);
-  padding: 2px 8px;
-  border-radius: 2px;
-  color: #cfd6dc;
-}
-.topbar-meta .pill.region { border-color: var(--accent); color: var(--accent); }
 .topbar-actions { margin-left: auto; display: flex; gap: 8px; }
 
+/* 70/75% preview · 25/30% sidebar (§1) — preview dominates */
 .workspace {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(0, 3fr);
   gap: 18px;
-  align-items: flex-start;
+  align-items: start;
 }
 
 .controls {
@@ -391,12 +407,30 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 .bulk { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
 
-.skin-search {
+/* §3: search + ALL/SELECTED/EQUIPPED filter above the skin categories */
+.skin-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-bottom: 10px;
 }
+.skin-search { margin: 0; }
 .skin-search input { padding: 8px 10px; font-size: 13px; }
+.seg { display: flex; gap: 4px; }
+.seg button {
+  flex: 1;
+  background: var(--void);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font: 600 10px/1 var(--font-ui);
+  letter-spacing: 0.1em;
+  padding: 7px 4px;
+  border-radius: 3px;
+}
+.seg button:hover { border-color: var(--line-strong); color: var(--text); }
+.seg button.on { border-color: var(--accent); background: var(--accent-dim); color: #fff; }
 
-/* visual skin grid — collection tiles */
+/* visual skin grid — collection tiles (§4: flat, art-dominant, no heavy glow) */
 .skin-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
@@ -414,20 +448,23 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   position: relative;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(165deg, #15202b 0%, #0c141d 100%);
-  border: 1.5px solid var(--line);
+  background: #131c26;
+  border: 1px solid var(--line);
   clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
   padding: 0;
   overflow: hidden;
   aspect-ratio: 1;
   color: inherit;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  transition: border-color 0.12s ease, background 0.12s ease, filter 0.12s ease;
 }
-.skin-cell:hover { filter: brightness(1.15); }
+.skin-cell:hover { filter: brightness(1.12); }
 .skin-cell.on {
+  /* thin rarity outline + brighter flat background — no glow */
   border-color: var(--rarity, var(--accent));
-  box-shadow: 0 0 0 1px var(--rarity, var(--accent)), 0 0 14px -4px var(--rarity, var(--accent));
+  background: #1c2735;
+  box-shadow: inset 0 0 0 1px var(--rarity, var(--accent));
 }
+/* dedicated selection marker: top-right diamond, only when selected */
 .skin-cell::after {
   content: "";
   position: absolute;
@@ -436,16 +473,22 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   width: 6px;
   height: 6px;
   transform: rotate(45deg);
-  background: var(--rarity, #4a5560);
-  opacity: 0.85;
-  box-shadow: 0 0 6px var(--rarity, transparent);
+  background: var(--rarity, var(--accent));
+  opacity: 0;
+  transition: opacity 0.12s ease;
   z-index: 1;
 }
-.skin-cell.eq::after {
+.skin-cell.on::after { opacity: 0.95; }
+/* equipped: subtle accent edge — label lives in the tooltip */
+.skin-cell.eq::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
   background: var(--accent);
-  box-shadow: 0 0 6px var(--accent);
-  width: 7px;
-  height: 7px;
+  z-index: 1;
 }
 .skin-cell-art {
   flex: 1;
@@ -504,23 +547,67 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   line-height: 1.5;
 }
 
-.skin-gun-label {
-  grid-column: 1 / -1;
-  font-family: var(--font-display);
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  color: var(--muted);
-  padding: 7px 0 3px;
-  margin-top: 4px;
-  border-bottom: 1px solid var(--line);
-  position: sticky;
-  top: 0;
-  background: linear-gradient(180deg, var(--panel) 85%, transparent);
-  z-index: 1;
+/* §4: collapsible weapon categories with counts */
+.skin-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-.skin-gun-label:first-child,
-.skin-grid > .skin-gun-label:not(:first-child) { margin-top: 0; }
-.skin-cell + .skin-gun-label { margin-top: 8px; }
+.skin-cat {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.015);
+  overflow: hidden;
+}
+.skin-cat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: left;
+}
+.skin-cat-head:hover { background: rgba(255, 255, 255, 0.03); }
+.skin-cat-caret {
+  width: 0;
+  height: 0;
+  border-left: 4px solid var(--muted);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 0.12s ease;
+  flex-shrink: 0;
+}
+.skin-cat-caret[data-open="true"] {
+  transform: rotate(90deg);
+  border-left-color: var(--accent);
+}
+.skin-cat-name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.skin-cat-count {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.skin-cat .skin-grid {
+  border-top: 1px solid var(--line);
+  max-height: 248px;
+  padding: 8px;
+  gap: 7px;
+}
 
 /* compact chips — cards / titles / buddies */
 .chips {
@@ -619,24 +706,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   color: var(--text);
 }
 
-/* footer fields */
-.footer-opts { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-.footer-opts label.opt {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  cursor: pointer;
-}
-.footer-opts label.opt:hover { color: var(--text); }
-.footer-opts input[type="checkbox"] { accent-color: var(--accent); }
-.footer-opts input[type="text"] { width: 150px; padding: 6px 8px; font-size: 13px; }
-
 /* ===== preview ===== */
-.preview-area { flex: 1; min-width: 0; }
+.preview-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 .preview-bar {
   display: flex;
   align-items: center;
@@ -644,6 +720,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
+/* export label swaps through phases (§7) — keep width stable */
+.preview-bar > .btn { min-width: 268px; text-align: center; }
 .pager {
   display: flex;
   align-items: center;
@@ -663,6 +741,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .pager button:hover:not(:disabled) { border-color: var(--accent); }
 .pager button:disabled { opacity: 0.3; }
 
+.preview-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-2) transparent;
+}
+/* context menu must not be clipped by the scroll container */
+.preview-scroll:has(.menu-open) { overflow: visible; }
 .preview-frame {
   position: relative;
   overflow: hidden;
@@ -676,6 +763,37 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .preview-scale { transform-origin: top left; }
 .export-note { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+/* §1/§6: FIT / 100% / fullscreen zoom (editor-only — export canvas unaffected) */
+.zoom-group { display: flex; gap: 4px; }
+.zoom-group button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font: 600 11px/1 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  border-radius: 3px;
+}
+.zoom-group button:hover { border-color: var(--accent); color: var(--text); }
+.zoom-group button.on {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: #fff;
+}
+.preview-area:fullscreen {
+  background: var(--void);
+  padding: 16px;
+  gap: 12px;
+}
+.preview-area:fullscreen .preview-scroll {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-area:fullscreen .preview-frame { box-shadow: none; }
+
 .hidden-export { position: fixed; left: -10000px; top: 0; z-index: -1; }
 
 /* ===== showcase card — VALORANT Collection look (fixed 1280×720, export-safe) ===== */
@@ -698,11 +816,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse 45% 80% at -5% 50%, rgba(255, 40, 60, 0.35), transparent 55%),
-    radial-gradient(ellipse 40% 50% at 0% 0%, rgba(255, 70, 85, 0.16), transparent 50%),
-    radial-gradient(ellipse 35% 45% at 100% 100%, rgba(80, 100, 255, 0.1), transparent 50%),
-    linear-gradient(180deg, #0c141d 0%, #070b10 100%);
+  /* flat planes only — no radial glows/gradients (§8) */
+  background: #0a1017;
 }
 .sc-root::after {
   content: "";
@@ -762,18 +877,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: linear-gradient(90deg, var(--accent), rgba(255, 70, 85, 0.05));
   clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
 }
-.sc-badge {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 2px;
-  letter-spacing: 0.1em;
-  color: #cfd6dc;
-  white-space: nowrap;
-}
-.sc-badge--region { border-color: var(--accent); color: var(--accent); }
 
 /* body: collection grid | info rail (card + ranks + stats) */
 .sc-body {
@@ -785,81 +888,61 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   padding: 6px 28px 8px;
   min-height: 0;
 }
-/* PEAK + CURRENT side by side in the 184px rail */
-.sc-ranks {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.sc-ranks .sc-rank-panel {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 6px 4px 8px;
-}
-.sc-rank-panel {
+/* single compact RANK block (§11): label + peak/current rows */
+.sc-rank-block {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
   clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  padding: 6px 9px 7px;
   flex-shrink: 0;
 }
-.sc-medal-label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+.sc-rank-block-label {
   font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   color: var(--accent);
-  text-align: center;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
+  margin-bottom: 3px;
 }
-.sc-rank-caret {
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid var(--accent);
-}
-.sc-medal-badge {
-  width: 52px;
-  height: 52px;
-  margin: 0 auto;
+.sc-rank-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.12));
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0;
 }
-.sc-medal-icon {
-  width: 100%;
-  height: 100%;
+.sc-rank-tag {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  width: 46px;
+  flex-shrink: 0;
+}
+.sc-rank-icon {
+  width: 15px;
+  height: 15px;
   object-fit: contain;
+  flex-shrink: 0;
   display: block;
-  /* export-safe: no CSS filters that can fail to rasterize */
 }
-.sc-medal-fallback {
-  font-family: var(--font-display);
-  font-size: 11px;
-  text-align: center;
-  line-height: 1.15;
-  letter-spacing: 0.04em;
-  padding: 0 4px;
+.sc-rank-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
-.sc-medal-name {
+.sc-rank-name {
   font-family: var(--font-display);
-  font-size: 11px;
-  text-align: center;
+  font-size: 12px;
   line-height: 1.1;
   letter-spacing: 0.04em;
-  margin-top: 3px;
-  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
-.sc-wallet { display: flex; flex-direction: column; gap: 5px; margin-top: 0; flex-shrink: 0; }
+/* wallet as one horizontal row (§11) */
+.sc-wallet { display: flex; flex-direction: row; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
 .sc-chip {
   display: inline-flex;
   align-items: center;
@@ -993,8 +1076,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* bg on the full grid cell so every slot aligns (header + stack share one panel) */
-  background: linear-gradient(165deg, #15202b 0%, #0c141d 100%);
+  /* flat plane on the full grid cell so every slot aligns (header + stack share one panel) */
+  background: #101822;
   border: 1px solid rgba(255, 255, 255, 0.08);
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
   padding: 6px 8px 8px;
@@ -1031,7 +1114,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   flex-shrink: 0;
 }
 
-/* one cell per gun — skins transparent, stacked inside the shared slot bg */
+/* one cell per gun — skins transparent, two-axis stack via inline transform (§13) */
 .sc-stack {
   position: relative;
   flex: 1;
@@ -1050,18 +1133,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   cursor: default;
   transition: transform 0.12s ease;
   pointer-events: none;
-  /* Vertical fan; step shrinks as n grows so many skins stay in-cell and overlap */
-  transform: translateY(
-    calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * min(14%, calc(52% / var(--n, 1))))
-  );
 }
 .sc-stack-item.clickable { cursor: pointer; }
-.sc-stack.is-stacked .sc-stack-item {
-  transform: translateY(
-    calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * min(10%, calc(44% / var(--n, 1))))
-  );
-}
-.sc-stack-item:hover { z-index: 40 !important; }
+.sc-stack-item:hover { z-index: 130 !important; }
 
 /* Hitbox = the img itself (frame is display:contents — no extra box) */
 .sc-stack-frame {
@@ -1136,8 +1210,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(165deg, #15202b 0%, #0c141d 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* lighter plane than gun cells — melee strip reads as a separate band (§18) */
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
   overflow: hidden;
 }
@@ -1150,27 +1225,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   border: none;
   clip-path: none;
 }
-.sc-knife-cell .sc-stack-item {
-  transform: none;
-}
 .sc-knife-cell .sc-stack-item:hover {
-  z-index: 40 !important;
+  z-index: 130 !important;
 }
 .sc-knife-cell .sc-stack-art {
   height: 76%;
   max-width: 92%;
 }
 
-.sc-tile-gem {
-  position: absolute;
-  top: 7px;
-  right: 9px;
-  width: 7px;
-  height: 7px;
-  transform: rotate(45deg);
-  z-index: 45;
-  pointer-events: none;
-}
 .sc-fallback { color: var(--muted); font-size: 11px; padding: 8px; text-align: center; }
 .sc-empty {
   flex: 1;
@@ -1237,17 +1299,18 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-empty-gun {
   width: 78%;
   height: 62%;
-  background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
-    repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 6px,
-      rgba(255, 255, 255, 0.03) 6px,
-      rgba(255, 255, 255, 0.03) 7px
-    );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.015);
   border: 1px dashed rgba(255, 255, 255, 0.14);
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.sc-silhouette {
+  width: 76%;
+  height: auto;
+  color: rgba(255, 255, 255, 0.07);
+  pointer-events: none;
 }
 .sc-knife-cell--empty .sc-empty-gun {
   width: 88%;
@@ -1280,15 +1343,44 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 118px;
-  max-width: min(168px, 140%);
-  padding: 6px;
+  gap: 5px;
+  min-width: 148px;
+  max-width: min(210px, 150%);
+  padding: 8px;
   background: rgba(8, 12, 16, 0.98);
   border: 1px solid rgba(255, 70, 85, 0.65);
   clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.7);
   pointer-events: auto;
+}
+.sc-skin-menu-title {
+  font: 700 11px/1.3 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.sc-skin-menu-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.sc-skin-menu-price { color: var(--muted); }
+.sc-skin-menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+.sc-skin-menu-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 .sc-skin-menu-btn {
   margin: 0;
@@ -1309,6 +1401,11 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sc-skin-menu-btn--danger {
   color: var(--accent);
 }
+.sc-skin-menu-btn.is-front {
+  background: rgba(255, 70, 85, 0.16);
+  border-color: rgba(255, 70, 85, 0.55);
+  color: #fff;
+}
 .sc-chromas--menu {
   position: static;
   left: auto;
@@ -1326,7 +1423,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   pointer-events: auto;
 }
 .sc-stack-item.menu-open {
-  z-index: 100 !important;
+  z-index: 150 !important;
 }
 .sc-stack-item.menu-open .sc-stack-art {
   filter: brightness(1.12)
@@ -1338,7 +1435,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   transform: none !important;
 }
 
-/* right rail: player card + ranks/stats under it — official largeArt aspect 268×640 */
+/* right rail: player card dominates, then rank block, wallet, summary (§11) */
 .sc-right {
   width: 184px;
   display: flex;
@@ -1346,14 +1443,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   gap: 10px;
   flex-shrink: 0;
   align-items: stretch;
-  overflow: hidden;
-}
-.sc-rail-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex-shrink: 1;
-  min-height: 0;
   overflow: hidden;
 }
 .sc-card-panel {
@@ -1366,7 +1455,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   flex: 0 0 auto;
   background: #0c141d;
   clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
-  box-shadow: 0 0 20px -6px rgba(255, 70, 85, 0.35);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
 }
 .sc-card-panel::before,
 .sc-card-panel::after {
@@ -1454,40 +1543,19 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   color: var(--text);
   z-index: 1;
 }
-.sc-buddies { flex-shrink: 0; }
-.sc-buddy-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.sc-buddy-row img { width: 30px; height: 30px; object-fit: contain; }
-.sc-stats {
+/* one summary line under the wallet (§11) */
+.sc-summary {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  flex-shrink: 0;
-  padding-top: 2px;
-}
-.sc-stat {
-  display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
   font-family: var(--font-display);
-}
-.sc-stat-label {
   font-size: 11px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
-.sc-stat-val {
-  font-size: 20px;
-  line-height: 1;
-  color: #fff;
-  letter-spacing: 0.04em;
-}
-.sc-stat-div {
-  width: 1px;
-  height: 22px;
-  background: rgba(255, 255, 255, 0.14);
-}
-.sc-stat svg { width: 14px; height: 12px; }
+.sc-summary span[aria-hidden] { color: var(--faint); }
 
 /* column loadout: sidearms has 6 rows — keep gun labels compact */
 .sc-cat-col .sc-cat-name { font-size: 12px; }
@@ -1539,7 +1607,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 /* ===== responsive (export canvas stays fixed 1280×720) ===== */
 @media (max-width: 1100px) {
-  .workspace { flex-direction: column; }
+  .workspace { grid-template-columns: 1fr; }
   .controls {
     width: 100%;
     max-height: none;

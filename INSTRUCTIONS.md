@@ -18,14 +18,18 @@ renders a pixel-faithful loadout preview they can curate and export.
 
 ## User journey (what happens, in order)
 
-1. **Sign-in gate** — dark card, Riot-styled. One primary recommended path
-   (browser cookie / remote login) + alternates (password, token paste, RSO).
-   Errors are human-readable ("log in again and copy a fresh ssid").
-2. **Workspace** loads with the account's inventory. Defaults pre-check premium
-   skins (≥1775 VP / Premium+ tier) and everything equipped.
-3. **Curation** — user toggles what appears; the preview updates live.
+1. **Sign-in gate** — dark card, Riot-styled. Primary path first: **browser cookie**
+   (`LOAD COLLECTION`, 4-step "Where do I find this?" how-to); everything else
+   collapsed under **Other sign-in methods ▾** (remote login, password, tokens,
+   RSO when configured). Cookie failures show human-readable copy + **Try again**.
+2. **Workspace** loads with the account's inventory (~75% preview / ~25% sidebar).
+   Defaults pre-check premium skins (≥1775 VP / Premium+ tier) and everything
+   equipped — noted in the sidebar.
+3. **Curation** — user toggles what appears (search, ALL/SELECTED/EQUIPPED
+   filter, collapsible weapon categories); the preview updates live.
 4. **Export** — "DOWNLOAD IMAGE (1440P)" (or "DOWNLOAD N IMAGES" when
-   paginated). File: `showcase-<riotid>-p1.png`…
+   paginated), showing phases: `PREPARING ASSETS…` → `RENDERING 2560 × 1440…`
+   / `RENDERING i / n…` → `DOWNLOADED ✓`. File: `showcase-<riotid>-p1.png`…
 
 ---
 
@@ -33,47 +37,59 @@ renders a pixel-faithful loadout preview they can curate and export.
 
 ### Workspace chrome (not part of the exported PNG)
 
-- **Top bar:** brand mark + `COLLECTION`, Riot ID `#TAG`, `LV. n`, region pill,
-  `x/y skins · <density>`, **New account** button.
-- **Left sidebar (controls):**
-  - Selection panel: *Select all premium / Select all / Clear all*.
-  - **Skins** panel: count `x/y`, *All / Premium / None*, filter box,
-    gun-grouped grid of skin thumbnails — each cell shows **art, name, VP price,
-    rarity-tinted border** (gold/purple/blue), equipped marker in tooltip.
-  - **Cards / Titles / Buddies** panels: chip rows with checkboxes + prices.
-  - Footer-fields panel (FM / PROOF optional notes). **Note:** these values are
-    currently *not* wired into the showcase render — don't assume they appear
-    in the PNG unless a task explicitly wires them up.
-- **Preview bar:** download button, page pager `◀ 1/N ▶` when multi-page, hint
-  *"Click a skin · menu to remove / front"*.
-- **Preview frame:** the live 1280×720 showcase, scaled to fit.
+- **Top bar:** brand mark + `COLLECTION`, `Name#TAG · LV. n · REGION`,
+  `x/y selected` (+ `density · page i/n` when multi-page), **Switch account**
+  button (confirm dialog clears the selection).
+- **Left sidebar (~25%, controls):**
+  - Selection panel: `x selected` + *Premium+ / Select all / Clear* + the note
+    "Premium+ and equipped cosmetics were selected automatically."
+  - **Skins** panel: count `x/y`, search box, `ALL / SELECTED / EQUIPPED`
+    segmented filter, collapsible weapon categories with `LABEL sel/total`
+    counts; each cell is art-dominant — **art + name + VP price**, thin
+    rarity-tinted outline + corner diamond when selected, subtle accent edge
+    when equipped (label in tooltip). No glow.
+  - **Cards / Titles / Buddies** panels: chip rows with checkboxes + prices
+    (+ per-section *All / Premium / None*).
+  - (No FM / PROOF footer-fields panel — removed.)
+- **Preview bar:** download button (with export phase text), page pager
+  `◀ 1/N ▶` when multi-page, hint *"Click a skin · menu to remove / front"*,
+  and **Fit / 100% / Fullscreen** zoom controls (editor-only — the exported
+  geometry never changes).
+- **Preview frame:** the live 1280×720 showcase, scaled to fit (or actual
+  size / fullscreen on demand).
 
 ### The showcase itself (this IS the exported image)
 
 ```
 HEADER      Riot ID #TAG · LV n · region · equipped title
 CENTER                                    │ RIGHT RAIL
-SIDEARMS column (full height)            │ player card (tall art)
-SMGS over SMGs, then SHOTGUNS            │ PEAK + CURRENT ranks
-RIFLES column                            │ VP / RP wallet icons
-SNIPERS over snipers, then HEAVIES       │ PREM:n  KNIFE:n
-── MELEE strip (cols 2–4, ~68px) ──      │ buddies +N
+SIDEARMS column (full height)            │ player card (tall art, dominant)
+SMGS over SMGs, then SHOTGUNS            │ RANK block: PEAK / CURRENT rows
+RIFLES column                            │ VP / RP wallet (one row)
+SNIPERS over snipers, then HEAVIES       │ PREMIUM n · KNIFE n · BUDDIES +n
+── MELEE strip (cols 2–4, ~68px) ──      │
 ```
 
 Must be visible / true:
 
 - **Exactly 4 category columns**; combined columns show **section titles
   mid-column** (SMGS above SMGs, SHOTGUNS above shotguns; SNIPERS then HEAVIES).
-- **All 19 official guns always present**, even empty (dashed empty cell);
-  empty MELEE strip always shown. Unknown guns → OTHER column.
-- **Skin stacks**: multiple skins per gun layered in one cell with an overlap
-  fan; **outline = the skin's rarity color** (gold `#e8c860` / purple
-  `#a866ff` / blue `#7fa3c8`), hover glows + scales.
-- **Click a skin in preview → context menu**: chroma variants row,
-  *Show in front*, *Remove*. Click does NOT toggle selection.
-- **Melee/knives** on their own full-width bottom strip, never in the gun grid.
-- Style: `#0f1923` bg, `#ff4655` accent, Bebas Neue labels, Inter body,
-  dark-glass panels with clipped corners.
+- **All 19 official guns always present**, even empty (dashed outline + faint
+  weapon silhouette, no `+`/labels); empty MELEE strip always shown. Unknown
+  guns → OTHER column.
+- **Skin stacks**: multiple skins per gun layered in one cell as a **two-axis
+  cascade** — front skin centered, rest recede diagonally (left columns
+  down-right, right columns down-left), spread bounded so nothing escapes the
+  cell; front order = manual "show in front" → equipped → rarity/price →
+  original. **Outline = the skin's rarity color** (gold `#e8c860` / purple
+  `#a866ff` / blue `#7fa3c8`), hover raises + glows.
+- **Click a skin in preview → context menu**: name, rarity label + VP price,
+  `VARIANT` thumbnails, *Show in front / Showing in front ✓*, *Remove from
+  showcase*. Click does NOT toggle selection.
+- **Melee/knives** on their own full-width bottom strip (lighter plane than
+  gun cells), never in the gun grid.
+- Style: `#0a1017` flat canvas, `#ff4655` accent wedge + left bar, Bebas Neue
+  labels, Inter body, flat dark planes with clipped corners (no radial glows).
 
 Must NOT be visible:
 
@@ -85,7 +101,10 @@ Must NOT be visible:
 ### Export guarantees
 
 - PNG is **2560×1440** (1280×720 × 2), fonts + images fully loaded before
-  capture, no menus/popovers in the PNG (export instance has no click handlers).
+  capture (a failed image load aborts with a visible error), no menus/popovers
+  in the PNG (export instance has no click handlers).
+- Export button walks through phases: `PREPARING ASSETS…` →
+  `RENDERING 2560 × 1440…` / `RENDERING i / n…` → `DOWNLOADED ✓`.
 - Multi-page only when unknown guns overflow (≤3 pages, `1/N` indicator).
 
 ---
@@ -96,6 +115,6 @@ Must NOT be visible:
 - Tokens/credentials: request memory only, never stored, never logged, never
   committed. Repo must stay free of secrets.
 - Verify before every commit: `npx tsc --noEmit && npx vitest run && npm run build`
-  (105 tests). Push to `main`, redeploy in Dokploy.
+  (112 tests). Push to `main`, redeploy in Dokploy.
 - Keep `SPEC.md` §6–§8 in sync with `src/Showcase.tsx` / `src/logic.ts` /
   `src/styles.css` when UI changes.

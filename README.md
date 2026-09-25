@@ -8,7 +8,7 @@ See `SPEC.md` for the full product/technical specification (§6–§8 = UI/layou
 
 ```bash
 npm install
-npm test          # vitest (selection defaults, pagination, auth parsers) — expect 105 tests green
+npm test          # vitest (selection defaults, pagination, stack layout, auth parsers) — expect 112 tests green
 npm run build     # tsc --noEmit + production bundle → dist/
 npm start         # serves API + built frontend on http://localhost:3001
 # or for development with hot reload:
@@ -21,15 +21,15 @@ npm run dev       # Express :3001 + Vite :5173 (proxied)
 npx tsc --noEmit && npx vitest run && npm run build
 ```
 
-All three must pass (105 tests). Then `git add … && git commit && git push` to `main`.
+All three must pass (112 tests). Then `git add … && git commit && git push` to `main`.
 
 ## Architecture
 
 ```
 src/                      # React frontend (Vite + TS)
-  App.tsx                 # state, auth forms, selection, preview + export Showcases
-  Showcase.tsx            # the showcase renderer (layout, stack fan, context menu, knife row)
-  logic.ts                # selection rules, rarityColor, WEAPON_CATEGORIES, paginate()
+  App.tsx                 # state, auth gate, selection sidebar, preview + export Showcases, zoom/toolbar
+  Showcase.tsx            # the showcase renderer (layout, two-axis stack, context menu, right rail, knife row)
+  logic.ts                # selection rules, rarityColor, WEAPON_CATEGORIES, paginate(), stack layout (stackLayers/orderStack)
   logic.test.ts           # UI-logic tests
   styles.css              # all styles; fixed 1280×720 `.sc-root` canvas
   types.ts                # SkinItem, ShowcasePayload, …
@@ -45,11 +45,12 @@ SPEC.md                   # product + technical spec (UI sections must stay in s
 
 ### UI invariants (easy to break — read before touching `Showcase.tsx`)
 
-- Export canvas is **fixed 1280×720** — `.sc-root` must never become responsive.
-- Preview clicks open the skin **context menu** (chromas / show in front / remove), they do not toggle selection; toggling lives in the sidebar checkboxes.
-- `paginate(allSkins, selection)` always emits all 19 official gun slots + the knife row; empty guns render as empty cells.
+- Export canvas is **fixed 1280×720** — `.sc-root` must never become responsive; preview zoom (Fit/100%/Fullscreen) only scales the editor preview.
+- Preview clicks open the **context menu** (name, rarity + VP, variants, show in front, remove from showcase), they do not toggle selection; toggling lives in the sidebar.
+- `paginate(allSkins, selection)` always emits all 19 official gun slots + the knife row; empty guns render as empty cells (dashed outline + silhouette).
+- Stacks are two-axis: front-first order (`orderStack`: manual front → equipped → tier score → stable) with inline `translate/scale` per layer (`stackLayers`), cascade direction per column (`stackDirectionForColumn`), spread bounded by `STACK_SPREAD` — never CSS-fan transforms.
 - Rarity outline color comes from `--rarity` set per stack item (`rarityColor()` in `logic.ts`).
-- Images load through `/img` proxy (allowlist `media.valorant-api.com`) so the PNG export doesn't taint the canvas.
+- Images load through `/img` proxy (allowlist `media.valorant-api.com`) so the PNG export doesn't taint the canvas; failed image loads abort the export.
 
 ## Deploy
 
