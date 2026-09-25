@@ -23,7 +23,7 @@
 
 ## 3. Auth model (MVP): token paste
 
-1. User retrieves their **access token** + **entitlements JWT** (well-known community token tools) and picks their **region**.
+1. User retrieves their **access token** + **entitlements JWT** (well-known community token tools) and picks their **region** (this dropdown is only shown here — all other sign-in flows auto-detect the region).
 2. Form posts `{ region, accessToken, entitlementsToken }` to `POST /api/account`.
 3. Server resolves **PUUID** via `GET https://auth.riotgames.com/userinfo` (Bearer access token). Manual PUUID field as advanced fallback.
 4. Tokens live in request memory only: never logged, never persisted, discarded when the response is sent.
@@ -160,7 +160,7 @@ Flow (verified against OAuth Client Documentation + valapidocs):
 
 Design decisions:
 
-- **Region stays user-selected** in v1 (auto-detect via Riot Geo endpoint = later).
+- **Region is auto-detected** via the Riot Geo endpoint (id_token → `affinities.live`) for every flow that has an id_token: cookie, password, remote browser, auto, and RSO. The manual region dropdown only exists inside the collapsed **token-paste** panel (no id_token there); everything else falls back to `na` if detection fails.
 - **Refresh tokens requested (`offline_access`) but never stored** — persistent sessions = stored account access; revisit deliberately post-launch.
 - **Entitlements step is the spike test:** if Riot refuses third-party RSO tokens at `entitlements.*`/`pd.*`, surface the explicit 403 message (already implemented) and fall back to helper-app option.
 - Env config via `.env` (see `.env.example`); missing config ⇒ `/api/rso/config` returns `configured:false` ⇒ button renders "COMING SOON".

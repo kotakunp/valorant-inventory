@@ -663,7 +663,7 @@ export default function App() {
                     : "No skins in this category."}
                 {!query &&
                   skinFilter === "all" &&
-                  " Try SWITCH ACCOUNT and connect again (or switch region — inventory is shard-specific)."}
+                  " Try SWITCH ACCOUNT and connect again."}
               </div>
             )}
             {skinGroups.map((g) => {
@@ -847,18 +847,8 @@ export default function App() {
             </div>
           )}
 
-          {/* ---- Cookie paste (primary) ---- */}
+          {/* ---- Cookie paste (primary) — region auto-detected server-side ---- */}
           <form onSubmit={submitCookies}>
-            <div className="form-row">
-              <div className="form-col">
-                <label>Region <span className="label-hint">(usually auto-detected)</span></label>
-                <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value as Region })}>
-                  {REGIONS.map((r) => (
-                    <option key={r} value={r}>{r.toUpperCase()}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
             <div className="form-row">
               <div className="form-col">
                 <label>ssid cookie</label>
@@ -891,8 +881,10 @@ export default function App() {
                 </li>
                 <li>
                   Press <strong>F12</strong> → open the <strong>Network</strong> tab → load{" "}
-                  <code>https://auth.riotgames.com/</code> in it (the &quot;An error occurred&quot; page
-                  is normal — ignore it).
+                  <a href="https://auth.riotgames.com/" target="_blank" rel="noreferrer noopener">
+                    <code>https://auth.riotgames.com/</code>
+                  </a>{" "}
+                  in it (the &quot;An error occurred&quot; page is normal — ignore it).
                 </li>
                 <li>
                   Click the <code>auth.riotgames.com</code> request → <strong>Request Headers</strong>{" "}
@@ -1063,6 +1055,16 @@ export default function App() {
 
             <div className="or-divider">or paste session tokens manually</div>
             <form onSubmit={fetchAccount}>
+              <div className="form-row">
+                <div className="form-col">
+                  <label>Region <span className="label-hint">(auto-detected for cookie sign-in)</span></label>
+                  <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value as Region })}>
+                    {REGIONS.map((r) => (
+                      <option key={r} value={r}>{r.toUpperCase()}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="form-row">
                 <div className="form-col">
                   <label>Access token</label>

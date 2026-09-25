@@ -152,6 +152,27 @@ export function normalizeRegion(value: unknown): Region | null {
   return null;
 }
 
+/**
+ * Auto-detect the account's region via the Riot Geo endpoint (needs id_token).
+ * Null when Riot is unreachable or the response is unparseable — callers fall
+ * back to the client-provided region.
+ */
+export async function detectRegion(accessToken: string, idToken: string): Promise<Region | null> {
+  try {
+    const geo = await fetch("https://riot-geo.pas.si.riotgames.com/pas/v1/product/valorant", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ id_token: idToken }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!geo.ok) return null;
+    const g = await geo.json().catch(() => null);
+    return normalizeRegion(g?.affinities?.live);
+  } catch {
+    return null;
+  }
+}
+
 /** Forgiving parser for what users paste:
  *  bare value → ssid=<value>;  single pair "ssid=abc";  or multi "ssid=a; asid=b; …".
  *  Normalizes: strips a leading "Cookie:" header, lowercases cookie names,
@@ -444,21 +465,7 @@ async function finishLogin(tokens: { accessToken: string; idToken: string }, puu
   }
 
   // Bonus: auto-detect region affinity from riot-geo (GamerNoTitle/VSC flow)
-  let region: Region | null = null;
-  try {
-    const geo = await fetch("https://riot-geo.pas.si.riotgames.com/pas/v1/product/valorant", {
-      method: "PUT",
-      headers: { ...headers, Authorization: `Bearer ${tokens.accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ id_token: tokens.idToken }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (geo.ok) {
-      const g = await geo.json().catch(() => null);
-      region = normalizeRegion(g?.affinities?.live);
-    }
-  } catch {
-    /* keep null → caller falls back to the user-selected region */
-  }
+  const region = await detectRegion(tokens.accessToken, tokens.idToken);
 
   return {
     kind: "tokens",

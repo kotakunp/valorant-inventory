@@ -1,4 +1,5 @@
 import { buildShowcase, UpstreamError } from "./valorant";
+import { detectRegion } from "./riotAuth";
 import type { ShowcasePayload, Region } from "../src/types";
 
 const AUTHORIZE_URL = "https://auth.riotgames.com/authorize";
@@ -66,7 +67,7 @@ async function authFetch(url: string, init: RequestInit, label: string): Promise
 export async function exchangeCodeForTokens(
   cfg: RsoConfig,
   code: string
-): Promise<{ accessToken: string; entitlementsToken: string; puuid: string }> {
+): Promise<{ accessToken: string; idToken: string; entitlementsToken: string; puuid: string }> {
   const tok = await authFetch(
     TOKEN_URL,
     {
@@ -107,12 +108,19 @@ export async function exchangeCodeForTokens(
   const entitlementsToken: string | undefined = ej?.entitlements_token;
   if (!entitlementsToken) throw new UpstreamError("Entitlements response missing entitlements_token.", 403);
 
-  return { accessToken, entitlementsToken, puuid };
+  return { accessToken, idToken: typeof tok?.id_token === "string" ? tok.id_token : "", entitlementsToken, puuid };
 }
 
 export async function handleRsoExchange(code: string, region: Region): Promise<ShowcasePayload> {
   const cfg = getRsoConfig();
   if (!cfg) throw new UpstreamError("RSO is not configured — set RSO_CLIENT_ID and RSO_REDIRECT_URI.", 400);
   const t = await exchangeCodeForTokens(cfg, code);
-  return buildShowcase({ region, accessToken: t.accessToken, entitlementsToken: t.entitlementsToken, puuid: t.puuid });
+  // Auto-detect region (same riot-geo call every other flow uses); fall back to the client's value.
+  const detected = t.idToken ? await detectRegion(t.accessToken, t.idToken) : null;
+  return buildShowcase({
+    region: detected ?? region,
+    accessToken: t.accessToken,
+    entitlementsToken: t.entitlementsToken,
+    puuid: t.puuid,
+  });
 }

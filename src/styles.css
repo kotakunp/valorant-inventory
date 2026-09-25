@@ -258,6 +258,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .cookie-howto summary:hover { color: var(--accent); }
 .cookie-howto ol { margin: 10px 0 6px; padding-left: 18px; line-height: 1.7; }
 .cookie-howto li { margin-bottom: 4px; }
+.cookie-howto li a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.cookie-howto li a:hover { color: #fff; }
 
 .other-ways {
   border-top: 1px solid var(--line);
