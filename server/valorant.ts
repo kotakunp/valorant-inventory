@@ -145,7 +145,7 @@ export function buildStoreSection(
     const tierUuid = typeof skin?.contentTierUuid === "string" ? skin.contentTierUuid.toLowerCase() : "";
     return tierUuid ? catalog.contentTiers.get(tierUuid) ?? null : null;
   };
-  const toOffer = (offer: any, discountPrice?: number | null): StoreOffer | null => {
+  const toOffer = (offer: any, discountPrice?: number | null, discountPercent?: number | null): StoreOffer | null => {
     const raw = offer?.Rewards?.[0]?.ItemID;
     if (typeof raw !== "string" || !raw) return null;
     const skinId = raw.toLowerCase();
@@ -158,6 +158,7 @@ export function buildStoreSection(
       icon: skinArt(entry.skin),
       price: vpFromCost(offer.Cost),
       discountPrice: discountPrice ?? null,
+      discountPercent: discountPercent ?? null,
       owned: ownedIds.has(skinId),
       contentTierRank: tier?.rank ?? null,
       contentTierIcon: tier?.icon ?? null,
@@ -168,11 +169,17 @@ export function buildStoreSection(
     .filter((o: StoreOffer | null): o is StoreOffer => o !== null);
   const seconds = sf?.SkinsPanelLayout?.SingleItemOffersRemainingDurationInSeconds;
   const nmRaw: any[] = Array.isArray(sf?.BonusStore?.BonusStoreOffers) ? sf.BonusStore.BonusStoreOffers : [];
+  // Real BonusStore offer: { Offer, DiscountPercent, DiscountCosts: {vpId: n}, IsSeen } —
+  // there is NO `DiscountPrice` field (older fixtures had it; keep as a fallback).
   const nightMarket = nmRaw
     .filter((o) => !o?.IsTrial)
-    .map((o: any) =>
-      toOffer(o?.Offer, typeof o?.DiscountPrice === "number" ? o.DiscountPrice : null)
-    )
+    .map((o: any) => {
+      const discountPrice =
+        vpFromCost(o?.DiscountCosts) ??
+        (typeof o?.DiscountPrice === "number" ? o.DiscountPrice : null);
+      const discountPercent = typeof o?.DiscountPercent === "number" ? o.DiscountPercent : null;
+      return toOffer(o?.Offer, discountPrice, discountPercent);
+    })
     .filter((o: StoreOffer | null): o is StoreOffer => o !== null);
   // Accessory store: sprays / buddies / cards / titles, priced in Kingdom Credits.
   const toAccessory = (offer: any): AccessoryOffer | null => {

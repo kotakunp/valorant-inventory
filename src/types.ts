@@ -71,6 +71,8 @@ export interface StoreOffer {
   price: number | null;
   /** Night market only: discounted price (standard price stays in `price`). */
   discountPrice?: number | null;
+  /** Night market only: Riot-provided `DiscountPercent` (fallback: computed from prices). */
+  discountPercent?: number | null;
   owned: boolean;
   /** valorant-api content tier rank (0 Select … 4 Ultra); null when unknown. */
   contentTierRank?: number | null;

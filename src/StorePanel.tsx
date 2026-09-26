@@ -43,11 +43,12 @@ function SectionHead({ label, time }: { label: string; time?: string | null }) {
 function SkinCard({ o, nightMarket }: { o: StoreOffer; nightMarket?: boolean }) {
   const art = imgUrl(o.icon);
   const rarity = rarityColor(o.price, 0, o.contentTierRank ?? null);
-  // Night-market discount tag ("-40%"), same math as the struck/discounted prices.
-  const discountPct =
-    nightMarket && o.price != null && o.price > 0 && o.discountPrice != null
+  // Night-market discount tag: Riot sends DiscountPercent; fall back to the price math.
+  const pctFromPrices =
+    o.price != null && o.price > 0 && o.discountPrice != null
       ? Math.round((1 - o.discountPrice / o.price) * 100)
       : null;
+  const discountPct = nightMarket ? o.discountPercent ?? pctFromPrices : null;
   return (
     <article
       className="sstore-card"

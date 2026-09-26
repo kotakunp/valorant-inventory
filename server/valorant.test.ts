@@ -160,7 +160,7 @@ describe("buildStoreSection", () => {
     const out = buildStoreSection(sf, catalog, new Set(["aaa"]));
     expect(out).not.toBeNull();
     expect(out!.offers).toEqual([
-      { skinId: "aaa", name: "Recon Vandal", icon: "https://x/l4.png", price: 1775, discountPrice: null, owned: true, contentTierRank: null, contentTierIcon: null },
+      { skinId: "aaa", name: "Recon Vandal", icon: "https://x/l4.png", price: 1775, discountPrice: null, discountPercent: null, owned: true, contentTierRank: null, contentTierIcon: null },
     ]);
     expect(out!.secondsToReset).toBe(3600);
     expect(out!.nightMarket).toEqual([]);
@@ -171,15 +171,20 @@ describe("buildStoreSection", () => {
     const sf = {
       BonusStore: {
         BonusStoreOffers: [
-          { Offer: { Rewards: [{ ItemID: "ddd" }], Cost: { ...VP, ...{ "85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741": 2175 } } }, DiscountPrice: 1087 },
-          { IsTrial: true, Offer: { Rewards: [{ ItemID: "bbb" }], Cost: VP } },
+          {
+            Offer: { Rewards: [{ ItemID: "ddd" }], Cost: { "85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741": 2175 } },
+            DiscountPercent: 50,
+            DiscountCosts: { "85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741": 1087 },
+            IsSeen: false,
+          },
+          { IsTrial: true, Offer: { Rewards: [{ ItemID: "bbb" }], Cost: VP }, DiscountPercent: 40, DiscountCosts: VP },
         ],
       },
     };
     const out = buildStoreSection(sf, catalog, new Set());
     expect(out!.offers).toEqual([]);
     expect(out!.nightMarket).toEqual([
-      { skinId: "ddd", name: "Night Gun", icon: "https://x/night.png", price: 2175, discountPrice: 1087, owned: false, contentTierRank: 3, contentTierIcon: "https://x/tier3.png" },
+      { skinId: "ddd", name: "Night Gun", icon: "https://x/night.png", price: 2175, discountPrice: 1087, discountPercent: 50, owned: false, contentTierRank: 3, contentTierIcon: "https://x/tier3.png" },
     ]);
     expect(out!.secondsToReset).toBeNull();
   });
