@@ -556,6 +556,19 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   border: 1px solid var(--accent);
   border-radius: 2px;
 }
+/* night-market discount tag on the art, top-left (mirrors the in-game store) */
+.sstore-discount {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 3px 6px;
+  font: 700 10px/1 var(--font-ui);
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 2px;
+  font-variant-numeric: tabular-nums;
+}
 /* fullscreen = showcase only (editor chrome hidden) */
 .preview-area:fullscreen .store-strip { display: none; }
 
