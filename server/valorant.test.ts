@@ -134,7 +134,7 @@ describe("buildStoreSection", () => {
       ["bbb", entry("Prime Vandal", "https://x/prime.png")],
       ["ddd", entry("Night Gun", "https://x/night.png", [], "TIERX")],
     ]),
-    contentTiers: new Map<string, number>([["tierx", 3]]),
+    contentTiers: new Map<string, { rank: number; icon: string | null }>([["tierx", { rank: 3, icon: "https://x/tier3.png" }]]),
     buddies: new Map<string, { name: string; icon: string | null }>([
       ["bud1", { name: "Lil' Buddy", icon: "https://x/buddy.png" }],
     ]),
@@ -160,7 +160,7 @@ describe("buildStoreSection", () => {
     const out = buildStoreSection(sf, catalog, new Set(["aaa"]));
     expect(out).not.toBeNull();
     expect(out!.offers).toEqual([
-      { skinId: "aaa", name: "Recon Vandal", icon: "https://x/l4.png", price: 1775, discountPrice: null, owned: true, contentTierRank: null },
+      { skinId: "aaa", name: "Recon Vandal", icon: "https://x/l4.png", price: 1775, discountPrice: null, owned: true, contentTierRank: null, contentTierIcon: null },
     ]);
     expect(out!.secondsToReset).toBe(3600);
     expect(out!.nightMarket).toEqual([]);
@@ -179,7 +179,7 @@ describe("buildStoreSection", () => {
     const out = buildStoreSection(sf, catalog, new Set());
     expect(out!.offers).toEqual([]);
     expect(out!.nightMarket).toEqual([
-      { skinId: "ddd", name: "Night Gun", icon: "https://x/night.png", price: 2175, discountPrice: 1087, owned: false, contentTierRank: 3 },
+      { skinId: "ddd", name: "Night Gun", icon: "https://x/night.png", price: 2175, discountPrice: 1087, owned: false, contentTierRank: 3, contentTierIcon: "https://x/tier3.png" },
     ]);
     expect(out!.secondsToReset).toBeNull();
   });

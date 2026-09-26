@@ -62,6 +62,8 @@ export interface StoreOffer {
   owned: boolean;
   /** valorant-api content tier rank (0 Select … 4 Ultra); null when unknown. */
   contentTierRank?: number | null;
+  /** Official content-tier gem icon (rarity logo), when the tier is known. */
+  contentTierIcon?: string | null;
 }
 
 /** Account store snapshot captured with the showcase (never exported). */

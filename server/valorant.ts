@@ -141,7 +141,7 @@ export function buildStoreSection(
   ownedIds: ReadonlySet<string>
 ): StoreSection | null {
   if (!sf) return null;
-  const tierRank = (skin: any): number | null => {
+  const tierOf = (skin: any): { rank: number; icon: string | null } | null => {
     const tierUuid = typeof skin?.contentTierUuid === "string" ? skin.contentTierUuid.toLowerCase() : "";
     return tierUuid ? catalog.contentTiers.get(tierUuid) ?? null : null;
   };
@@ -151,6 +151,7 @@ export function buildStoreSection(
     const skinId = raw.toLowerCase();
     const entry = catalog.skins.get(skinId);
     if (!entry) return null;
+    const tier = tierOf(entry.skin);
     return {
       skinId,
       name: typeof entry.skin?.displayName === "string" && entry.skin.displayName ? entry.skin.displayName : "Unknown skin",
@@ -158,7 +159,8 @@ export function buildStoreSection(
       price: vpFromCost(offer.Cost),
       discountPrice: discountPrice ?? null,
       owned: ownedIds.has(skinId),
-      contentTierRank: tierRank(entry.skin),
+      contentTierRank: tier?.rank ?? null,
+      contentTierIcon: tier?.icon ?? null,
     };
   };
   const daily = (sf?.SkinsPanelLayout?.SingleItemStoreOffers ?? [])
@@ -358,7 +360,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
       variantCount: chromas.length,
       isKnife,
       equipped: equippedSkins.has(skinUuid),
-      contentTierRank: tierUuid ? catalog.contentTiers.get(tierUuid) ?? null : null,
+      contentTierRank: tierUuid ? catalog.contentTiers.get(tierUuid)?.rank ?? null : null,
       chromas,
       defaultChromaId,
     });

@@ -24,8 +24,8 @@ export interface Catalog {
   sprays: Map<string, { name: string; icon: string | null }>;
   /** tier index → official badge (latest competitivetiers table). */
   rankTiers: Map<number, RankTierInfo>;
-  /** contentTierUuid → rank (0 Select … 4 Ultra). */
-  contentTiers: Map<string, number>;
+  /** contentTierUuid → rank (0 Select … 4 Ultra) + official tier gem icon. */
+  contentTiers: Map<string, { rank: number; icon: string | null }>;
   /** Uppercase weapon displayName → official default-weapon render (displayIcon). */
   weaponIcons: Map<string, string>;
 }
@@ -63,12 +63,17 @@ function indexRankTiers(raw: any): Map<number, RankTierInfo> {
   return out;
 }
 
-/** contentTierUuid → rank (0 Select … 4 Ultra). */
-function indexContentTiers(raw: any): Map<string, number> {
-  const out = new Map<string, number>();
+/** contentTierUuid → rank (0 Select … 4 Ultra) + official tier gem icon. */
+function indexContentTiers(raw: any): Map<string, { rank: number; icon: string | null }> {
+  const out = new Map<string, { rank: number; icon: string | null }>();
   for (const t of raw?.data ?? []) {
     const id = typeof t?.uuid === "string" ? t.uuid.toLowerCase() : "";
-    if (id && typeof t?.rank === "number") out.set(id, t.rank);
+    if (id && typeof t?.rank === "number") {
+      out.set(id, {
+        rank: t.rank,
+        icon: typeof t.displayIcon === "string" && t.displayIcon ? t.displayIcon : null,
+      });
+    }
   }
   return out;
 }

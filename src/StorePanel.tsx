@@ -55,7 +55,10 @@ function SkinCard({ o, nightMarket }: { o: StoreOffer; nightMarket?: boolean }) 
       <div className="sstore-bar">
         <div className="sstore-meta">
           <span className="sstore-name">{o.name}</span>
-          <span className="sstore-rarity">{rarityLabel(o.price, 0, o.contentTierRank ?? null)}</span>
+          <span className="sstore-rarity">
+            {o.contentTierIcon && <img className="sstore-rarity-gem" src={imgUrl(o.contentTierIcon)!} alt="" />}
+            {rarityLabel(o.price, 0, o.contentTierRank ?? null)}
+          </span>
         </div>
         {nightMarket && o.discountPrice != null ? (
           <span className="sstore-price sstore-price--nm">

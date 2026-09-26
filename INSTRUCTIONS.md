@@ -63,8 +63,9 @@ renders a pixel-faithful loadout preview they can curate and export.
   never exported): game-style rule headers — `DAILY OFFERS` + live
   `HH:MM:SS` rotation countdown, `NIGHT MARKET` (struck standard + accent
   discount) and `ACCESSORIES` (Kingdom-Credit prices) when active. Skin
-  cards show a rarity-tinted outline + rarity label (ULTRA / PREMIUM /
-  SELECT / STANDARD) above the currency-icon price and `OWNED` badge;
+  cards show a rarity-tinted outline + the official tier-gem icon with a
+  rarity label (ULTRA / PREMIUM / SELECT / STANDARD) above the
+  currency-icon price and `OWNED` badge;
   accessory rows scroll horizontally when long. Width tracks the preview
   frame at any zoom.
 
