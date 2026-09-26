@@ -121,19 +121,20 @@ describe("rankBadge", () => {
 
 describe("buildStoreSection", () => {
   const VP = { "85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741": 1775 };
-  const entry = (name: string, icon: string | null, levels: any[] = []) => ({
+  const entry = (name: string, icon: string | null, levels: any[] = [], tier: string | null = null) => ({
     weaponUuid: "w",
     weaponName: "Vandal",
     category: "",
     defaultSkinUuid: null,
-    skin: { displayName: name, displayIcon: icon, levels },
+    skin: { displayName: name, displayIcon: icon, levels, contentTierUuid: tier },
   });
   const catalog = {
     skins: new Map<string, any>([
       ["aaa", entry("Recon Vandal", null, [{ displayIcon: "https://x/l4.png" }])],
       ["bbb", entry("Prime Vandal", "https://x/prime.png")],
-      ["ddd", entry("Night Gun", "https://x/night.png")],
+      ["ddd", entry("Night Gun", "https://x/night.png", [], "TIERX")],
     ]),
+    contentTiers: new Map<string, number>([["tierx", 3]]),
     buddies: new Map<string, { name: string; icon: string | null }>([
       ["bud1", { name: "Lil' Buddy", icon: "https://x/buddy.png" }],
     ]),
@@ -159,7 +160,7 @@ describe("buildStoreSection", () => {
     const out = buildStoreSection(sf, catalog, new Set(["aaa"]));
     expect(out).not.toBeNull();
     expect(out!.offers).toEqual([
-      { skinId: "aaa", name: "Recon Vandal", icon: "https://x/l4.png", price: 1775, discountPrice: null, owned: true },
+      { skinId: "aaa", name: "Recon Vandal", icon: "https://x/l4.png", price: 1775, discountPrice: null, owned: true, contentTierRank: null },
     ]);
     expect(out!.secondsToReset).toBe(3600);
     expect(out!.nightMarket).toEqual([]);
@@ -178,7 +179,7 @@ describe("buildStoreSection", () => {
     const out = buildStoreSection(sf, catalog, new Set());
     expect(out!.offers).toEqual([]);
     expect(out!.nightMarket).toEqual([
-      { skinId: "ddd", name: "Night Gun", icon: "https://x/night.png", price: 2175, discountPrice: 1087, owned: false },
+      { skinId: "ddd", name: "Night Gun", icon: "https://x/night.png", price: 2175, discountPrice: 1087, owned: false, contentTierRank: 3 },
     ]);
     expect(out!.secondsToReset).toBeNull();
   });

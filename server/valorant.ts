@@ -137,10 +137,14 @@ function skinArt(skin: any): string | null {
  */
 export function buildStoreSection(
   sf: any,
-  catalog: Pick<Catalog, "skins" | "buddies" | "cards" | "titles" | "sprays">,
+  catalog: Pick<Catalog, "skins" | "buddies" | "cards" | "titles" | "sprays" | "contentTiers">,
   ownedIds: ReadonlySet<string>
 ): StoreSection | null {
   if (!sf) return null;
+  const tierRank = (skin: any): number | null => {
+    const tierUuid = typeof skin?.contentTierUuid === "string" ? skin.contentTierUuid.toLowerCase() : "";
+    return tierUuid ? catalog.contentTiers.get(tierUuid) ?? null : null;
+  };
   const toOffer = (offer: any, discountPrice?: number | null): StoreOffer | null => {
     const raw = offer?.Rewards?.[0]?.ItemID;
     if (typeof raw !== "string" || !raw) return null;
@@ -154,6 +158,7 @@ export function buildStoreSection(
       price: vpFromCost(offer.Cost),
       discountPrice: discountPrice ?? null,
       owned: ownedIds.has(skinId),
+      contentTierRank: tierRank(entry.skin),
     };
   };
   const daily = (sf?.SkinsPanelLayout?.SingleItemStoreOffers ?? [])

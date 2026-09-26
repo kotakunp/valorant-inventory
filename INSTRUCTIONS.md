@@ -62,10 +62,11 @@ renders a pixel-faithful loadout preview they can curate and export.
 - **Store strip** (under the frame, editor-only — hidden in fullscreen,
   never exported): game-style rule headers — `DAILY OFFERS` + live
   `HH:MM:SS` rotation countdown, `NIGHT MARKET` (struck standard + accent
-  discount) and `ACCESSORIES` (Kingdom-Credit prices) when active. Card
-  rows show art + name + currency-icon price + `OWNED` badge; accessory
-  rows scroll horizontally when long. Width tracks the preview frame at
-  any zoom.
+  discount) and `ACCESSORIES` (Kingdom-Credit prices) when active. Skin
+  cards show a rarity-tinted outline + rarity label (ULTRA / PREMIUM /
+  SELECT / STANDARD) above the currency-icon price and `OWNED` badge;
+  accessory rows scroll horizontally when long. Width tracks the preview
+  frame at any zoom.
 
 ### The showcase itself (this IS the exported image)
 

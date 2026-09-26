@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
+import { rarityColor, rarityLabel } from "./logic";
 import type { AccessoryOffer, StoreOffer, StoreSection } from "./types";
 
 const imgUrl = (u: string | null) => (u ? `/img/${encodeURIComponent(u)}` : null);
 const fmt = (n: number) => n.toLocaleString("en-US");
+
+/** #rrggbb → #rrggbbaa (rarity-tinted card outline). */
+const hexA = (hex: string, a: number) =>
+  `${hex}${Math.round(a * 255).toString(16).padStart(2, "0")}`;
 
 const VP_ICON =
   "https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741/displayicon.png";
@@ -37,13 +42,21 @@ function SectionHead({ label, time }: { label: string; time?: string | null }) {
 
 function SkinCard({ o, nightMarket }: { o: StoreOffer; nightMarket?: boolean }) {
   const art = imgUrl(o.icon);
+  const rarity = rarityColor(o.price, 0, o.contentTierRank ?? null);
   return (
-    <article className="sstore-card" title={o.name}>
+    <article
+      className="sstore-card"
+      title={o.name}
+      style={{ borderColor: hexA(rarity, 0.55), "--rarity": rarity } as React.CSSProperties}
+    >
       <div className="sstore-art">
         {art ? <img src={art} alt="" loading="lazy" /> : <span className="sstore-art-fb">?</span>}
       </div>
       <div className="sstore-bar">
-        <span className="sstore-name">{o.name}</span>
+        <div className="sstore-meta">
+          <span className="sstore-name">{o.name}</span>
+          <span className="sstore-rarity">{rarityLabel(o.price, 0, o.contentTierRank ?? null)}</span>
+        </div>
         {nightMarket && o.discountPrice != null ? (
           <span className="sstore-price sstore-price--nm">
             {o.price != null && <s>{fmt(o.price)}</s>}

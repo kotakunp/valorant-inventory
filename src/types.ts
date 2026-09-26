@@ -60,6 +60,8 @@ export interface StoreOffer {
   /** Night market only: discounted price (standard price stays in `price`). */
   discountPrice?: number | null;
   owned: boolean;
+  /** valorant-api content tier rank (0 Select … 4 Ultra); null when unknown. */
+  contentTierRank?: number | null;
 }
 
 /** Account store snapshot captured with the showcase (never exported). */
