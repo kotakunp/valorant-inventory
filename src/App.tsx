@@ -1208,7 +1208,6 @@ export default function App() {
           {section("card", "Cards", data.cards)}
           {section("title", "Titles", data.titles)}
           {section("buddy", "Buddies", data.buddies)}
-          {data.store && <StorePanel store={data.store} generatedAt={data.generatedAt} />}
         </div>
 
         <div className="preview-area" ref={previewAreaRef}>
@@ -1275,6 +1274,9 @@ export default function App() {
                 />
               </div>
             </div>
+            {data.store && (
+              <StorePanel store={data.store} generatedAt={data.generatedAt} width={Math.round(CANVAS_W * previewScale)} />
+            )}
           </div>
         </div>
       </div>

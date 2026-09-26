@@ -70,6 +70,17 @@ export interface StoreSection {
   secondsToReset: number | null;
   /** Night-market offers (empty when inactive). */
   nightMarket: StoreOffer[];
+  /** Accessory-store offers (sprays/buddies/cards/titles — Kingdom-Credit priced). */
+  accessories: AccessoryOffer[];
+}
+
+export interface AccessoryOffer {
+  id: string;
+  name: string;
+  icon: string | null;
+  kind: "spray" | "buddy" | "card" | "title";
+  /** Kingdom Credits. */
+  price: number | null;
 }
 
 export interface ShowcasePayload {

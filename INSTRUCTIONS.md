@@ -52,10 +52,6 @@ renders a pixel-faithful loadout preview they can curate and export.
     when equipped (label in tooltip). No glow.
   - **Cards / Titles / Buddies** panels: chip rows with checkboxes + prices
     (+ per-section *All / Premium / None*).
-  - **Store** panel (bottom): the account's 4 daily offers with VP prices,
-    `OWNED` tags, and a live `resets in …` countdown; night-market offers
-    below it (struck standard price + discounted price) when active.
-    Snapshot from sign-in — editor-only, never exported.
   - (No FM / PROOF footer-fields panel — removed.)
 - **Preview bar:** download button (with export phase text), page pager
   `◀ 1/N ▶` when multi-page, hint *"Hover a stack to browse its skins"*,
@@ -63,6 +59,13 @@ renders a pixel-faithful loadout preview they can curate and export.
   geometry never changes).
 - **Preview frame:** the live 1280×720 showcase, scaled to fit (or actual
   size / fullscreen on demand).
+- **Store strip** (under the frame, editor-only — hidden in fullscreen,
+  never exported): game-style rule headers — `DAILY OFFERS` + live
+  `HH:MM:SS` rotation countdown, `NIGHT MARKET` (struck standard + accent
+  discount) and `ACCESSORIES` (Kingdom-Credit prices) when active. Card
+  rows show art + name + currency-icon price + `OWNED` badge; accessory
+  rows scroll horizontally when long. Width tracks the preview frame at
+  any zoom.
 
 ### The showcase itself (this IS the exported image)
 

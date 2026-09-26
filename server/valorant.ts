@@ -1,4 +1,4 @@
-import type { ChromaOption, RankBadge, Region, ShowcasePayload, SkinItem, CardItem, TitleItem, BuddyItem, StoreOffer, StoreSection } from "../src/types";
+import type { ChromaOption, RankBadge, Region, ShowcasePayload, SkinItem, CardItem, TitleItem, BuddyItem, StoreOffer, StoreSection, AccessoryOffer } from "../src/types";
 import { getCatalog, getClientVersion, type Catalog } from "./catalog";
 
 export class UpstreamError extends Error {
@@ -26,6 +26,7 @@ const VP_CURRENCY = "85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741";
 const VP_CURRENCY_LEGACY = "85ad13f7-3d1b-512d-6e5d-26b47a83e808";
 const RP_CURRENCY = "e59aa87c-4cbf-517a-5983-6e81511be9b7";
 const RP_CURRENCY_LEGACY = "e046853e-4d7d-4d58-88ad-68b3dcef81a6";
+const KC_CURRENCY = "85ca954a-41f2-ce94-9b45-8ca3dd39a00d";
 
 function vpFromCost(cost: any): number | null {
   if (!cost || typeof cost !== "object") return null;
@@ -34,6 +35,12 @@ function vpFromCost(cost: any): number | null {
   }
   if (typeof cost.valorantPoints === "number") return cost.valorantPoints;
   return null;
+}
+
+/** Kingdom Credits (accessory store). */
+function kcFromCost(cost: any): number | null {
+  if (!cost || typeof cost !== "object") return null;
+  return typeof cost[KC_CURRENCY] === "number" ? cost[KC_CURRENCY] : null;
 }
 
 function statusError(status: number, label: string): UpstreamError {
@@ -110,7 +117,8 @@ export function buildPriceMapFromStorefront(sf: any): Map<string, number> {
   }
   // Night market — use standard Cost, not the discount
   for (const o of sf?.BonusStore?.BonusStoreOffers ?? []) addOffer(o?.Offer);
-  // Accessory store is Kingdom-Credit priced — ignored here (price is VP-only).
+  // Accessory store is Kingdom-Credit priced — excluded from the VP map
+  // (its prices are surfaced separately by buildStoreSection).
   return map;
 }
 
@@ -123,12 +131,13 @@ function skinArt(skin: any): string | null {
 }
 
 /**
- * Daily store + night market from the storefront response (already fetched for
- * the price map). Offers whose item isn't in the catalog are skipped.
+ * Daily store + night market + accessory store from the storefront response
+ * (already fetched for the price map). Skin offers whose item isn't in the
+ * catalog are skipped.
  */
 export function buildStoreSection(
   sf: any,
-  catalog: Pick<Catalog, "skins">,
+  catalog: Pick<Catalog, "skins" | "buddies" | "cards" | "titles" | "sprays">,
   ownedIds: ReadonlySet<string>
 ): StoreSection | null {
   if (!sf) return null;
@@ -158,10 +167,29 @@ export function buildStoreSection(
       toOffer(o?.Offer, typeof o?.DiscountPrice === "number" ? o.DiscountPrice : null)
     )
     .filter((o: StoreOffer | null): o is StoreOffer => o !== null);
+  // Accessory store: sprays / buddies / cards / titles, priced in Kingdom Credits.
+  const toAccessory = (offer: any): AccessoryOffer | null => {
+    const raw = offer?.Rewards?.[0]?.ItemID;
+    if (typeof raw !== "string" || !raw) return null;
+    const id = raw.toLowerCase();
+    const buddy = catalog.buddies.get(id);
+    if (buddy) return { id, name: buddy.name, icon: buddy.icon, kind: "buddy", price: kcFromCost(offer.Cost) };
+    const card = catalog.cards.get(id);
+    if (card) return { id, name: card.name, icon: card.avatar, kind: "card", price: kcFromCost(offer.Cost) };
+    const title = catalog.titles.get(id);
+    if (title) return { id, name: title.name, icon: null, kind: "title", price: kcFromCost(offer.Cost) };
+    const spray = catalog.sprays.get(id);
+    if (spray) return { id, name: spray.name, icon: spray.icon, kind: "spray", price: kcFromCost(offer.Cost) };
+    return null;
+  };
+  const accessories = (sf?.AccessoryStore?.AccessoryStoreOffers ?? [])
+    .map((o: any) => toAccessory(o?.Offer ?? o))
+    .filter((o: AccessoryOffer | null): o is AccessoryOffer => o !== null);
   return {
     offers: daily,
     secondsToReset: typeof seconds === "number" && seconds > 0 ? seconds : null,
     nightMarket,
+    accessories,
   };
 }
 

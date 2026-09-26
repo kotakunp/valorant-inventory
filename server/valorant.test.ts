@@ -134,6 +134,16 @@ describe("buildStoreSection", () => {
       ["bbb", entry("Prime Vandal", "https://x/prime.png")],
       ["ddd", entry("Night Gun", "https://x/night.png")],
     ]),
+    buddies: new Map<string, { name: string; icon: string | null }>([
+      ["bud1", { name: "Lil' Buddy", icon: "https://x/buddy.png" }],
+    ]),
+    cards: new Map<string, { name: string; icon: string | null; avatar: string | null }>(),
+    titles: new Map<string, { name: string; text: string }>([
+      ["ttl1", { name: "Ascendant", text: "Ascendant" }],
+    ]),
+    sprays: new Map<string, { name: string; icon: string | null }>([
+      ["spr1", { name: "GG Spray", icon: "https://x/spray.png" }],
+    ]),
   };
 
   it("parses daily offers + countdown; skips catalog misses", () => {
@@ -153,6 +163,7 @@ describe("buildStoreSection", () => {
     ]);
     expect(out!.secondsToReset).toBe(3600);
     expect(out!.nightMarket).toEqual([]);
+    expect(out!.accessories).toEqual([]);
   });
 
   it("parses night-market discounts and skips trials", () => {
@@ -174,5 +185,27 @@ describe("buildStoreSection", () => {
 
   it("null when storefront missing", () => {
     expect(buildStoreSection(null, catalog, new Set())).toBeNull();
+  });
+
+  it("parses accessory-store offers with KC prices, skips unknown items", () => {
+    const KC = { "85ca954a-41f2-ce94-9b45-8ca3dd39a00d": 4000 };
+    const sf = {
+      AccessoryStore: {
+        AccessoryStoreOffers: [
+          { Offer: { Rewards: [{ ItemTypeID: "dd3bf334-87f3-40bd-b043-682a57a8dc3a", ItemID: "BUD1" }], Cost: KC } },
+          { Offer: { Rewards: [{ ItemTypeID: "037ad50e-51ea-4535-8846-7076d7fe297a", ItemID: "SPR1" }], Cost: KC } },
+          { Offer: { Rewards: [{ ItemTypeID: "de7caa6b-adf7-4588-bbd1-143831e786c6", ItemID: "TTL1" }], Cost: KC } },
+          { Offer: { Rewards: [{ ItemTypeID: "3f296c07-64c3-494c-923b-fe692a4fa1bd", ItemID: "NOPE" }], Cost: KC } },
+        ],
+      },
+    };
+    const out = buildStoreSection(sf, catalog, new Set());
+    expect(out!.accessories).toEqual([
+      { id: "bud1", name: "Lil' Buddy", icon: "https://x/buddy.png", kind: "buddy", price: 4000 },
+      { id: "spr1", name: "GG Spray", icon: "https://x/spray.png", kind: "spray", price: 4000 },
+      { id: "ttl1", name: "Ascendant", icon: null, kind: "title", price: 4000 },
+    ]);
+    expect(out!.offers).toEqual([]);
+    expect(out!.nightMarket).toEqual([]);
   });
 });

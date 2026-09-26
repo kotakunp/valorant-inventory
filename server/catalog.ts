@@ -20,6 +20,8 @@ export interface Catalog {
   cards: Map<string, { name: string; icon: string | null; avatar: string | null }>;
   titles: Map<string, { name: string; text: string }>;
   buddies: Map<string, { name: string; icon: string | null }>;
+  /** spray uuids (root + levels) → name/icon (Accessory store sprays). */
+  sprays: Map<string, { name: string; icon: string | null }>;
   /** tier index → official badge (latest competitivetiers table). */
   rankTiers: Map<number, RankTierInfo>;
   /** contentTierUuid → rank (0 Select … 4 Ultra). */
@@ -73,17 +75,19 @@ function indexContentTiers(raw: any): Map<string, number> {
 
 export async function getCatalog(): Promise<Catalog> {
   if (cache && Date.now() - cache.at < CATALOG_TTL_MS) return cache.data;
-  const [weapons, cards, titles, buddies, ranks, contentTiers] = await Promise.all([
+  const [weapons, cards, titles, buddies, ranks, contentTiers, sprays] = await Promise.all([
     getJson("https://valorant-api.com/v1/weapons"),
     getJson("https://valorant-api.com/v1/playercards"),
     getJson("https://valorant-api.com/v1/playertitles"),
     getJson("https://valorant-api.com/v1/buddies"),
     getJson("https://valorant-api.com/v1/competitivetiers").catch(() => null),
     getJson("https://valorant-api.com/v1/contenttiers").catch(() => null),
+    getJson("https://valorant-api.com/v1/sprays").catch(() => null),
   ]);
   const data: Catalog = {
     skins: new Map(),
     cards: new Map(), titles: new Map(), buddies: new Map(),
+    sprays: new Map(),
     rankTiers: indexRankTiers(ranks),
     contentTiers: indexContentTiers(contentTiers),
     weaponIcons: new Map(),
@@ -141,6 +145,16 @@ export async function getCatalog(): Promise<Catalog> {
     for (const lvl of b.levels ?? []) {
       const id = lc(lvl.uuid);
       if (id) data.buddies.set(id, entry);
+    }
+  }
+  for (const s of sprays?.data ?? []) {
+    const entry = { name: s.displayName, icon: s.displayIcon ?? s.levels?.[0]?.displayIcon ?? null };
+    const root = lc(s.uuid);
+    if (root) data.sprays.set(root, entry);
+    // offers can reference spray level uuids too
+    for (const lvl of s.levels ?? []) {
+      const id = lc(lvl.uuid);
+      if (id) data.sprays.set(id, entry);
     }
   }
   cache = { at: Date.now(), data };
