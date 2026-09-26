@@ -122,6 +122,19 @@ export function buildPriceMapFromStorefront(sf: any): Map<string, number> {
   return map;
 }
 
+/** Standard VP price per content-tier rank (Select 875 → Ultra 2475). */
+const TIER_VP: Record<number, number> = { 0: 875, 1: 1275, 2: 1775, 3: 2175, 4: 2475 };
+
+/**
+ * Catalog-wide VP price: the storefront price when the skin is in today's
+ * store, otherwise the standard price for its content tier. Without this,
+ * only the ~10 items in today's offers would carry a price and any
+ * collection-value total would read as 0.
+ */
+export function tierVpPrice(rank: number | null): number | null {
+  return rank == null ? null : TIER_VP[rank] ?? null;
+}
+
 /** Highest-level skin art: last level displayIcon → skin displayIcon. */
 function skinArt(skin: any): string | null {
   const levels: any[] = Array.isArray(skin?.levels) ? skin.levels : [];
@@ -357,17 +370,18 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
       entry.category.toLowerCase().includes("knife") || /knife|melee/i.test(entry.weaponName);
 
     const tierUuid = typeof entry.skin.contentTierUuid === "string" ? entry.skin.contentTierUuid.toLowerCase() : "";
+    const contentTierRank = tierUuid ? catalog.contentTiers.get(tierUuid)?.rank ?? null : null;
     bySkinUuid.set(skinUuid, {
       id: skinUuid,
       name: entry.skin.displayName ?? "Unknown skin",
       weaponName: entry.weaponName,
       icon: activeChroma?.icon ?? baseIcon,
-      price: pricesAvailable ? priceMap!.get(skinUuid) ?? null : null,
+      price: priceMap?.get(skinUuid) ?? tierVpPrice(contentTierRank),
       levelCount: levels.length,
       variantCount: chromas.length,
       isKnife,
       equipped: equippedSkins.has(skinUuid),
-      contentTierRank: tierUuid ? catalog.contentTiers.get(tierUuid)?.rank ?? null : null,
+      contentTierRank,
       chromas,
       defaultChromaId,
     });

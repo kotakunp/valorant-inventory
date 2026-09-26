@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseEntitlements, parseRanks, rankBadge, buildPriceMapFromStorefront, buildStoreSection } from "./valorant";
+import { parseEntitlements, parseRanks, rankBadge, buildPriceMapFromStorefront, buildStoreSection, tierVpPrice } from "./valorant";
 
 const CARDS = "3f296c07-64c3-494c-923b-fe692a4fa1bd";
 
@@ -213,5 +213,20 @@ describe("buildStoreSection", () => {
     ]);
     expect(out!.offers).toEqual([]);
     expect(out!.nightMarket).toEqual([]);
+  });
+});
+
+describe("tierVpPrice", () => {
+  it("maps content-tier ranks to standard VP", () => {
+    expect(tierVpPrice(0)).toBe(875);
+    expect(tierVpPrice(1)).toBe(1275);
+    expect(tierVpPrice(2)).toBe(1775);
+    expect(tierVpPrice(3)).toBe(2175);
+    expect(tierVpPrice(4)).toBe(2475);
+  });
+
+  it("null / unknown rank → null (battlepass or free skins)", () => {
+    expect(tierVpPrice(null)).toBeNull();
+    expect(tierVpPrice(99)).toBeNull();
   });
 });
