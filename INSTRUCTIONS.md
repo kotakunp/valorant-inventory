@@ -43,8 +43,9 @@ renders a pixel-faithful loadout preview they can curate and export.
   `x/y selected` (+ `density · page i/n` when multi-page), **Switch account**
   button (confirm dialog clears the selection).
 - **Left sidebar (~25%, controls):**
-  - Selection panel: `x selected` + *Premium+ / Select all / Clear* + the note
-    "Premium+ and equipped cosmetics were selected automatically."
+  - Selection panel: `x selected` + *Premium+ / Select all / Clear* + a live
+    collection total (`n VP spent · ~$n`, list prices, hidden when priceless)
+    + the note "Premium+ and equipped cosmetics were selected automatically." 
   - **Skins** panel: count `x/y`, search box, `ALL / SELECTED / EQUIPPED`
     segmented filter, collapsible weapon categories with `LABEL sel/total`
     counts; each cell is art-dominant — **art + name + VP price**, thin
@@ -78,8 +79,8 @@ CENTER                                    │ RIGHT RAIL
 SIDEARMS column (full height)            │ player card (tall art, dominant)
 SMGS over SMGs, then SHOTGUNS            │ RANK: PEAK + CURRENT medallions
 RIFLES column                            │ VP / RP wallet (one row)
-SNIPERS over snipers, then HEAVIES       │ PREMIUM n · KNIFE n · BUDDIES +n
-── MELEE strip (cols 2–4, ~68px) ──      │
+SNIPERS over snipers, then HEAVIES       │ SPENT n VP · ~$n
+── MELEE strip (cols 2–4, ~68px) ──      │ PREMIUM n · KNIFE n · BUDDIES +n
 ```
 
 Must be visible / true:
