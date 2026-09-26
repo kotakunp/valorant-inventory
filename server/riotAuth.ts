@@ -318,7 +318,7 @@ export interface AuthResult {
   region: Region | null;
 }
 
-function subFromIdToken(idToken: string): string | null {
+export function subFromIdToken(idToken: string): string | null {
   try {
     const payload = idToken.split(".")[1];
     if (!payload) return null;
@@ -329,7 +329,7 @@ function subFromIdToken(idToken: string): string | null {
   }
 }
 
-async function requestEntitlements(accessToken: string): Promise<string> {
+export async function requestEntitlements(accessToken: string): Promise<string> {
   let res: Response;
   try {
     res = await fetch(ENTITLEMENTS_URL, {

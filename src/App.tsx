@@ -9,6 +9,7 @@ import { SITEKEY, loadHcaptcha, widgetToken, resetCaptcha, renderCaptcha, fetchC
 import { Showcase, CANVAS_W, CANVAS_H } from "./Showcase";
 import { RemoteBrowserPanel } from "./RemoteBrowser";
 import { StorePanel } from "./StorePanel";
+import { ACCESS_URL_LOGIN_LINK } from "./types";
 
 const REGIONS: Region[] = ["na", "eu", "ap", "kr", "latam", "br"];
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -44,7 +45,7 @@ function takeRemoteCreds(): { username: string; password: string } | undefined {
   return undefined;
 }
 
-type LoadKind = "cookies" | "password" | "mfa" | "auto" | "tokens" | "rso";
+type LoadKind = "cookies" | "password" | "mfa" | "auto" | "url" | "rso";
 
 /** Normalize a pasted cookie string for the API (strip Cookie: header, trim). */
 function normalizeCookiePaste(raw: string): string {
@@ -74,7 +75,7 @@ function humanizeCookieError(msg: string): string {
 }
 
 export default function App() {
-  const [form, setForm] = useState({ region: "na" as Region, accessToken: "", entitlementsToken: "", puuid: "" });
+  const [form, setForm] = useState({ region: "na" as Region, accessUrl: "" });
   const [data, setData] = useState<ShowcasePayload | null>(null);
   const [selection, setSelection] = useState<Selection>({});
   const [chromaSel, setChromaSel] = useState<ChromaSelection>({});
@@ -257,24 +258,28 @@ export default function App() {
     };
   }, [data, captchaNeeded, captchaSolver, captchaChallenge.captchaSessionId, captchaChallenge.rqdata, captchaChallenge.sitekey]);
 
-  async function fetchAccount(e: FormEvent) {
+  async function fetchAccessUrl(e: FormEvent) {
     e.preventDefault();
-    if (!form.accessToken.trim() || !form.entitlementsToken.trim()) {
-      setError("Both the access token and the entitlements token are required for manual mode.");
+    const url = form.accessUrl.trim();
+    if (!url) {
+      setError("Paste the full access URL from the Riot sign-in redirect.");
+      return;
+    }
+    if (!url.includes("#")) {
+      setError("That URL has no #fragment — copy the ENTIRE address bar URL from the redirect page (Riot puts the token after the #).");
+      return;
+    }
+    if (!url.includes("access_token=")) {
+      setError("No access_token in that URL — open the sign-in link in the how-to, log in, then paste the redirect URL.");
       return;
     }
     setError(null);
-    setLoading("tokens");
+    setLoading("url");
     try {
-      const res = await fetch("/api/account", {
+      const res = await fetch("/api/account/access-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          region: form.region,
-          accessToken: form.accessToken,
-          entitlementsToken: form.entitlementsToken,
-          puuid: form.puuid.trim() || undefined,
-        }),
+        body: JSON.stringify({ region: form.region, url }),
       });
       const json = (await res.json().catch(() => ({}))) as ShowcasePayload & { error?: string };
       if (!res.ok || json.error) {
@@ -927,18 +932,6 @@ export default function App() {
           <details className="other-ways">
             <summary>Other sign-in methods ▾</summary>
 
-            <div className="form-row" style={{ marginTop: 12 }}>
-              <div className="form-col">
-                <label>PUUID (optional fallback)</label>
-                <input
-                  type="text"
-                  placeholder="auto-resolved from your access token"
-                  value={form.puuid}
-                  onChange={(e) => setForm({ ...form, puuid: e.target.value })}
-                />
-              </div>
-            </div>
-
             <div className="or-divider">email / password (needs CAPMONSTER on hosted)</div>
             <form onSubmit={submitLogin}>
               {auth.mode !== "mfa" && (
@@ -1054,11 +1047,11 @@ export default function App() {
               with no copying. On the hosted site this falls back to a remote browser.
             </p>
 
-            <div className="or-divider">or paste session tokens manually</div>
-            <form onSubmit={fetchAccount}>
+            <div className="or-divider">or paste the access URL</div>
+            <form onSubmit={fetchAccessUrl}>
               <div className="form-row">
                 <div className="form-col">
-                  <label>Region <span className="label-hint">(auto-detected for cookie sign-in)</span></label>
+                  <label>Region <span className="label-hint">(auto-detected from the URL)</span></label>
                   <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value as Region })}>
                     {REGIONS.map((r) => (
                       <option key={r} value={r}>{r.toUpperCase()}</option>
@@ -1068,28 +1061,43 @@ export default function App() {
               </div>
               <div className="form-row">
                 <div className="form-col">
-                  <label>Access token</label>
+                  <label>Access URL</label>
                   <textarea
                     rows={3}
-                    placeholder="eyJ..."
-                    value={form.accessToken}
-                    onChange={(e) => setForm({ ...form, accessToken: e.target.value })}
+                    spellCheck={false}
+                    placeholder="https://playvalorant.com/opt_in#access_token=…"
+                    value={form.accessUrl}
+                    onChange={(e) => setForm({ ...form, accessUrl: e.target.value })}
                   />
                 </div>
               </div>
-              <div className="form-row">
-                <div className="form-col">
-                  <label>Entitlements token (JWT)</label>
-                  <textarea
-                    rows={3}
-                    placeholder="eyJ..."
-                    value={form.entitlementsToken}
-                    onChange={(e) => setForm({ ...form, entitlementsToken: e.target.value })}
-                  />
-                </div>
-              </div>
+              <details className="cookie-howto">
+                <summary>How do I get the access URL?</summary>
+                <ol>
+                  <li>
+                    Open the{" "}
+                    <a href={ACCESS_URL_LOGIN_LINK} target="_blank" rel="noreferrer noopener">
+                      Riot sign-in link
+                    </a>{" "}
+                    — Riot&apos;s real page, captcha and 2FA included.
+                  </li>
+                  <li>
+                    After signing in you land on <strong>playvalorant.com/opt_in</strong> — a blank
+                    or &quot;404&quot; page is normal, ignore it.
+                  </li>
+                  <li>
+                    Copy the <strong>entire address bar URL</strong>, including everything after{" "}
+                    <code>#</code>.
+                  </li>
+                  <li>Paste it above and hit <strong>Load collection</strong>. Valid ~1 hour.</li>
+                </ol>
+                <p className="note" style={{ marginTop: 6 }}>
+                  The token is used once to mint API tokens in request memory — never stored or
+                  logged. You never type your password here.
+                </p>
+              </details>
               <button className="btn manual" type="submit" disabled={loading !== null}>
-                {loading === "tokens" ? "FETCHING…" : "FETCH WITH PASTED TOKENS"}
+                {loading === "url" ? "FETCHING…" : "LOAD WITH ACCESS URL"}
               </button>
             </form>
             {rso?.configured && (
@@ -1131,7 +1139,7 @@ export default function App() {
     setZoom("fit");
     setExportPhase(null);
     setCookieFailed(false);
-    setForm({ region: form.region, accessToken: "", entitlementsToken: "", puuid: "" });
+    setForm({ region: form.region, accessUrl: "" });
     setCreds({ email: "", password: "", otp: "" });
     setAuth({ mode: "idle", sessionId: "", email: "" });
     setCookieInput("");

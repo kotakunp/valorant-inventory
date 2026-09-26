@@ -12,7 +12,7 @@ A web app that turns a VALORANT account's cosmetics into a **single downloadable
 loadout screen** — for the account owner to attach to a listing or show off.
 Output is a PNG file only: no share links, no gallery, nothing stored.
 
-The user signs in (cookie paste / remote browser / password / token paste / RSO),
+The user signs in (cookie paste / remote browser / password / access URL / RSO),
 the server pulls their inventory from Riot's unofficial endpoints, and the app
 renders a pixel-faithful loadout preview they can curate and export.
 
@@ -21,8 +21,8 @@ renders a pixel-faithful loadout preview they can curate and export.
 1. **Sign-in gate** — dark card, Riot-styled. Primary path first: **browser cookie**
    (`LOAD COLLECTION`, 4-step "Where do I find this?" how-to with a direct link to
    auth.riotgames.com); region is **auto-detected** (Riot Geo) so there is no
-   server picker — only the collapsed token-paste panel keeps one. Everything else
-   under **Other sign-in methods ▾** (remote login, password, tokens, RSO when
+   server picker — only the collapsed access-URL panel keeps one. Everything else
+   under **Other sign-in methods ▾** (remote login, password, access URL, RSO when
    configured). Cookie failures show human-readable copy + **Try again**.
 2. **Workspace** loads with the account's inventory (~75% preview / ~25% sidebar).
    Defaults pre-check premium skins (≥1775 VP / Premium+ tier) and everything

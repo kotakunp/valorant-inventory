@@ -16,18 +16,20 @@
 
 | Source | Provides | Auth |
 |---|---|---|
-| Unofficial Riot **client endpoints** (`pd.{shard}.a.pvp.net`, `auth.riotgames.com`) | Owned skins, cards, titles, buddies; VP/RP wallet; account level; current + peak rank; equipped loadout; VP prices; Riot ID | Pasted `access token` + `entitlements JWT` (per request, never stored) |
+| Unofficial Riot **client endpoints** (`pd.{shard}.a.pvp.net`, `auth.riotgames.com`) | Owned skins, cards, titles, buddies; VP/RP wallet; account level; current + peak rank; equipped loadout; VP prices; Riot ID | Pasted **access URL** (access token; entitlements minted server-side) — per request, never stored |
 | **[valorant-api.com](https://valorant-api.com)** (community API, free) | Static catalog: item display names, icons/images | None (server-side cache, 24h TTL) |
 
 **Why not OAuth (RSO):** Riot's official OAuth only exposes identity (`account-v1`) and match/ranked/status APIs. **No inventory endpoint or scope exists** in the official API, and production keys require manual Riot approval. OAuth may be added later *only* as an identity step; inventory will still use the entitlements flow.
 
-## 3. Auth model (MVP): token paste
+## 3. Auth model: access URL (one paste)
 
-1. User retrieves their **access token** + **entitlements JWT** (well-known community token tools) and picks their **region** (this dropdown is only shown here — all other sign-in flows auto-detect the region).
-2. Form posts `{ region, accessToken, entitlementsToken }` to `POST /api/account`.
-3. Server resolves **PUUID** via `GET https://auth.riotgames.com/userinfo` (Bearer access token). Manual PUUID field as advanced fallback.
+1. User opens the Riot authorize link (`ACCESS_URL_LOGIN_LINK`: `client_id=play-valorant-web-prod`, `redirect_uri=playvalorant.com/opt_in`, `response_type=token id_token`, `scope=account openid`) **in their own browser** — captcha/2FA happen on Riot's real page — and copies the full redirect URL (`playvalorant.com/opt_in#access_token=…&id_token=…`; the token is in the **fragment**, and a 404 page there is normal).
+2. Form posts `{ url, region? }` to `POST /api/account/access-url`. Region is only a fallback — it auto-detects from the tokens (Riot Geo) when possible; PUUID comes from the JWT `sub`.
+3. Server (`server/accessUrl.ts` → `extractAccessUrl`): validates the fragment (rejects missing `#` / missing `access_token` / expired `exp` with copy-paste-friendly errors) → mints the **entitlements JWT** (`POST entitlements.auth.riotgames.com/api/token/v1`, Bearer) → `detectRegion` → `buildShowcase`.
 4. Tokens live in request memory only: never logged, never persisted, discarded when the response is sent.
 5. Server performs all `pd.*` calls (browsers cannot: no CORS headers on Riot endpoints).
+
+Legacy two-token paste: `POST /api/account` still accepts `{region, accessToken, entitlementsToken, puuid?}` (the old manual panel was replaced by the access-URL panel).
 
 **Region → shard map:** `latam→na, br→na, na→na, eu→eu, ap→ap, kr→kr`.
 
@@ -128,7 +130,8 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /api/account` | `{region, accessToken, entitlementsToken, puuid?}` → joined showcase payload |
+| `POST /api/account` | `{region, accessToken, entitlementsToken, puuid?}` → joined showcase payload (legacy) |
+| `POST /api/account/access-url` | `{url, region?}` → extract fragment token, mint entitlements, auto region/PUUID → showcase payload |
 | `GET /img/:url` | Image proxy, **allowlist `media.valorant-api.com` only** |
 | `GET /api/health` | Liveness |
 | `GET /*` | Frontend (dev: Vite proxy → Express `:3001`) |

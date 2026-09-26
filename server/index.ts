@@ -4,7 +4,8 @@ import fs from "node:fs";
 import { buildShowcase, UpstreamError } from "./valorant";
 import type { Region } from "../src/types";
 import { getRsoConfig, buildAuthorizeUrl, handleRsoExchange } from "./rso";
-import { startLogin, submitMfa, rateLimit, AuthFlowError, loginWithCookies, normalizeRegion, requestCaptchaChallenge, parseCookieInput } from "./riotAuth";
+import { startLogin, submitMfa, rateLimit, AuthFlowError, loginWithCookies, normalizeRegion, requestCaptchaChallenge, parseCookieInput, detectRegion, requestEntitlements, subFromIdToken } from "./riotAuth";
+import { extractAccessUrl } from "./accessUrl";
 import { autoLoginWithBrowser } from "./browserLogin";
 import {
   startRemoteBrowser,
@@ -29,6 +30,36 @@ app.use(express.json({ limit: "32kb" }));
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, at: new Date().toISOString() });
+});
+
+// One-paste sign-in: user pastes the Riot redirect URL (#access_token=…) —
+// the server mints entitlements + resolves region/PUUID from it (never stored).
+app.post("/api/account/access-url", async (req, res) => {
+  const { url, region } = req.body ?? {};
+  try {
+    const { accessToken, idToken } = extractAccessUrl(url);
+    const entitlementsToken = await requestEntitlements(accessToken);
+    const detected = await detectRegion(accessToken, idToken);
+    const resolved = detected ?? normalizeRegion(region) ?? "na";
+    const payload = await buildShowcase({
+      region: resolved,
+      accessToken,
+      entitlementsToken,
+      puuid: subFromIdToken(idToken || accessToken) ?? undefined,
+    });
+    res.json(payload);
+  } catch (e) {
+    if (e instanceof AuthFlowError) {
+      res.status(e.status).json({ error: e.message });
+      return;
+    }
+    if (e instanceof UpstreamError) {
+      res.status(e.httpStatus).json({ error: e.message });
+      return;
+    }
+    console.error("[api/account/access-url] internal error:", e instanceof Error ? e.message : e);
+    res.status(500).json({ error: "Internal error while building the showcase." });
+  }
 });
 
 app.post("/api/account", async (req, res) => {

@@ -52,6 +52,18 @@ export interface BuddyItem {
 }
 
 /** One row in the account's store (daily offer or night-market offer). */
+/**
+ * Riot authorize link for one-paste sign-in: lands on playvalorant.com/opt_in
+ * with `access_token`/`id_token` in the URL fragment (implicit flow).
+ */
+export const ACCESS_URL_LOGIN_LINK =
+  "https://auth.riotgames.com/authorize" +
+  "?client_id=play-valorant-web-prod" +
+  "&redirect_uri=https%3A%2F%2Fplayvalorant.com%2Fopt_in" +
+  "&response_type=token%20id_token" +
+  "&scope=account%20openid" +
+  "&nonce=1";
+
 export interface StoreOffer {
   skinId: string;
   name: string;
