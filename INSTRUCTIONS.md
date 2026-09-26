@@ -61,8 +61,9 @@ renders a pixel-faithful loadout preview they can curate and export.
   size / fullscreen on demand).
 - **Store strip** (under the frame, editor-only — hidden in fullscreen,
   never exported): game-style rule headers — `DAILY OFFERS` + live
-  `HH:MM:SS` rotation countdown, `NIGHT MARKET` (struck standard + accent
-  discount) and `ACCESSORIES` (Kingdom-Credit prices) when active. Skin
+  `HH:MM:SS` rotation countdown, `NIGHT MARKET` (accent `−N%` tag, struck
+  standard + discounted price) and `ACCESSORIES` (Kingdom-Credit prices)
+  when active. Skin
   cards show a rarity-tinted outline + the official tier-gem icon with a
   rarity label (ULTRA / PREMIUM / SELECT / STANDARD) above the
   currency-icon price and `OWNED` badge;
