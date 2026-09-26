@@ -105,8 +105,8 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 ├─────────────────────────────────────────────┬───────────────────────┤
 │ COLLECTION COLUMNS                         │ PLAYER CARD (dominant)│
 │ SIDEARMS│SMGS│SHOTGUNS │RIFLES│SNIPERS│HEAVIES │ tall art panel       │
-│ col1 spans full height (incl. melee band)  │ RANK block            │
-│ section titles sit on their own groups     │  PEAK / CURRENT rows  │
+│ col1 spans full height (incl. melee band)  │ RANK medallions       │
+│ section titles sit on their own groups     │  PEAK + CURRENT       │
 │ hover stack → spread (outside the canvas)    │ VP / RP wallet row    │
 │ ── MELEE (cols 2–4, ~68px, lighter) ──     │ PREMIUM n · KNIFE n   │
 │                                             │  · BUDDIES +n        │
@@ -121,7 +121,7 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 - **Hover spread:** pointer entry or keyboard focus on a weapon reveals all its selected skins beside the stack. Each row has a fixed large target, name, artwork, variants, front and remove actions. Only artwork scales on hover, never the hit target. A 180ms leave delay bridges the gap to the spread. Long lists scroll; position is clamped within the viewport. Escape, resize, or scrolling outside the spread dismisses it. Touch can tap the same target. No separate inspector or click-to-edit flow. Export instances render no hover targets or portals.
 
 - **Empty slots always rendered** for official guns (and empty MELEE strip) — the official default-weapon render at low opacity (`defaultIcons`), no border, no `+`/labels; matches VALORANT loadout.
-- **Right rail:** player card dominates (official 268:640 art ratio) → single compact **RANK** block (PEAK + CURRENT rows, tier icon + name + color) → wallet as one horizontal VP/RP row → one summary line `PREMIUM n · KNIFE n · BUDDIES +n`. No per-stat cards. Skins grid takes full remaining width (no left rail). No footer bar.
+- **Right rail:** player card dominates (official 268:640 art ratio) → side-by-side **rank medallions** (PEAK + CURRENT panels: caret label, bordered tier-icon badge in tier color, tier name below) → wallet as one horizontal VP/RP row → one summary line `PREMIUM n · KNIFE n · BUDDIES +n`. No per-stat cards. Skins grid takes full remaining width (no left rail). No footer bar.
 - **Knives:** always a dedicated full-width bottom strip (each knife its own cell); never overflow into the gun grid.
 - **Stacking:** same gun's skins are layered in one cell; hover reveals individually hoverable skins in the spread. Art outline uses the skin's **rarity color** (`--rarity` set per item from `rarityColor()` → multi-`drop-shadow` on `.sc-stack-art`); hovering a spread row highlights its artwork without shifting targets.
 - Page indicator `1/2` bottom-right when multi-page.

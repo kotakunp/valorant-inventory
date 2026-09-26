@@ -76,7 +76,7 @@ renders a pixel-faithful loadout preview they can curate and export.
 HEADER      Riot ID #TAG · LV n · region · equipped title
 CENTER                                    │ RIGHT RAIL
 SIDEARMS column (full height)            │ player card (tall art, dominant)
-SMGS over SMGs, then SHOTGUNS            │ RANK block: PEAK / CURRENT rows
+SMGS over SMGs, then SHOTGUNS            │ RANK: PEAK + CURRENT medallions
 RIFLES column                            │ VP / RP wallet (one row)
 SNIPERS over snipers, then HEAVIES       │ PREMIUM n · KNIFE n · BUDDIES +n
 ── MELEE strip (cols 2–4, ~68px) ──      │

@@ -86,23 +86,30 @@ function CurrencyIcon({ src, alt }: { src: string; alt: string }) {
   return <img className="sc-wallet-icon" src={imgUrl(src) ?? undefined} alt={alt} />;
 }
 
-/** One compact row inside the rail's single RANK block (§11). */
-function RankRow({ label, tier, badge }: { label: string; tier: number | null; badge?: RankBadge | null }) {
+/** Rank medallion panel in the rail (bordered tier badge + tier-colored name). */
+function Medallion({ label, tier, badge }: { label: string; tier: number | null; badge?: RankBadge | null }) {
   const info = tierInfo(tier);
   const name = badge?.name ?? info.name;
   const color = badge?.color ?? info.color;
   const icon = badge?.icon ?? null;
   return (
-    <div className="sc-rank-row">
-      <span className="sc-rank-tag">{label}</span>
-      {icon ? (
-        <img className="sc-rank-icon" src={imgUrl(icon)!} alt="" />
-      ) : (
-        <span className="sc-rank-dot" style={{ background: color }} aria-hidden="true" />
-      )}
-      <span className="sc-rank-name" style={{ color }}>
+    <div className="sc-rank-panel">
+      <div className="sc-medal-label">
+        <span className="sc-rank-caret" aria-hidden="true" />
+        {label}
+      </div>
+      <div className="sc-medal-badge" style={{ borderColor: color }}>
+        {icon ? (
+          <img className="sc-medal-icon" src={imgUrl(icon)!} alt={name} title={name} />
+        ) : (
+          <span className="sc-medal-fallback" style={{ color }}>
+            {name}
+          </span>
+        )}
+      </div>
+      <div className="sc-medal-name" style={{ color }}>
         {name}
-      </span>
+      </div>
     </div>
   );
 }
@@ -343,10 +350,9 @@ export function Showcase({
               {checkedCards.length > 1 && <div className="sc-more">+{checkedCards.length - 1} MORE</div>}
             </div>
           )}
-          <div className="sc-rank-block">
-            <div className="sc-rank-block-label">RANK</div>
-            <RankRow label="PEAK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
-            <RankRow label="CURRENT" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
+          <div className="sc-ranks">
+            <Medallion label="PEAK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
+            <Medallion label="CURRENT" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
           </div>
           {(payload.wallet.vp != null || payload.wallet.rp != null) && (
             <div className="sc-wallet">

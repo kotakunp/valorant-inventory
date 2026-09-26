@@ -1047,58 +1047,79 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   padding: 6px 28px 8px;
   min-height: 0;
 }
-/* single compact RANK block (§11): label + peak/current rows */
-.sc-rank-block {
+/* rank medallions: PEAK + CURRENT side-by-side panels (pre-spec design) */
+.sc-ranks {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.sc-ranks .sc-rank-panel {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 4px 8px;
+}
+.sc-rank-panel {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
   clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-  padding: 6px 9px 7px;
   flex-shrink: 0;
 }
-.sc-rank-block-label {
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  color: var(--accent);
-  margin-bottom: 3px;
-}
-.sc-rank-row {
+.sc-medal-label {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 2px 0;
-}
-.sc-rank-tag {
+  justify-content: center;
+  gap: 4px;
   font-size: 8px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.1em;
-  color: var(--muted);
-  width: 46px;
-  flex-shrink: 0;
+  color: var(--accent);
+  text-align: center;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
 }
-.sc-rank-icon {
-  width: 15px;
-  height: 15px;
+.sc-rank-caret {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--accent);
+}
+.sc-medal-badge {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.12));
+}
+.sc-medal-icon {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  flex-shrink: 0;
   display: block;
+  /* export-safe: no CSS filters that can fail to rasterize */
 }
-.sc-rank-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.sc-rank-name {
+.sc-medal-fallback {
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  padding: 0 4px;
+}
+.sc-medal-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  text-align: center;
   line-height: 1.1;
   letter-spacing: 0.04em;
+  margin-top: 3px;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
 }
 /* wallet as one horizontal row (§11) */
 .sc-wallet { display: flex; flex-direction: row; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
