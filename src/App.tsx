@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, type FormEvent, type CSSPropertie
 import { toPng } from "html-to-image";
 import type { ChromaSelection, ItemKind, Region, Selection, ShowcasePayload, SkinItem } from "./types";
 import { selKey } from "./types";
-import { buildSelection, groupByGun, isPremiumSkin, paginate, rarityColor } from "./logic";
+import { buildSelection, collectionValue, groupByGun, isPremiumSkin, paginate, rarityColor, vpToUsd } from "./logic";
 import type { AnyItem } from "./logic";
 import { makeState, parseCallback, RSO_STATE_KEY, RSO_REGION_KEY } from "./rso";
 import { SITEKEY, loadHcaptcha, widgetToken, resetCaptcha, renderCaptcha, fetchCaptchaChallenge } from "./captcha";
@@ -1124,6 +1124,8 @@ export default function App() {
   }
 
   const shownCount = pages.totalSelected - pages.truncated;
+  // Live collection total (list prices) for the selection panel.
+  const selVp = data ? collectionValue(data, selection) : 0;
 
   const resetAccount = () => {
     setData(null);
@@ -1203,6 +1205,11 @@ export default function App() {
               <button className="btn ghost" onClick={() => allSections("all")}>Select all</button>
               <button className="btn ghost" onClick={() => allSections("none")}>Clear</button>
             </div>
+            {selVp > 0 && (
+              <p className="sel-value">
+                <strong>{fmt(selVp)} VP</strong> spent · ~${fmt(vpToUsd(selVp))}
+              </p>
+            )}
             <p className="note" style={{ marginTop: 0 }}>
               Premium+ and equipped cosmetics were selected automatically.
             </p>

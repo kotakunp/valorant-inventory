@@ -1573,6 +1573,17 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   color: var(--muted);
 }
 .sc-summary span[aria-hidden] { color: var(--faint); }
+/* SPENT line: numbers pop, label stays muted */
+.sc-value strong { color: var(--text); font-weight: 400; }
+
+/* sidebar: live collection total under the selection tools */
+.sel-value {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sel-value strong { color: var(--accent); font-weight: 700; }
 
 /* column loadout: sidearms has 6 rows — keep gun labels compact */
 .sc-cat-col .sc-cat-name { font-size: 12px; }

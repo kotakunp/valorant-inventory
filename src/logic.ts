@@ -171,6 +171,11 @@ export function collectionValue(payload: ShowcasePayload, sel: Selection): numbe
   return total;
 }
 
+/** Estimate USD for VP at the base tier (1,000 VP = $9.99), whole dollars. */
+export function vpToUsd(vp: number): number {
+  return Math.round(vp * 0.00999);
+}
+
 export function rarityColor(
   price: number | null,
   levelCount = 0,

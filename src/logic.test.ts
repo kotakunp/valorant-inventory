@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, orderStack, paginate, rarityColor, rarityLabel, skinTierScore, stackDirectionForColumn, stackLayers, stackSteps, STACK_SPREAD, tierInfo, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
+import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, orderStack, paginate, rarityColor, rarityLabel, skinTierScore, stackDirectionForColumn, stackLayers, stackSteps, STACK_SPREAD, tierInfo, vpToUsd, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
 import type { CardItem, ShowcasePayload, SkinItem } from "./types";
 import { selKey } from "./types";
 
@@ -350,5 +350,11 @@ describe("presentation helpers", () => {
     expect(sel["skin:b"]).toBe(false);
     expect(sel["card:c"]).toBe(true);
     expect(collectionValue(payload, sel)).toBe(1775 + 375);
+  });
+
+  it("vpToUsd estimates dollars at the base tier (1000 VP = $9.99)", () => {
+    expect(vpToUsd(0)).toBe(0);
+    expect(vpToUsd(1000)).toBe(10);
+    expect(vpToUsd(45230)).toBe(452);
   });
 });

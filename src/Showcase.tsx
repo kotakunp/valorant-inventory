@@ -6,12 +6,14 @@ import type { GunGroup, Pages, StackDirection, StackLayer } from "./logic";
 import {
   WEAPON_CATEGORIES,
   LOADOUT_GUNS,
+  collectionValue,
   orderStack,
   rarityColor,
   stackDirectionForColumn,
   stackLayers,
   tierInfo,
   isPremiumSkin,
+  vpToUsd,
 } from "./logic";
 
 export const CANVAS_W = 1280;
@@ -159,6 +161,8 @@ export function Showcase({
   // Shared premium rule (price / content tier / level fallback) — matches selection.
   const premCount = checkedSkins.filter((s) => isPremiumSkin(s)).length;
   const knifeCount = checkedSkins.filter((s) => s.isKnife).length;
+  // Collection value of the checked items (list prices; hidden when 0 / priceless).
+  const totalVp = collectionValue(payload, selection);
   const checkedCards = payload.cards.filter((c) => isOn("card", c.id));
   const checkedTitles = payload.titles.filter((t) => isOn("title", t.id));
   const checkedBuddies = payload.buddies.filter((b) => isOn("buddy", b.id));
@@ -368,6 +372,15 @@ export function Showcase({
                   {fmt(payload.wallet.rp)}
                 </span>
               )}
+            </div>
+          )}
+          {totalVp > 0 && (
+            <div className="sc-summary sc-value">
+              <span>SPENT</span>
+              <span aria-hidden="true">·</span>
+              <strong>{fmt(totalVp)} VP</strong>
+              <span aria-hidden="true">·</span>
+              <strong>~${fmt(vpToUsd(totalVp))}</strong>
             </div>
           )}
           <div className="sc-summary">
