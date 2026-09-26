@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseEntitlements, parseRanks, rankBadge, buildPriceMapFromStorefront } from "./valorant";
+import { parseEntitlements, parseRanks, rankBadge, buildPriceMapFromStorefront, buildStoreSection } from "./valorant";
 
 const CARDS = "3f296c07-64c3-494c-923b-fe692a4fa1bd";
 
@@ -116,5 +116,63 @@ describe("rankBadge", () => {
   it("null tier or unknown tier → null", () => {
     expect(rankBadge(null, tiers)).toBeNull();
     expect(rankBadge(99, tiers)).toBeNull();
+  });
+});
+
+describe("buildStoreSection", () => {
+  const VP = { "85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741": 1775 };
+  const entry = (name: string, icon: string | null, levels: any[] = []) => ({
+    weaponUuid: "w",
+    weaponName: "Vandal",
+    category: "",
+    defaultSkinUuid: null,
+    skin: { displayName: name, displayIcon: icon, levels },
+  });
+  const catalog = {
+    skins: new Map<string, any>([
+      ["aaa", entry("Recon Vandal", null, [{ displayIcon: "https://x/l4.png" }])],
+      ["bbb", entry("Prime Vandal", "https://x/prime.png")],
+      ["ddd", entry("Night Gun", "https://x/night.png")],
+    ]),
+  };
+
+  it("parses daily offers + countdown; skips catalog misses", () => {
+    const sf = {
+      SkinsPanelLayout: {
+        SingleItemStoreOffers: [
+          { Rewards: [{ ItemID: "AAA" }], Cost: VP },
+          { Rewards: [{ ItemID: "MISSING" }], Cost: VP },
+        ],
+        SingleItemOffersRemainingDurationInSeconds: 3600,
+      },
+    };
+    const out = buildStoreSection(sf, catalog, new Set(["aaa"]));
+    expect(out).not.toBeNull();
+    expect(out!.offers).toEqual([
+      { skinId: "aaa", name: "Recon Vandal", icon: "https://x/l4.png", price: 1775, discountPrice: null, owned: true },
+    ]);
+    expect(out!.secondsToReset).toBe(3600);
+    expect(out!.nightMarket).toEqual([]);
+  });
+
+  it("parses night-market discounts and skips trials", () => {
+    const sf = {
+      BonusStore: {
+        BonusStoreOffers: [
+          { Offer: { Rewards: [{ ItemID: "ddd" }], Cost: { ...VP, ...{ "85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741": 2175 } } }, DiscountPrice: 1087 },
+          { IsTrial: true, Offer: { Rewards: [{ ItemID: "bbb" }], Cost: VP } },
+        ],
+      },
+    };
+    const out = buildStoreSection(sf, catalog, new Set());
+    expect(out!.offers).toEqual([]);
+    expect(out!.nightMarket).toEqual([
+      { skinId: "ddd", name: "Night Gun", icon: "https://x/night.png", price: 2175, discountPrice: 1087, owned: false },
+    ]);
+    expect(out!.secondsToReset).toBeNull();
+  });
+
+  it("null when storefront missing", () => {
+    expect(buildStoreSection(null, catalog, new Set())).toBeNull();
   });
 });

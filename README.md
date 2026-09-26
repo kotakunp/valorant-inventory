@@ -33,7 +33,7 @@ src/                      # React frontend (Vite + TS)
   logic.test.ts           # UI-logic tests
   styles.css              # all styles; fixed 1280×720 `.sc-root` canvas
   types.ts                # SkinItem, ShowcasePayload, …
-  rso.ts, captcha.ts, RemoteBrowser.tsx
+  rso.ts, captcha.ts, RemoteBrowser.tsx, StorePanel.tsx
 server/                   # Express (tsx, no build step)
   index.ts                # routes + /img proxy + static dist/ in production
   valorant.ts             # Riot pipeline: entitlements/storefront/wallet/MMR → buildShowcase

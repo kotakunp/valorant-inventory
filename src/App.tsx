@@ -8,6 +8,7 @@ import { makeState, parseCallback, RSO_STATE_KEY, RSO_REGION_KEY } from "./rso";
 import { SITEKEY, loadHcaptcha, widgetToken, resetCaptcha, renderCaptcha, fetchCaptchaChallenge } from "./captcha";
 import { Showcase, CANVAS_W, CANVAS_H } from "./Showcase";
 import { RemoteBrowserPanel } from "./RemoteBrowser";
+import { StorePanel } from "./StorePanel";
 
 const REGIONS: Region[] = ["na", "eu", "ap", "kr", "latam", "br"];
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -1207,6 +1208,7 @@ export default function App() {
           {section("card", "Cards", data.cards)}
           {section("title", "Titles", data.titles)}
           {section("buddy", "Buddies", data.buddies)}
+          {data.store && <StorePanel store={data.store} generatedAt={data.generatedAt} />}
         </div>
 
         <div className="preview-area" ref={previewAreaRef}>

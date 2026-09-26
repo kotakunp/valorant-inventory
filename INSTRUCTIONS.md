@@ -52,6 +52,10 @@ renders a pixel-faithful loadout preview they can curate and export.
     when equipped (label in tooltip). No glow.
   - **Cards / Titles / Buddies** panels: chip rows with checkboxes + prices
     (+ per-section *All / Premium / None*).
+  - **Store** panel (bottom): the account's 4 daily offers with VP prices,
+    `OWNED` tags, and a live `resets in …` countdown; night-market offers
+    below it (struck standard price + discounted price) when active.
+    Snapshot from sign-in — editor-only, never exported.
   - (No FM / PROOF footer-fields panel — removed.)
 - **Preview bar:** download button (with export phase text), page pager
   `◀ 1/N ▶` when multi-page, hint *"Hover a stack to browse its skins"*,

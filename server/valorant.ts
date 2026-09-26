@@ -1,5 +1,5 @@
-import type { ChromaOption, RankBadge, Region, ShowcasePayload, SkinItem, CardItem, TitleItem, BuddyItem } from "../src/types";
-import { getCatalog, getClientVersion } from "./catalog";
+import type { ChromaOption, RankBadge, Region, ShowcasePayload, SkinItem, CardItem, TitleItem, BuddyItem, StoreOffer, StoreSection } from "../src/types";
+import { getCatalog, getClientVersion, type Catalog } from "./catalog";
 
 export class UpstreamError extends Error {
   constructor(message: string, readonly httpStatus = 502) {
@@ -112,6 +112,57 @@ export function buildPriceMapFromStorefront(sf: any): Map<string, number> {
   for (const o of sf?.BonusStore?.BonusStoreOffers ?? []) addOffer(o?.Offer);
   // Accessory store is Kingdom-Credit priced — ignored here (price is VP-only).
   return map;
+}
+
+/** Highest-level skin art: last level displayIcon → skin displayIcon. */
+function skinArt(skin: any): string | null {
+  const levels: any[] = Array.isArray(skin?.levels) ? skin.levels : [];
+  const last = levels.length ? levels[levels.length - 1]?.displayIcon : null;
+  if (typeof last === "string" && last) return last;
+  return typeof skin?.displayIcon === "string" && skin.displayIcon ? skin.displayIcon : null;
+}
+
+/**
+ * Daily store + night market from the storefront response (already fetched for
+ * the price map). Offers whose item isn't in the catalog are skipped.
+ */
+export function buildStoreSection(
+  sf: any,
+  catalog: Pick<Catalog, "skins">,
+  ownedIds: ReadonlySet<string>
+): StoreSection | null {
+  if (!sf) return null;
+  const toOffer = (offer: any, discountPrice?: number | null): StoreOffer | null => {
+    const raw = offer?.Rewards?.[0]?.ItemID;
+    if (typeof raw !== "string" || !raw) return null;
+    const skinId = raw.toLowerCase();
+    const entry = catalog.skins.get(skinId);
+    if (!entry) return null;
+    return {
+      skinId,
+      name: typeof entry.skin?.displayName === "string" && entry.skin.displayName ? entry.skin.displayName : "Unknown skin",
+      icon: skinArt(entry.skin),
+      price: vpFromCost(offer.Cost),
+      discountPrice: discountPrice ?? null,
+      owned: ownedIds.has(skinId),
+    };
+  };
+  const daily = (sf?.SkinsPanelLayout?.SingleItemStoreOffers ?? [])
+    .map((o: any) => toOffer(o))
+    .filter((o: StoreOffer | null): o is StoreOffer => o !== null);
+  const seconds = sf?.SkinsPanelLayout?.SingleItemOffersRemainingDurationInSeconds;
+  const nmRaw: any[] = Array.isArray(sf?.BonusStore?.BonusStoreOffers) ? sf.BonusStore.BonusStoreOffers : [];
+  const nightMarket = nmRaw
+    .filter((o) => !o?.IsTrial)
+    .map((o: any) =>
+      toOffer(o?.Offer, typeof o?.DiscountPrice === "number" ? o.DiscountPrice : null)
+    )
+    .filter((o: StoreOffer | null): o is StoreOffer => o !== null);
+  return {
+    offers: daily,
+    secondsToReset: typeof seconds === "number" && seconds > 0 ? seconds : null,
+    nightMarket,
+  };
 }
 
 export function parseRanks(body: any): { current: number | null; peak: number | null } {
@@ -258,8 +309,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
       (equippedChroma && chromas.some((c) => c.id === equippedChroma) && equippedChroma) ||
       chromas[0]?.id ||
       null;
-    const baseIcon =
-      (levels.length ? levels[levels.length - 1]?.displayIcon : null) ?? entry.skin.displayIcon ?? null;
+    const baseIcon = skinArt(entry.skin);
     const activeChroma = chromas.find((c) => c.id === defaultChromaId);
     const isKnife =
       entry.category.toLowerCase().includes("knife") || /knife|melee/i.test(entry.weaponName);
@@ -338,6 +388,9 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
 
   const name0 = Array.isArray(nameBody) ? nameBody[0] : null;
   const parsedRanks = parseRanks(mmrBody);
+  const store = storefrontBody
+    ? buildStoreSection(storefrontBody, catalog, new Set(bySkinUuid.keys()))
+    : null;
 
   return {
     puuid,
@@ -355,6 +408,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     pricesAvailable,
     // Uppercase gun label → official default-weapon render (empty-slot art).
     defaultIcons: Object.fromEntries(catalog.weaponIcons),
+    store,
     generatedAt: new Date().toISOString(),
   };
 }

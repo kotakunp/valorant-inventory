@@ -72,7 +72,7 @@ Every item is a **checkbox** (sidebar selection panels). Preview skins **do not 
 - Selection = in-memory UI state only; nothing persisted.
 - **Collection value** footer = Σ VP prices of *checked* items.
 
-**Editor workspace (never exported):** grid split ≈ 75% preview / 25% sidebar. Top bar: `COLLECTION` · `Name#TAG · LV. n · REGION` · `x/y selected` · `density · page i/n` (only when multi-page) · **Switch account** (confirm dialog → clears selection). Preview toolbar: export button (phase labels, §7), pager `◀ 1/N ▶` when multi-page, hint text, and **Fit / 100% / Fullscreen** zoom controls (editor-only — the export canvas stays fixed 1280×720).
+**Editor workspace (never exported):** grid split ≈ 75% preview / 25% sidebar. Top bar: `COLLECTION` · `Name#TAG · LV. n · REGION` · `x/y selected` · `density · page i/n` (only when multi-page) · **Switch account** (confirm dialog → clears selection). Preview toolbar: export button (phase labels, §7), pager `◀ 1/N ▶` when multi-page, hint text, and **Fit / 100% / Fullscreen** zoom controls (editor-only — the export canvas stays fixed 1280×720). Sidebar ends with a **Store** panel: the account's 4 daily offers (art + VP price + `OWNED` tag) with a live `resets in …` countdown, plus night-market discounts when active — parsed from the storefront already fetched for pricing (`store` on the payload; editor-only).
 
 **MMR parsing:** current tier = `LatestCompetitiveUpdate.TierAfterUpdate` (fallback: latest season's `CompetitiveTier`); peak tier = max `CompetitiveTier` across all seasons in `QueueSkills.competitive.SeasonalInfoBySeasonID`.
 

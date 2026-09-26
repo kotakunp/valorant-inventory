@@ -51,6 +51,27 @@ export interface BuddyItem {
   equipped: boolean;
 }
 
+/** One row in the account's store (daily offer or night-market offer). */
+export interface StoreOffer {
+  skinId: string;
+  name: string;
+  icon: string | null;
+  price: number | null;
+  /** Night market only: discounted price (standard price stays in `price`). */
+  discountPrice?: number | null;
+  owned: boolean;
+}
+
+/** Account store snapshot captured with the showcase (never exported). */
+export interface StoreSection {
+  /** Daily rotational store (4 offers). */
+  offers: StoreOffer[];
+  /** Seconds until the daily rotation, as of `generatedAt`. */
+  secondsToReset: number | null;
+  /** Night-market offers (empty when inactive). */
+  nightMarket: StoreOffer[];
+}
+
 export interface ShowcasePayload {
   puuid: string;
   gameName: string;
@@ -66,6 +87,8 @@ export interface ShowcasePayload {
   pricesAvailable: boolean;
   /** Uppercase gun label → official default-weapon render (empty-slot art). */
   defaultIcons?: Record<string, string>;
+  /** Daily store + night market (null when the storefront wasn't available). */
+  store?: StoreSection | null;
   generatedAt: string;
 }
 
