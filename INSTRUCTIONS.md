@@ -18,12 +18,14 @@ renders a pixel-faithful loadout preview they can curate and export.
 
 ## User journey (what happens, in order)
 
-1. **Sign-in gate** — dark card, Riot-styled. Primary path first: **browser cookie**
-   (`LOAD COLLECTION`, 4-step "Where do I find this?" how-to with a direct link to
-   auth.riotgames.com); region is **auto-detected** (Riot Geo) so there is no
-   server picker — only the collapsed access-URL panel keeps one. Everything else
-   under **Other sign-in methods ▾** (remote login, password, access URL, RSO when
-   configured). Cookie failures show human-readable copy + **Try again**.
+1. **Sign-in gate** — dark card, Riot-styled. Primary path: **access URL paste** —
+   an always-visible 4-step guide whose first step is a one-click **Riot sign-in
+   link** (Riot's real page, captcha + 2FA), then paste the whole
+   `…opt_in#access_token=…` address-bar URL (`LOAD COLLECTION`); region + PUUID are
+   **auto-detected** — there is **no server picker anywhere**. Everything else
+   under **Other sign-in methods ▾** (ssid cookie paste + how-to, remote login,
+   password, Chrome auto, RSO when configured). Cookie failures show
+   human-readable copy + **Try again**.
 2. **Workspace** loads with the account's inventory (~75% preview / ~25% sidebar).
    Defaults pre-check premium skins (≥1775 VP / Premium+ tier) and everything
    equipped — noted in the sidebar.

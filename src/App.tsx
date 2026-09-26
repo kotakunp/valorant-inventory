@@ -11,7 +11,6 @@ import { RemoteBrowserPanel } from "./RemoteBrowser";
 import { StorePanel } from "./StorePanel";
 import { ACCESS_URL_LOGIN_LINK } from "./types";
 
-const REGIONS: Region[] = ["na", "eu", "ap", "kr", "latam", "br"];
 const fmt = (n: number) => n.toLocaleString("en-US");
 
 const qs = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
@@ -279,7 +278,7 @@ export default function App() {
       const res = await fetch("/api/account/access-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ region: form.region, url }),
+        body: JSON.stringify({ url }),
       });
       const json = (await res.json().catch(() => ({}))) as ShowcasePayload & { error?: string };
       if (!res.ok || json.error) {
@@ -853,63 +852,53 @@ export default function App() {
             </div>
           )}
 
-          {/* ---- Cookie paste (primary) — region auto-detected server-side ---- */}
-          <form onSubmit={submitCookies}>
-            <div className="form-row">
-              <div className="form-col">
-                <label>ssid cookie</label>
-                <input
-                  type="text"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder="Paste ssid value, or ssid=…; asid=…; tdid=…"
-                  value={cookieInput}
-                  onChange={(e) => {
-                    setCookieInput(e.target.value);
-                    if (cookieFailed) {
-                      setCookieFailed(false);
-                      setError(null);
-                    }
-                  }}
-                />
-                <p className="cookie-hint">
-                  Full Cookie header recommended — ssid alone is often not enough.
-                </p>
-              </div>
-            </div>
-            <details className="cookie-howto">
-              <summary>Where do I find this?</summary>
+          {/* ---- Access URL (primary) — direct link + always-visible guide;
+                 region/PUUID auto-detected server-side, no server picker ---- */}
+          <form onSubmit={fetchAccessUrl}>
+            <div className="cookie-howto access-steps">
               <ol>
                 <li>
-                  Log in at <strong>playvalorant.com</strong> (or <strong>account.riotgames.com</strong>)
-                  in your browser — Riot&apos;s real page, captcha and 2FA included. Tick{" "}
-                  <em>Remember me</em>.
-                </li>
-                <li>
-                  Press <strong>F12</strong> → open the <strong>Network</strong> tab → load{" "}
-                  <a href="https://auth.riotgames.com/" target="_blank" rel="noreferrer noopener">
-                    <code>https://auth.riotgames.com/</code>
+                  Open the{" "}
+                  <a
+                    className="access-link"
+                    href={ACCESS_URL_LOGIN_LINK}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    Riot sign-in link →
                   </a>{" "}
-                  in it (the &quot;An error occurred&quot; page is normal — ignore it).
+                  — Riot&apos;s real page, captcha and 2FA included.
                 </li>
                 <li>
-                  Click the <code>auth.riotgames.com</code> request → <strong>Request Headers</strong>{" "}
-                  → copy the entire <strong>cookie</strong> value (a long{" "}
-                  <code>ssid=…; asid=…; tdid=…</code> string).
+                  Sign in, then you land on <strong>playvalorant.com/opt_in</strong> — a blank or
+                  &quot;404&quot; page is normal, ignore it.
                 </li>
                 <li>
-                  Paste it above and hit <strong>Load collection</strong>. Full Cookie header
-                  recommended — ssid alone is often not enough. (Application tab → Cookies →{" "}
-                  <strong>.riotgames.com</strong> works too; Firefox may truncate long values.)
+                  Copy the <strong>entire address bar URL</strong>, including everything after{" "}
+                  <code>#</code>.
                 </li>
+                <li>Paste it below and hit <strong>Load collection</strong>. Valid ~1 hour.</li>
               </ol>
               <p className="note" style={{ marginTop: 6 }}>
-                Your password never leaves Riot. The cookie is used once to mint API tokens, then
-                discarded — no login is performed by us at all.
+                Your server is auto-detected — no region setting needed. The token is used once to
+                mint API tokens in request memory — never stored or logged. You never type your
+                password here.
               </p>
-            </details>
+            </div>
+            <div className="form-row">
+              <div className="form-col">
+                <label>Access URL</label>
+                <textarea
+                  rows={3}
+                  spellCheck={false}
+                  placeholder="https://playvalorant.com/opt_in#access_token=…"
+                  value={form.accessUrl}
+                  onChange={(e) => setForm({ ...form, accessUrl: e.target.value })}
+                />
+              </div>
+            </div>
             <button className="btn btn-block" type="submit" disabled={loading !== null}>
-              {loading === "cookies" ? "LOADING…" : "LOAD COLLECTION"}
+              {loading === "url" ? "FETCHING…" : "LOAD COLLECTION"}
             </button>
           </form>
 
@@ -931,6 +920,66 @@ export default function App() {
           {/* ---- Everything else (collapsed) ---- */}
           <details className="other-ways">
             <summary>Other sign-in methods ▾</summary>
+
+            {/* ---- Cookie paste (fallback) — region auto-detected server-side ---- */}
+            <form onSubmit={submitCookies}>
+              <div className="form-row">
+                <div className="form-col">
+                  <label>ssid cookie</label>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Paste ssid value, or ssid=…; asid=…; tdid=…"
+                    value={cookieInput}
+                    onChange={(e) => {
+                      setCookieInput(e.target.value);
+                      if (cookieFailed) {
+                        setCookieFailed(false);
+                        setError(null);
+                      }
+                    }}
+                  />
+                  <p className="cookie-hint">
+                    Full Cookie header recommended — ssid alone is often not enough.
+                  </p>
+                </div>
+              </div>
+              <details className="cookie-howto">
+                <summary>Where do I find this?</summary>
+                <ol>
+                  <li>
+                    Log in at <strong>playvalorant.com</strong> (or <strong>account.riotgames.com</strong>)
+                    in your browser — Riot&apos;s real page, captcha and 2FA included. Tick{" "}
+                    <em>Remember me</em>.
+                  </li>
+                  <li>
+                    Press <strong>F12</strong> → open the <strong>Network</strong> tab → load{" "}
+                    <a href="https://auth.riotgames.com/" target="_blank" rel="noreferrer noopener">
+                      <code>https://auth.riotgames.com/</code>
+                    </a>{" "}
+                    in it (the &quot;An error occurred&quot; page is normal — ignore it).
+                  </li>
+                  <li>
+                    Click the <code>auth.riotgames.com</code> request → <strong>Request Headers</strong>{" "}
+                    → copy the entire <strong>cookie</strong> value (a long{" "}
+                    <code>ssid=…; asid=…; tdid=…</code> string).
+                  </li>
+                  <li>
+                    Paste it above and hit <strong>Load collection</strong>. Full Cookie header
+                    recommended — ssid alone is often not enough. (Application tab → Cookies →{" "}
+                    <strong>.riotgames.com</strong> works too; Firefox may truncate long values.)
+                  </li>
+                </ol>
+                <p className="note" style={{ marginTop: 6 }}>
+                  Your password never leaves Riot. The cookie is used once to mint API tokens, then
+                  discarded — no login is performed by us at all.
+                </p>
+              </details>
+              <button className="btn btn-block" type="submit" disabled={loading !== null}>
+                {loading === "cookies" ? "LOADING…" : "LOAD WITH COOKIE"}
+              </button>
+            </form>
 
             <div className="or-divider">email / password (needs CAPMONSTER on hosted)</div>
             <form onSubmit={submitLogin}>
@@ -1047,59 +1096,6 @@ export default function App() {
               with no copying. On the hosted site this falls back to a remote browser.
             </p>
 
-            <div className="or-divider">or paste the access URL</div>
-            <form onSubmit={fetchAccessUrl}>
-              <div className="form-row">
-                <div className="form-col">
-                  <label>Region <span className="label-hint">(auto-detected from the URL)</span></label>
-                  <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value as Region })}>
-                    {REGIONS.map((r) => (
-                      <option key={r} value={r}>{r.toUpperCase()}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-col">
-                  <label>Access URL</label>
-                  <textarea
-                    rows={3}
-                    spellCheck={false}
-                    placeholder="https://playvalorant.com/opt_in#access_token=…"
-                    value={form.accessUrl}
-                    onChange={(e) => setForm({ ...form, accessUrl: e.target.value })}
-                  />
-                </div>
-              </div>
-              <details className="cookie-howto">
-                <summary>How do I get the access URL?</summary>
-                <ol>
-                  <li>
-                    Open the{" "}
-                    <a href={ACCESS_URL_LOGIN_LINK} target="_blank" rel="noreferrer noopener">
-                      Riot sign-in link
-                    </a>{" "}
-                    — Riot&apos;s real page, captcha and 2FA included.
-                  </li>
-                  <li>
-                    After signing in you land on <strong>playvalorant.com/opt_in</strong> — a blank
-                    or &quot;404&quot; page is normal, ignore it.
-                  </li>
-                  <li>
-                    Copy the <strong>entire address bar URL</strong>, including everything after{" "}
-                    <code>#</code>.
-                  </li>
-                  <li>Paste it above and hit <strong>Load collection</strong>. Valid ~1 hour.</li>
-                </ol>
-                <p className="note" style={{ marginTop: 6 }}>
-                  The token is used once to mint API tokens in request memory — never stored or
-                  logged. You never type your password here.
-                </p>
-              </details>
-              <button className="btn manual" type="submit" disabled={loading !== null}>
-                {loading === "url" ? "FETCHING…" : "LOAD WITH ACCESS URL"}
-              </button>
-            </form>
             {rso?.configured && (
               <button
                 type="button"

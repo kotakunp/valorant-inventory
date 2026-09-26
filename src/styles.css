@@ -261,6 +261,22 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .cookie-howto li a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .cookie-howto li a:hover { color: #fff; }
 
+/* primary access-URL guide: one-click Riot sign-in link */
+.access-steps .access-link {
+  display: inline-block;
+  padding: 6px 14px;
+  margin-right: 6px;
+  background: var(--accent);
+  border-radius: var(--radius);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+}
+.access-steps .access-link:hover { filter: brightness(1.12); color: #fff; }
+
 .other-ways {
   border-top: 1px solid var(--line);
   margin-top: 16px;

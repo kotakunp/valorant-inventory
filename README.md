@@ -94,10 +94,11 @@ but deliberately **not stored** in v1.
 
 ## Sign-in modes
 
-1. **Email/password + email OTP** — server performs Riot's 2026 authenticate flow in memory (challenge → captcha → password PUT → OTP → entitlements). Credentials never stored. **Hosted caveat:** hCaptcha Enterprise tokens minted in our widget are host-locked to `authenticate.riotgames.com` and Riot rejects tokens from `valorant.muur.app` / `localhost`. Fix options: set `CAPMONSTER_API_KEY` (server solves for the correct origin) or use AUTO LOGIN remote browser / cookie paste.
-2. **Browser cookie (recommended)** — log in at playvalorant.com yourself, copy the `ssid` cookie, paste it. Server mints tokens via Cookie Reauth (~1 week stable). **AUTO LOGIN:** desktop harvests your installed Chrome session (macOS Keychain / Windows DPAPI) or opens a local Chrome window. **On the hosted VPS** AUTO LOGIN falls back to a **remote Chromium** streamed into the page — you log in on Riot's real domain inside the frame (captcha + 2FA work), cookies are harvested server-side, showcase loads automatically. Chromium is installed by nixpacks (`nixPkgs`) and discovered on `PATH` at runtime.
-3. **Paste session tokens (advanced)** — PowerShell/lockfile method (below).
-4. **RSO "Sign in with Riot"** — activates via `.env` after Riot approves the OAuth client.
+1. **Access URL (recommended)** — open the Riot sign-in link in your own browser (captcha/2FA happen on Riot's real page), then copy the entire redirect URL (`playvalorant.com/opt_in#access_token=…` — the `#…` fragment matters) and paste it. Server mints entitlements, auto-detects region/PUUID (no region picker anywhere); the token is used once in request memory, never stored.
+2. **Email/password + email OTP** — server performs Riot's 2026 authenticate flow in memory (challenge → captcha → password PUT → OTP → entitlements). Credentials never stored. **Hosted caveat:** hCaptcha Enterprise tokens minted in our widget are host-locked to `authenticate.riotgames.com` and Riot rejects tokens from `valorant.muur.app` / `localhost`. Fix options: set `CAPMONSTER_API_KEY` (server solves for the correct origin) or use AUTO LOGIN remote browser / cookie paste.
+3. **Browser cookie** — log in at playvalorant.com yourself, copy the `ssid` cookie, paste it. Server mints tokens via Cookie Reauth (~1 week stable). **AUTO LOGIN:** desktop harvests your installed Chrome session (macOS Keychain / Windows DPAPI) or opens a local Chrome window. **On the hosted VPS** AUTO LOGIN falls back to a **remote Chromium** streamed into the page — you log in on Riot's real domain inside the frame (captcha + 2FA work), cookies are harvested server-side, showcase loads automatically. Chromium is installed by nixpacks (`nixPkgs`) and discovered on `PATH` at runtime.
+4. **Paste session tokens (advanced)** — PowerShell/lockfile method (below).
+5. **RSO "Sign in with Riot"** — activates via `.env` after Riot approves the OAuth client.
 
 ## Security notes
 
