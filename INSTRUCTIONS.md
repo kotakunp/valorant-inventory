@@ -74,9 +74,12 @@ renders a pixel-faithful loadout preview they can curate and export.
   frame at any zoom. Names wrap to two lines at a readable 13–14px (never
   ellipsized mid-name) with the second line reserved so every bar in a row
   stays flush; a long single word takes a third line rather than breaking.
-  Hovering a card (tapping on touch) opens an enlarged
-  peek beside it — same card markup, art at its natural aspect ratio; a
-  click pins it open, leave/tap-away/`Escape`/scroll dismiss it.
+  Hovering a card opens an enlarged peek beside it — same card markup, art at
+  its natural aspect ratio — and clicking (or tapping / `Enter`) selects that
+  card: **one at a time**, marked with an accent ring and `aria-pressed`, with
+  the peek holding while you hover others. Re-selecting the same card, a click
+  away or `Escape` clears it; scrolling re-anchors the peek to its card instead
+  of dismissing it.
 
 ### The showcase itself (this IS the exported image)
 

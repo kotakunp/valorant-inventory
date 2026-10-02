@@ -610,7 +610,16 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
       Anchored beside the card (centered when space is tight); the art keeps
       its natural aspect ratio. Click pins it; leave/tap-away/Escape/scroll
       dismiss (state machine in StorePanel.tsx, mirrors the stack spread). ---- */
-.sstore-cell { min-width: 0; cursor: zoom-in; }
+.sstore-cell { min-width: 0; cursor: zoom-in; border-radius: 4px; }
+/* Immediate feedback on the card itself, before the peek has painted. */
+.sstore-cell:hover > .sstore-card { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22); }
+/* The one selected card: accent ring (single selection, cleared on Escape or
+   a click away). The ring is a shadow because the card border is inline. */
+.sstore-cell.is-selected > .sstore-card {
+  box-shadow: 0 0 0 2px var(--accent), 0 8px 22px rgba(0, 0, 0, 0.5);
+}
+.sstore-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sstore-cell:focus-visible > .sstore-card { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22); }
 @keyframes sstore-peek-in {
   from { opacity: 0; transform: translateY(4px) scale(0.985); }
   to { opacity: 1; transform: none; }
