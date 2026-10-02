@@ -446,14 +446,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: var(--line);
 }
 .sstore-head-title {
-  font: 700 13px/1 var(--font-display);
-  letter-spacing: 0.18em;
+  font: 700 15px/1 var(--font-display);
+  letter-spacing: 0.16em;
   color: var(--text);
   text-transform: uppercase;
   white-space: nowrap;
 }
 .sstore-head-time {
-  font: 700 13px/1 var(--font-mono, monospace);
+  font: 700 15px/1 var(--font-mono, monospace);
   letter-spacing: 0.1em;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
@@ -469,12 +469,24 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sstore-row--scroll {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(150px, 1fr);
+  /* Don't inherit .sstore-row's wrapping template — scroll cards are sized
+     purely by grid-auto-columns: they grow to fill when there are few, but
+     never shrink below a floor that fits the longest single skin/accessory
+     word (mid-word breaks look broken). Mobile bumps this to 220px. */
+  grid-template-columns: none;
+  grid-auto-columns: minmax(210px, 1fr);
   overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--panel-2) transparent;
   padding-bottom: 4px;
 }
+/* A long single word (DIVINE INTERVENTION) can't fit a narrow scroll card on
+   two lines — allow a 3rd instead of silently clipping, and stretch the card
+   to the row height so every bar bottom still lines up. */
+.sstore-row--scroll .sstore-name { -webkit-line-clamp: 3; }
+.sstore-row--scroll .sstore-cell { display: flex; }
+.sstore-row--scroll .sstore-cell > .sstore-card { flex: 1; }
+.sstore-row--scroll .sstore-bar { margin-top: auto; }
 
 .sstore-card {
   position: relative;
@@ -500,7 +512,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   object-fit: contain;
 }
 .sstore-art-fb {
-  font: 700 11px/1 var(--font-ui);
+  font: 700 12px/1 var(--font-ui);
   letter-spacing: 0.1em;
   color: var(--muted);
   text-transform: uppercase;
@@ -525,37 +537,43 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font: 700 8.5px/1 var(--font-ui);
+  font: 700 10px/1 var(--font-ui);
   letter-spacing: 0.14em;
   color: var(--rarity, var(--muted));
   text-transform: uppercase;
 }
 .sstore-rarity-gem {
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   object-fit: contain;
 }
 .sstore-name {
   flex: 1;
   min-width: 0;
-  font: 600 11px/1.25 var(--font-display);
-  letter-spacing: 0.04em;
+  font: 600 13px/1.3 var(--font-display);
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--text);
-  white-space: nowrap;
+  /* Wraps to 2 lines (never ellipsized) with the second line always reserved,
+     so every bar in a row stays the same height and flush to the card bottom. */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  min-height: calc(2 * 1.3em);
 }
 .sstore-price {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
 }
-.sstore-price img { width: 12px; height: 12px; object-fit: contain; }
+.sstore-price img { width: 14px; height: 14px; object-fit: contain; }
 .sstore-price s { color: var(--muted); font-weight: 600; }
 .sstore-price--nm strong { color: var(--accent); }
 .sstore-price-na { color: var(--muted); font-weight: 600; }
@@ -563,8 +581,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   position: absolute;
   top: 6px;
   right: 6px;
-  padding: 2px 5px;
-  font-size: 8px;
+  padding: 3px 6px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--accent);
@@ -577,8 +595,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   position: absolute;
   top: 6px;
   left: 6px;
-  padding: 3px 6px;
-  font: 700 10px/1 var(--font-ui);
+  padding: 4px 7px;
+  font: 700 11px/1 var(--font-ui);
   letter-spacing: 0.06em;
   color: #fff;
   background: var(--accent);
@@ -587,6 +605,56 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 /* fullscreen = showcase only (editor chrome hidden) */
 .preview-area:fullscreen .store-strip { display: none; }
+
+/* ---- Store card peek: enlarged on hover/tap so the art can be inspected.
+      Anchored beside the card (centered when space is tight); the art keeps
+      its natural aspect ratio. Click pins it; leave/tap-away/Escape/scroll
+      dismiss (state machine in StorePanel.tsx, mirrors the stack spread). ---- */
+.sstore-cell { min-width: 0; cursor: zoom-in; }
+@keyframes sstore-peek-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.sstore-peek {
+  position: fixed;
+  z-index: 100;
+  width: min(420px, calc(100vw - 24px));
+  background: #121c27;
+  border: 1px solid #46525f;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.55);
+  color: var(--text);
+  font-family: var(--font-ui);
+  animation: sstore-peek-in 0.12s ease;
+}
+.sstore-peek .sstore-card { background: transparent; border: 0; border-radius: 0; }
+.sstore-peek .sstore-art { aspect-ratio: auto; padding: 16px; }
+.sstore-peek .sstore-art img {
+  width: 100%;
+  height: auto;
+  max-height: min(52vh, 480px); /* tall art (player cards) stays on screen */
+  object-fit: contain;
+}
+.sstore-peek .sstore-art-fb { font-size: 15px; }
+.sstore-peek .sstore-bar { padding: 12px 14px; gap: 12px; }
+.sstore-peek .sstore-name {
+  font-size: 21px;
+  white-space: normal;
+  display: block;
+  /* Peek shows the name in full: undo the grid cards' 2-line clamp + reserved slot. */
+  -webkit-line-clamp: none;
+  min-height: 0;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+.sstore-peek .sstore-rarity { font-size: 12px; }
+.sstore-peek .sstore-rarity-gem { width: 16px; height: 16px; }
+.sstore-peek .sstore-price { font-size: 18px; gap: 6px; }
+.sstore-peek .sstore-price img { width: 20px; height: 20px; }
+.sstore-peek .sstore-discount { top: 10px; left: 10px; font-size: 14px; padding: 5px 9px; }
+.sstore-peek .sstore-owned { top: 10px; right: 10px; font-size: 11px; padding: 4px 8px; }
 
 .bulk { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
 
@@ -1673,6 +1741,36 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .topbar-name { font-size: 22px; }
   .export-note { margin-left: 0; width: 100%; }
   .controls { grid-template-columns: 1fr; }
+
+  /* Store strip: compact 2×2 daily/night grid (in-game look) + bigger type.
+     Phones render the strip full-bleed (~fitScale width), so drop the desktop
+     auto-fit minimums (180px → 1-up on ≤390px screens) for a fixed 2 columns.
+     Accessories keep their horizontal scroll row. */
+  .store-strip { gap: 12px; }
+  .sstore-head { gap: 10px; margin-bottom: 8px; }
+  .sstore-head-title { font-size: 16px; letter-spacing: 0.14em; }
+  .sstore-head-time { font-size: 16px; }
+  .sstore-row--daily,
+  .sstore-row:not(.sstore-row--scroll) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* Wider scroll cards → long single words (INTERVENTION) fit whole instead
+     of breaking mid-word; overflow falls back to the 3-line clamp above. */
+  .sstore-row--scroll { grid-auto-columns: minmax(220px, 1fr); }
+  .sstore-art { padding: 6px; }
+  .sstore-bar { padding: 8px 10px; gap: 8px; }
+  /* Bigger than the desktop scale; the base already wraps to 2 lines. */
+  .sstore-name { font-size: 14px; }
+  .sstore-rarity { font-size: 11px; }
+  .sstore-rarity-gem { width: 13px; height: 13px; }
+  .sstore-price { font-size: 14px; }
+  .sstore-price img { width: 15px; height: 15px; }
+  /* Struck-through old price doesn't fit beside the name at 2-up width —
+     the −% badge on the art already communicates the discount. */
+  .sstore-price--nm s { display: none; }
+  .sstore-owned { font-size: 10px; padding: 3px 6px; }
+  .sstore-discount { font-size: 12px; padding: 4px 8px; }
+  .sstore-art-fb { font-size: 13px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

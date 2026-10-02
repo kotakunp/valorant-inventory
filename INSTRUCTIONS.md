@@ -71,7 +71,12 @@ renders a pixel-faithful loadout preview they can curate and export.
   rarity label (ULTRA / PREMIUM / SELECT / STANDARD) above the
   currency-icon price and `OWNED` badge;
   accessory rows scroll horizontally when long. Width tracks the preview
-  frame at any zoom.
+  frame at any zoom. Names wrap to two lines at a readable 13–14px (never
+  ellipsized mid-name) with the second line reserved so every bar in a row
+  stays flush; a long single word takes a third line rather than breaking.
+  Hovering a card (tapping on touch) opens an enlarged
+  peek beside it — same card markup, art at its natural aspect ratio; a
+  click pins it open, leave/tap-away/`Escape`/scroll dismiss it.
 
 ### The showcase itself (this IS the exported image)
 

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { rarityColor, rarityLabel } from "./logic";
 import type { AccessoryOffer, StoreOffer, StoreSection } from "./types";
 
@@ -20,6 +21,12 @@ const KIND_LABEL: Record<AccessoryOffer["kind"], string> = {
   card: "CARD",
   title: "TITLE",
 };
+
+/** Identity of the card a peek shows (rect/pinned live on `Peek`). */
+type PeekBase =
+  | { key: string; kind: "skin"; offer: StoreOffer; nightMarket?: boolean }
+  | { key: string; kind: "acc"; offer: AccessoryOffer };
+type Peek = PeekBase & { rect: DOMRect; pinned: boolean };
 
 function hhmmss(totalSec: number): string {
   const s = Math.max(0, totalSec);
@@ -136,6 +143,73 @@ export function StorePanel({
     return () => clearInterval(t);
   }, []);
 
+  /* ---- Hover/tap peek: enlarged card anchored beside the trigger so the
+     art can be inspected. Mirrors the showcase stack-spread pattern
+     (180ms leave grace, Escape/resize/scroll dismiss) plus a click pin so
+     touch users (no hover) can inspect too. ---- */
+  const [peek, setPeek] = useState<Peek | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const keepOpen = () => clearTimeout(closeTimer.current);
+  const closeSoon = () => {
+    keepOpen();
+    // Pinned peeks survive the grace — touch fires pointerleave right after the pinning tap.
+    closeTimer.current = setTimeout(() => setPeek((p) => (p && p.pinned ? p : null)), 180);
+  };
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPeek(null);
+    };
+    const close = () => setPeek(null);
+    const scroll = (event: Event) => {
+      if (!(event.target instanceof Element) || !event.target.closest(".sstore-peek")) setPeek(null);
+    };
+    const clickAway = (event: MouseEvent) => {
+      const target = event.target;
+      setPeek((p) => {
+        if (!p || !p.pinned) return p;
+        if (
+          target instanceof Element &&
+          (target.closest(".sstore-peek") || target.closest(".sstore-cell"))
+        )
+          return p;
+        return null;
+      });
+    };
+    window.addEventListener("scroll", scroll, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", escape);
+    window.addEventListener("click", clickAway);
+    return () => {
+      window.removeEventListener("scroll", scroll, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", escape);
+      window.removeEventListener("click", clickAway);
+    };
+  }, []);
+
+  /** Hover (mouse/pen): transient peek; re-hovering a pinned card keeps it pinned. */
+  const cellEnter = (event: React.PointerEvent<HTMLDivElement>, base: PeekBase) => {
+    if (event.pointerType === "touch") return; // tap is handled by the click path
+    keepOpen();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setPeek((prev) => ({
+      ...base,
+      rect,
+      pinned: prev != null && prev.key === base.key ? prev.pinned : false,
+    }));
+  };
+  const cellLeave = () => closeSoon();
+  /** Click/tap: pin the peek open (tapping the same card again closes it). */
+  const cellClick = (event: React.MouseEvent<HTMLDivElement>, base: PeekBase) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setPeek((prev) =>
+      prev != null && prev.key === base.key && prev.pinned
+        ? null
+        : { ...base, rect, pinned: true }
+    );
+  };
+
   const expiryMs =
     store.secondsToReset != null ? Date.parse(generatedAt) + store.secondsToReset * 1000 : null;
   const resetLeft = expiryMs != null ? Math.round((expiryMs - now) / 1000) : null;
@@ -152,7 +226,15 @@ export function StorePanel({
           <SectionHead label="DAILY OFFERS" time={resetLeft != null && resetLeft > 0 ? hhmmss(resetLeft) : null} />
           <div className="sstore-row sstore-row--daily">
             {store.offers.map((o) => (
-              <SkinCard key={o.skinId} o={o} />
+              <div
+                className="sstore-cell"
+                key={o.skinId}
+                onPointerEnter={(e) => cellEnter(e, { key: `skin:${o.skinId}`, kind: "skin", offer: o })}
+                onPointerLeave={cellLeave}
+                onClick={(e) => cellClick(e, { key: `skin:${o.skinId}`, kind: "skin", offer: o })}
+              >
+                <SkinCard o={o} />
+              </div>
             ))}
           </div>
         </section>
@@ -162,7 +244,19 @@ export function StorePanel({
           <SectionHead label="NIGHT MARKET" />
           <div className="sstore-row">
             {store.nightMarket.map((o) => (
-              <SkinCard key={o.skinId} o={o} nightMarket />
+              <div
+                className="sstore-cell"
+                key={o.skinId}
+                onPointerEnter={(e) =>
+                  cellEnter(e, { key: `skin:${o.skinId}`, kind: "skin", offer: o, nightMarket: true })
+                }
+                onPointerLeave={cellLeave}
+                onClick={(e) =>
+                  cellClick(e, { key: `skin:${o.skinId}`, kind: "skin", offer: o, nightMarket: true })
+                }
+              >
+                <SkinCard o={o} nightMarket />
+              </div>
             ))}
           </div>
         </section>
@@ -172,11 +266,89 @@ export function StorePanel({
           <SectionHead label="ACCESSORIES" />
           <div className="sstore-row sstore-row--scroll">
             {store.accessories.map((o) => (
-              <AccessoryCard key={o.id} o={o} />
+              <div
+                className="sstore-cell"
+                key={o.id}
+                onPointerEnter={(e) => cellEnter(e, { key: `acc:${o.id}`, kind: "acc", offer: o })}
+                onPointerLeave={cellLeave}
+                onClick={(e) => cellClick(e, { key: `acc:${o.id}`, kind: "acc", offer: o })}
+              >
+                <AccessoryCard o={o} />
+              </div>
             ))}
           </div>
         </section>
       )}
+      {peek && (
+        <StorePeek key={peek.key} peek={peek} onEnter={keepOpen} onLeave={closeSoon} />
+      )}
     </div>
+  );
+}
+
+/**
+ * Portal peek: the same card markup, enlarged, art at its natural aspect
+ * ratio (no fixed box, no crop). Anchored beside the trigger when there's
+ * room, centered over it otherwise, clamped to the viewport after measuring —
+ * the 1s countdown re-render plus a delayed pass re-anchor once the art loads.
+ */
+function StorePeek({
+  peek,
+  onEnter,
+  onLeave,
+}: {
+  peek: Peek;
+  onEnter: () => void;
+  onLeave: () => void;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const [, force] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const r = peek.rect;
+    const left =
+      vw - r.right >= w + 16
+        ? r.right + 8
+        : r.left >= w + 16
+          ? r.left - w - 8
+          : Math.max(12, Math.min(r.left + r.width / 2 - w / 2, vw - w - 12));
+    const top = Math.max(12, Math.min(r.top, vh - h - 12));
+    setPos((p) => (p && p.left === left && p.top === top ? p : { left, top }));
+  });
+  // Art loads after first paint — one delayed pass re-clamps the position.
+  useEffect(() => {
+    const t = setTimeout(() => force((n) => n + 1), 450);
+    return () => clearTimeout(t);
+  }, []);
+
+  const body =
+    peek.kind === "skin" ? (
+      <SkinCard o={peek.offer} nightMarket={peek.nightMarket} />
+    ) : (
+      <AccessoryCard o={peek.offer} />
+    );
+
+  return createPortal(
+    <aside
+      ref={ref}
+      className="sstore-peek"
+      aria-label={`Inspect ${peek.offer.name}`}
+      style={{
+        left: pos?.left ?? peek.rect.left,
+        top: pos?.top ?? peek.rect.top,
+        visibility: pos ? "visible" : "hidden",
+      }}
+      onPointerEnter={onEnter}
+      onPointerLeave={onLeave}
+    >
+      {body}
+    </aside>,
+    document.fullscreenElement ?? document.body
   );
 }
