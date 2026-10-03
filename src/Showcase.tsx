@@ -3,6 +3,7 @@ import { HoverSkins } from "./HoverSkins";
 import type { ChromaSelection, RankBadge, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
 import { selKey } from "./types";
 import type { GunGroup, Pages, StackDirection, StackLayer } from "./logic";
+import { SkinArt, skinArtStyle } from "./skinArt";
 import {
   WEAPON_CATEGORIES,
   LOADOUT_GUNS,
@@ -70,11 +71,13 @@ function GunSilhouette() {
 }
 
 /** Dimmed official default-weapon render for empty loadout cells (fallback: silhouette). */
-function EmptyGunArt({ icon }: { icon?: string }) {
+function EmptyGunArt({ icon, weaponName }: { icon?: string; weaponName: string }) {
   return icon ? (
-    <img className="sc-empty-art" src={imgUrl(icon)!} alt="" />
+    <SkinArt className="sc-empty-art" src={imgUrl(icon)!} alt="" weaponName={weaponName} />
   ) : (
-    <GunSilhouette />
+    <div className="sc-silhouette-wrap" style={skinArtStyle(weaponName)}>
+      <GunSilhouette />
+    </div>
   );
 }
 
@@ -224,7 +227,7 @@ export function Showcase({
       transform: `translate(${layer.dx * 100}%, ${layer.dy * 100}%) scale(${layer.scale})`,
       ["--rarity" as string]: rarityColor(s.price, s.levelCount, s.contentTierRank ?? null),
     }}>
-      {tileIcon(s) ? <span className="sc-stack-frame"><img className="sc-stack-art" src={imgUrl(tileIcon(s))!} alt="" /></span>
+      {tileIcon(s) ? <span className="sc-stack-frame"><SkinArt className="sc-stack-art" src={imgUrl(tileIcon(s))!} alt="" weaponName={s.weaponName} isKnife={s.isKnife} /></span>
         : <span className="sc-fallback">{s.weaponName}</span>}
     </div>
   );
@@ -252,7 +255,7 @@ export function Showcase({
         >
           {empty ? (
             <div className="sc-empty-gun">
-              <EmptyGunArt icon={payload.defaultIcons?.[gun.id]} />
+              <EmptyGunArt icon={payload.defaultIcons?.[gun.id]} weaponName={gun.id === "MELEE" ? "Melee" : gun.label} />
             </div>
           ) : (
             items.map((s, i) => stackItem(s, i, gun.id, layers[i], items.length))
@@ -326,7 +329,7 @@ export function Showcase({
                   <div className="sc-knife-cell sc-knife-cell--empty">
                     <div className="sc-stack sc-stack--empty">
                       <div className="sc-empty-gun">
-                        <EmptyGunArt icon={payload.defaultIcons?.["MELEE"]} />
+                        <EmptyGunArt icon={payload.defaultIcons?.["MELEE"]} weaponName="Melee" />
                       </div>
                     </div>
                   </div>

@@ -7,6 +7,7 @@ import type { AnyItem } from "./logic";
 import { makeState, parseCallback, RSO_STATE_KEY, RSO_REGION_KEY } from "./rso";
 import { SITEKEY, loadHcaptcha, widgetToken, resetCaptcha, renderCaptcha, fetchCaptchaChallenge } from "./captcha";
 import { Showcase, CANVAS_W, CANVAS_H } from "./Showcase";
+import { SkinArt } from "./skinArt";
 import { RemoteBrowserPanel } from "./RemoteBrowser";
 import { StorePanel } from "./StorePanel";
 import { ACCESS_URL_LOGIN_LINK } from "./types";
@@ -709,7 +710,7 @@ export default function App() {
                           >
                             {i.price != null && <span className="vp">{i.price}</span>}
                             <span className="skin-cell-art">
-                              {icon ? <img src={img(icon)} alt="" /> : null}
+                              {icon ? <SkinArt src={img(icon)!} alt="" weaponName={i.weaponName} isKnife={i.isKnife} /> : null}
                             </span>
                             <span className="skin-cell-name">{i.name}</span>
                           </button>

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { rarityColor, rarityLabel } from "./logic";
+import { SkinArt } from "./skinArt";
 import type { AccessoryOffer, StoreOffer, StoreSection } from "./types";
 
 const imgUrl = (u: string | null) => (u ? `/img/${encodeURIComponent(u)}` : null);
@@ -64,7 +65,7 @@ function SkinCard({ o, nightMarket }: { o: StoreOffer; nightMarket?: boolean }) 
       style={{ borderColor: hexA(rarity, 0.55), "--rarity": rarity } as React.CSSProperties}
     >
       <div className="sstore-art">
-        {art ? <img src={art} alt="" loading="lazy" /> : <span className="sstore-art-fb">?</span>}
+        {art ? <SkinArt src={art} alt="" loading="lazy" weaponName={o.weaponName} /> : <span className="sstore-art-fb">?</span>}
       </div>
       {discountPct != null && discountPct > 0 && (
         <span className="sstore-discount">−{discountPct}%</span>

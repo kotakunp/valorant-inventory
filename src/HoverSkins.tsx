@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
 import type { ChromaSelection, SkinItem } from "./types";
 import { rarityColor } from "./logic";
+import { SkinArt } from "./skinArt";
 
 interface Props {
   gun: string;
@@ -21,7 +22,7 @@ const image = (url: string) => `/img/${encodeURIComponent(url)}`;
 export function HoverSkins({ gun, items, rect, chromas, onEnter, onLeave, onFront, onRemove, onChroma }: Props) {
   if (!items.length) return null;
   const width = Math.min(360, window.innerWidth - 24);
-  const height = Math.min(48 + items.length * 132, window.innerHeight * 0.75);
+  const height = Math.min(48 + items.length * 176, window.innerHeight * 0.75);
   const left = rect.right + width + 12 < window.innerWidth
     ? rect.right + 8
     : Math.max(12, rect.left - width - 8);
@@ -44,7 +45,7 @@ export function HoverSkins({ gun, items, rect, chromas, onEnter, onLeave, onFron
               aria-label={skin.name}
               style={{ "--rarity": rarityColor(skin.price, skin.levelCount, skin.contentTierRank) } as CSSProperties}>
               <div className="skin-hover-name"><strong>{skin.name}</strong><span>{index === 0 && gun !== "MELEE" ? "FRONT" : skin.equipped ? "EQUIPPED" : ""}</span></div>
-              <div className="skin-hover-art">{icon && <img src={image(icon)} alt={skin.name} />}</div>
+              <div className="skin-hover-art">{icon && <SkinArt src={image(icon)} alt={skin.name} weaponName={skin.weaponName} isKnife={skin.isKnife} />}</div>
               <div className="skin-hover-actions">
                 <div className="skin-hover-variants" role="group" aria-label={`${skin.name} variants`}>
                   {skin.chromas.length > 1 && skin.chromas.map((chroma, i) => (

@@ -18,6 +18,29 @@
   --font-ui: "Inter", system-ui, sans-serif;
 }
 
+/* ---- §S: regulated skin-art size — one rule for every surface that shows
+        gun skins (showcase stacks + empty slots, sidebar skin grid, hover
+        spread, store cards + peek). Riot's skin renders are cropped tight to
+        the gun and normalized to one bitmap width, so plain fit-to-box drew a
+        small pistol as large as a long rifle. The renders do preserve true
+        shape, so scaling by the weapon's true body length restores real
+        relative size: `--gun-len` (src/skinArt.tsx) is that length, longest
+        gun = 1. Width is that share of the art box, height follows the
+        render's own aspect, and the height cap only guards overflow. Same
+        value on every surface ⇒ one regulated relative size everywhere. */
+img.skin-art {
+  --gun-len: 0.78;
+  display: block;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  margin: 0 auto;
+  width: calc(var(--gun-len) * 100%);
+  height: auto;
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
 * { box-sizing: border-box; }
 
 html, body, #root { min-height: 100%; }
@@ -506,7 +529,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   padding: 8px;
   background: linear-gradient(180deg, #101b26 0%, #0d151e 100%);
 }
-.sstore-art img {
+.sstore-art img:not(.skin-art) {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
@@ -639,7 +662,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .sstore-peek .sstore-card { background: transparent; border: 0; border-radius: 0; }
 .sstore-peek .sstore-art { aspect-ratio: auto; padding: 16px; }
-.sstore-peek .sstore-art img {
+.sstore-peek .sstore-art img:not(.skin-art) {
   width: 100%;
   height: auto;
   max-height: min(52vh, 480px); /* tall art (player cards) stays on screen */
@@ -760,9 +783,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.04), transparent 70%);
 }
 .skin-cell-art img {
-  max-width: 90%;
-  max-height: 100%;
-  object-fit: contain;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
 }
 .skin-cell-name {
@@ -1416,13 +1436,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   pointer-events: none;
 }
 .sc-stack-art {
-  /* height drives size; width follows intrinsic gun aspect (tight to outline) */
-  height: 68%;
-  width: auto;
-  max-width: 88%;
-  object-fit: contain;
+  /* regulated size: img.skin-art contract (src/skinArt.tsx) */
   pointer-events: auto;
-  flex-shrink: 0;
   filter: drop-shadow(1px 0 0 var(--rarity, rgba(232, 236, 240, 0.7)))
     drop-shadow(-1px 0 0 var(--rarity, rgba(232, 236, 240, 0.7)))
     drop-shadow(0 1px 0 var(--rarity, rgba(232, 236, 240, 0.7)))
@@ -1492,10 +1507,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 
 .sc-knife-cell .sc-stack-art {
-  height: 76%;
-  max-width: 92%;
+  /* melee cells are narrow; the img.skin-art contract sizes the art */
 }
-
 .sc-fallback { color: var(--muted); font-size: 11px; padding: 8px; text-align: center; }
 .sc-empty {
   flex: 1;
@@ -1519,30 +1532,26 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   justify-content: center;
 }
 .sc-empty-gun {
-  width: 78%;
-  height: 62%;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.sc-silhouette-wrap {
+  width: calc(var(--gun-len, 0.78) * 100%);
+  margin: 0 auto;
 }
 .sc-silhouette {
-  width: 76%;
+  width: 100%;
   height: auto;
   color: rgba(255, 255, 255, 0.07);
   pointer-events: none;
 }
 .sc-empty-art {
-  width: 90%;
-  height: auto;
-  max-height: 90%;
-  object-fit: contain;
+  /* same regulated size as skinned art (img.skin-art contract) */
   opacity: 0.45;
   pointer-events: none;
-}
-.sc-knife-cell--empty .sc-empty-gun {
-  width: 88%;
-  height: 56%;
 }
 
 /* right rail: player card dominates, then rank block, wallet, summary (§11) */
@@ -1800,14 +1809,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .skin-hover-spread > header strong { font: 20px/1 var(--font-display); letter-spacing: .08em; }
 .skin-hover-spread > header span { font-size: 11px; color: var(--muted); }
 .skin-hover-list { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 6px; }
-.skin-hover-row { padding: 10px; border: 1px solid transparent; border-radius: 3px; background: #0d151e; margin-bottom: 5px; min-height: 126px; }
+.skin-hover-row { padding: 10px; border: 1px solid transparent; border-radius: 3px; background: #0d151e; margin-bottom: 5px; min-height: 170px; }
 .skin-hover-row:last-child { margin-bottom: 0; }
 .skin-hover-row:hover, .skin-hover-row:focus-within { border-color: var(--rarity); background: #1b2937; }
 .skin-hover-name { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .skin-hover-name strong { font-size: 12px; font-weight: 600; }
 .skin-hover-name > span { font-size: 9px; letter-spacing: .08em; color: var(--muted); }
-.skin-hover-art { height: 64px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-.skin-hover-art img { max-width: 90%; max-height: 54px; object-fit: contain; transition: transform .15s ease, filter .15s ease; }
+.skin-hover-art { height: 96px; display: flex; align-items: center; justify-content: center; padding: 0 6px; pointer-events: none; }
+.skin-hover-art img { transition: transform .15s ease, filter .15s ease; }
 .skin-hover-row:hover .skin-hover-art img, .skin-hover-row:focus-within .skin-hover-art img { transform: scale(1.08); filter: drop-shadow(0 0 2px var(--rarity)); }
 .skin-hover-actions { display: flex; gap: 6px; align-items: center; }
 .skin-hover-actions > button { border: 1px solid var(--line); border-radius: 3px; background: transparent; color: var(--muted); font-size: 10px; padding: 5px 7px; min-height: 28px; }

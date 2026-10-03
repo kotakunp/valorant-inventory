@@ -67,6 +67,8 @@ export const ACCESS_URL_LOGIN_LINK =
 export interface StoreOffer {
   skinId: string;
   name: string;
+  /** Weapon this skin belongs to — drives the regulated skin-art size. */
+  weaponName: string;
   icon: string | null;
   price: number | null;
   /** Night market only: discounted price (standard price stays in `price`). */

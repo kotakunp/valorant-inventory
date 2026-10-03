@@ -168,6 +168,7 @@ export function buildStoreSection(
     return {
       skinId,
       name: typeof entry.skin?.displayName === "string" && entry.skin.displayName ? entry.skin.displayName : "Unknown skin",
+      weaponName: entry.weaponName,
       icon: skinArt(entry.skin),
       price: vpFromCost(offer.Cost),
       discountPrice: discountPrice ?? null,

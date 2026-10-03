@@ -53,6 +53,11 @@ renders a pixel-faithful loadout preview they can curate and export.
     counts; each cell is art-dominant — **art + name + VP price**, thin
     rarity-tinted outline + corner diamond when selected, subtle accent edge
     when equipped (label in tooltip). No glow.
+  - **Skin art sizing is regulated everywhere** (showcase stacks + empty
+    slots, skin grid, hover spread, store cards + peek): each gun skin renders
+    at the weapon's true body length as a share of its box (longest gun = 1),
+    so a small pistol is never drawn as large as a rifle and every surface
+    shows the same relative size (`src/skinArt.tsx` → `img.skin-art`).
   - **Cards / Titles / Buddies** panels: chip rows with checkboxes + prices
     (+ per-section *All / Premium / None*).
   - (No FM / PROOF footer-fields panel — removed.)

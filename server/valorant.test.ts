@@ -160,7 +160,7 @@ describe("buildStoreSection", () => {
     const out = buildStoreSection(sf, catalog, new Set(["aaa"]));
     expect(out).not.toBeNull();
     expect(out!.offers).toEqual([
-      { skinId: "aaa", name: "Recon Vandal", icon: "https://x/l4.png", price: 1775, discountPrice: null, discountPercent: null, owned: true, contentTierRank: null, contentTierIcon: null },
+      { skinId: "aaa", name: "Recon Vandal", weaponName: "Vandal", icon: "https://x/l4.png", price: 1775, discountPrice: null, discountPercent: null, owned: true, contentTierRank: null, contentTierIcon: null },
     ]);
     expect(out!.secondsToReset).toBe(3600);
     expect(out!.nightMarket).toEqual([]);
@@ -184,7 +184,7 @@ describe("buildStoreSection", () => {
     const out = buildStoreSection(sf, catalog, new Set());
     expect(out!.offers).toEqual([]);
     expect(out!.nightMarket).toEqual([
-      { skinId: "ddd", name: "Night Gun", icon: "https://x/night.png", price: 2175, discountPrice: 1087, discountPercent: 50, owned: false, contentTierRank: 3, contentTierIcon: "https://x/tier3.png" },
+      { skinId: "ddd", name: "Night Gun", weaponName: "Vandal", icon: "https://x/night.png", price: 2175, discountPrice: 1087, discountPercent: 50, owned: false, contentTierRank: 3, contentTierIcon: "https://x/tier3.png" },
     ]);
     expect(out!.secondsToReset).toBeNull();
   });
