@@ -503,13 +503,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   scrollbar-color: var(--panel-2) transparent;
   padding-bottom: 4px;
 }
-/* A long single word (DIVINE INTERVENTION) can't fit a narrow scroll card on
-   two lines — allow a 3rd instead of silently clipping, and stretch the card
-   to the row height so every bar bottom still lines up. */
-.sstore-row--scroll .sstore-name { -webkit-line-clamp: 3; }
-.sstore-row--scroll .sstore-cell { display: flex; }
-.sstore-row--scroll .sstore-cell > .sstore-card { flex: 1; }
-.sstore-row--scroll .sstore-bar { margin-top: auto; }
+/* A long name (DIVINE INTERVENTION) can need a 3rd line on narrow cards — the
+   base clamp allows it and the stretch below keeps every bar bottom aligned
+   even when one card in the row grows. Applies to every row (daily, night
+   market, accessories), so bars stay flush wherever cards are compared. */
+.sstore-cell { display: flex; }
+.sstore-cell > .sstore-card { flex: 1; }
+.sstore-bar { margin-top: auto; }
 
 .sstore-card {
   position: relative;
@@ -573,19 +573,24 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sstore-name {
   flex: 1;
   min-width: 0;
-  font: 600 13px/1.3 var(--font-display);
+  /* One readable name scale across every store card row (daily, night market,
+     accessories) — the peek scales proportionally on top of it. Bebas Neue is
+     condensed and reads small, so this is deliberately larger than the UI's
+     body scale. */
+  font: 600 17px/1.25 var(--font-display);
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--text);
-  /* Wraps to 2 lines (never ellipsized) with the second line always reserved,
-     so every bar in a row stays the same height and flush to the card bottom. */
+  /* Two lines reserved (never ellipsized) so short names keep the bars even;
+     a third line takes over when a long name needs it (DIVINE INTERVENTION),
+     and the stretched card + bar margin below keep every bar bottom flush. */
   white-space: normal;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
-  min-height: calc(2 * 1.3em);
+  min-height: calc(2 * 1.25em);
 }
 .sstore-price {
   display: inline-flex;
@@ -671,7 +676,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .sstore-peek .sstore-art-fb { font-size: 15px; }
 .sstore-peek .sstore-bar { padding: 12px 14px; gap: 12px; }
 .sstore-peek .sstore-name {
-  font-size: 21px;
+  font-size: 26px;
   white-space: normal;
   display: block;
   /* Peek shows the name in full: undo the grid cards' 2-line clamp + reserved slot. */
@@ -1777,8 +1782,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .sstore-row--scroll { grid-auto-columns: minmax(220px, 1fr); }
   .sstore-art { padding: 6px; }
   .sstore-bar { padding: 8px 10px; gap: 8px; }
-  /* Bigger than the desktop scale; the base already wraps to 2 lines. */
-  .sstore-name { font-size: 14px; }
+  /* Bigger than the desktop scale; the base already wraps to 2–3 lines. */
+  .sstore-name { font-size: 19px; }
   .sstore-rarity { font-size: 11px; }
   .sstore-rarity-gem { width: 13px; height: 13px; }
   .sstore-price { font-size: 14px; }

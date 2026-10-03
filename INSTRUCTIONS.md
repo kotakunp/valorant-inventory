@@ -76,9 +76,9 @@ renders a pixel-faithful loadout preview they can curate and export.
   rarity label (ULTRA / PREMIUM / SELECT / STANDARD) above the
   currency-icon price and `OWNED` badge;
   accessory rows scroll horizontally when long. Width tracks the preview
-  frame at any zoom. Names wrap to two lines at a readable 13–14px (never
+  frame at any zoom. Names wrap to two lines at a readable 17–19px (never
   ellipsized mid-name) with the second line reserved so every bar in a row
-  stays flush; a long single word takes a third line rather than breaking.
+  stays flush; a long name takes a third line rather than being clipped.
   Hovering a card opens an enlarged peek beside it — same card markup, art at
   its natural aspect ratio — and clicking (or tapping / `Enter`) selects that
   card: **one at a time**, marked with an accent ring and `aria-pressed`, with
