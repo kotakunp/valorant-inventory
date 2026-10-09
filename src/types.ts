@@ -103,6 +103,37 @@ export interface AccessoryOffer {
   price: number | null;
 }
 
+/**
+ * One recent match — slim server-side projection of match-details (the raw
+ * round-by-round blob is never shipped). Powers the editor-only matches strip.
+ */
+export interface RecentMatch {
+  id: string;
+  /** Match start, ISO 8601. */
+  start: string;
+  /** Raw QueueID (competitive, unrated, hurm, …) — tab grouping key. */
+  queue: string;
+  /** Display label: queue name, else gamemode catalog name, else raw ID. */
+  mode: string;
+  map: string;
+  mapIcon: string | null;
+  /** Agent display name + icon for the played agent (characterId). */
+  agent: string;
+  agentIcon: string | null;
+  /** Win/loss (null when teams were missing — e.g. forfeits). */
+  won: boolean | null;
+  /** Rounds won: mine vs theirs (null when teams were missing). */
+  score: { mine: number; theirs: number } | null;
+  kills: number;
+  deaths: number;
+  assists: number;
+  /** Average combat score (score / roundsPlayed). */
+  acs: number;
+  durationMs: number | null;
+  /** RankedRating earned — competitive/premier only, null elsewhere. */
+  rr: number | null;
+}
+
 export interface ShowcasePayload {
   puuid: string;
   gameName: string;
@@ -120,6 +151,8 @@ export interface ShowcasePayload {
   defaultIcons?: Record<string, string>;
   /** Daily store + night market (null when the storefront wasn't available). */
   store?: StoreSection | null;
+  /** Recent matches for the editor strip (absent/empty → strip not rendered). */
+  matches?: RecentMatch[];
   generatedAt: string;
 }
 
@@ -140,6 +173,15 @@ export interface Ranks {
 
 export type ItemKind = "skin" | "card" | "title" | "buddy";
 export type Selection = Record<string, boolean>;
+
+/**
+ * Kinds the showcase renders as a single slot — one profile card, one title
+ * (`Showcase.tsx` takes `checkedCards[0]` / `checkedTitles[0]`). Selecting one
+ * therefore clears the others of that kind, radio-style; skins and buddies
+ * (`BUDDIES +n`) stay multi-select.
+ */
+export const SINGLE_SLOT_KINDS: readonly ItemKind[] = ["card", "title"];
+export const isSingleSlot = (kind: ItemKind): boolean => SINGLE_SLOT_KINDS.includes(kind);
 /** skinId → chosen chroma id (UI state only). */
 export type ChromaSelection = Record<string, string>;
 

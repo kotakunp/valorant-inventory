@@ -1,49 +1,19 @@
 import { useMemo, useState, useEffect, useRef, type FormEvent, type CSSProperties } from "react";
 import { toPng } from "html-to-image";
-import type { ChromaSelection, ItemKind, Region, Selection, ShowcasePayload, SkinItem } from "./types";
-import { selKey } from "./types";
-import { buildSelection, collectionValue, groupByGun, isPremiumSkin, paginate, rarityColor, vpToUsd } from "./logic";
+import type { CardItem, ChromaSelection, ItemKind, Region, Selection, ShowcasePayload, SkinItem } from "./types";
+import { isSingleSlot, selKey } from "./types";
+import { buildSelection, collectionValue, groupByGun, isPremiumSkin, paginate, pickSingleSlot, rarityColor, vpToUsd } from "./logic";
 import type { AnyItem } from "./logic";
 import { makeState, parseCallback, RSO_STATE_KEY, RSO_REGION_KEY } from "./rso";
 import { SITEKEY, loadHcaptcha, widgetToken, resetCaptcha, renderCaptcha, fetchCaptchaChallenge } from "./captcha";
 import { Showcase, CANVAS_W, CANVAS_H } from "./Showcase";
 import { SkinArt } from "./skinArt";
-import { RemoteBrowserPanel } from "./RemoteBrowser";
+import { CardPeek } from "./CardPeek";
+import { MatchesStrip } from "./MatchesStrip";
 import { StorePanel } from "./StorePanel";
 import { ACCESS_URL_LOGIN_LINK } from "./types";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
-
-const qs = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-const IS_REMOTE_POPUP = qs.get("remote") === "1";
-const POPUP_REGION = ((qs.get("region") as Region) || "na") satisfies Region;
-const REMOTE_CREDS_KEY = "valorant-remote-creds";
-
-/** Stash email/password for the remote popup (sessionStorage — same-origin tab copy only). */
-function stashRemoteCreds(email: string, password: string): void {
-  if (!email || !password || typeof sessionStorage === "undefined") return;
-  try {
-    sessionStorage.setItem(REMOTE_CREDS_KEY, JSON.stringify({ username: email, password }));
-  } catch {
-    /* private mode */
-  }
-}
-
-function takeRemoteCreds(): { username: string; password: string } | undefined {
-  if (typeof sessionStorage === "undefined") return undefined;
-  try {
-    const raw = sessionStorage.getItem(REMOTE_CREDS_KEY);
-    if (!raw) return undefined;
-    sessionStorage.removeItem(REMOTE_CREDS_KEY);
-    const parsed = JSON.parse(raw) as { username?: string; password?: string };
-    if (parsed.username && parsed.password) {
-      return { username: parsed.username, password: parsed.password };
-    }
-  } catch {
-    /* ignore */
-  }
-  return undefined;
-}
 
 type LoadKind = "cookies" | "password" | "mfa" | "auto" | "url" | "rso";
 
@@ -80,6 +50,8 @@ export default function App() {
   const [selection, setSelection] = useState<Selection>({});
   const [chromaSel, setChromaSel] = useState<ChromaSelection>({});
   const [bringToFront, setBringToFront] = useState<Record<string, string>>({});
+  /** Card chip hover peek (sidebar CARDS panel) — the chip avatar is 16px. */
+  const [cardPeek, setCardPeek] = useState<{ item: CardItem; el: HTMLElement } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<LoadKind | null>(null);
   const [page, setPage] = useState(0);
@@ -112,14 +84,27 @@ export default function App() {
   const [zoom, setZoom] = useState<"fit" | "100">("fit");
   const [fitScale, setFitScale] = useState(0.75);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [remoteOpen, setRemoteOpen] = useState(false);
-  const [remoteCreds, setRemoteCreds] = useState<{ username: string; password: string } | undefined>(() =>
-    IS_REMOTE_POPUP ? takeRemoteCreds() : undefined
-  );
-  const remoteWinRef = useRef<Window | null>(null);
   const captchaDivRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const previewAreaRef = useRef<HTMLDivElement>(null);
+
+  // Card chip peek: open on hover/focus, 180ms leave-grace so the pointer can
+  // cross the gap onto the panel itself (StorePanel's keepOpen/closeSoon).
+  const peekCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const openCardPeek = (item: CardItem, el: HTMLElement) => {
+    clearTimeout(peekCloseTimer.current);
+    setCardPeek({ item, el });
+  };
+  const keepCardPeekOpen = () => clearTimeout(peekCloseTimer.current);
+  const closeCardPeekSoon = () => {
+    clearTimeout(peekCloseTimer.current);
+    peekCloseTimer.current = setTimeout(() => setCardPeek(null), 180);
+  };
+  const closeCardPeek = () => {
+    clearTimeout(peekCloseTimer.current);
+    setCardPeek(null);
+  };
+  useEffect(() => () => clearTimeout(peekCloseTimer.current), []);
 
   useEffect(() => {
     fetch("/api/rso/config")
@@ -134,19 +119,6 @@ export default function App() {
       if (parsed.kind === "error") setError(parsed.message);
       else void exchangeRsoCode(parsed.code);
     }
-
-    // Popup child → opener: deliver showcase when remote login finishes.
-    const onMsg = (ev: MessageEvent) => {
-      if (ev.origin !== window.location.origin) return;
-      if (ev.data?.type === "valorant-showcase" && ev.data.payload) {
-        applyShowcase(ev.data.payload as ShowcasePayload);
-        setRemoteOpen(false);
-        setError(null);
-      }
-    };
-    window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fit preview to available width (export canvas stays fixed 1280×720).
@@ -216,6 +188,24 @@ export default function App() {
     setSelection(buildSelection(json));
     setChromaSel(defaultChromaMap(json));
     setPage(0);
+    setCardPeek(null); // the previous payload's chips are gone
+  }
+
+  /**
+   * Load guard: several sign-in paths can be in flight at once (access URL,
+   * RSO callback, password, MFA, cookie, AUTO LOGIN). A slow earlier response
+   * must not silently replace the account the user is now looking at.
+   */
+  const loadSeqRef = useRef(0);
+  /** Call before the async sign-in fetch; hold the token for `applyIfCurrent`. */
+  function beginLoad(): number {
+    return ++loadSeqRef.current;
+  }
+  /** Apply the payload only when no newer load has started since `token`. */
+  function applyIfCurrent(token: number, json: ShowcasePayload): boolean {
+    if (loadSeqRef.current !== token) return false;
+    applyData(json);
+    return true;
   }
 
   useEffect(() => {
@@ -236,7 +226,7 @@ export default function App() {
       if (!challenge.solver && !captchaSolver) {
         setCaptchaStatus("error");
         setError(
-          "Riot rejects captcha solved on this site (host-lock). Use AUTO LOGIN (remote browser) or paste the ssid cookie. " +
+          "Riot rejects captcha solved on this site (host-lock). Use the access URL, AUTO LOGIN, or paste the ssid cookie. " +
             "To enable password mode, set CAPMONSTER_API_KEY in the server env."
         );
         return;
@@ -260,6 +250,7 @@ export default function App() {
 
   async function fetchAccessUrl(e: FormEvent) {
     e.preventDefault();
+    const loadToken = beginLoad();
     const url = form.accessUrl.trim();
     if (!url) {
       setError("Paste the full access URL from the Riot sign-in redirect.");
@@ -286,7 +277,7 @@ export default function App() {
         setError(json.error ?? `Request failed (${res.status})`);
         return;
       }
-      applyShowcase(json);
+      applyIfCurrent(loadToken, json);
     } catch {
       setError("Network error — is the server running on port 3001?");
     } finally {
@@ -294,8 +285,22 @@ export default function App() {
     }
   }
 
+  /**
+   * Toggle a selection. Card and title are single-slot on the showcase, so
+   * picking one releases the others of that kind (radio-style); skins and
+   * buddies stay multi-select.
+   */
   const toggle = (kind: ItemKind, id: string) =>
-    setSelection((s) => ({ ...s, [selKey(kind, id)]: !s[selKey(kind, id)] }));
+    setSelection((s) => {
+      const key = selKey(kind, id);
+      const on = !s[key];
+      if (!isSingleSlot(kind)) return { ...s, [key]: on };
+      const prefix = `${kind}:`;
+      const next = { ...s };
+      if (on) for (const k of Object.keys(next)) if (k.startsWith(prefix)) next[k] = false;
+      next[key] = on;
+      return next;
+    });
 
   const removeSkin = (id: string) =>
     setSelection((s) => ({ ...s, [selKey("skin", id)]: false }));
@@ -309,6 +314,14 @@ export default function App() {
   const setSection = (kind: ItemKind, mode: "all" | "none" | "premium") => {
     if (!data) return;
     const items: AnyItem[] = { skin: data.skins, card: data.cards, title: data.titles, buddy: data.buddies }[kind];
+    if (isSingleSlot(kind)) {
+      // One-slot kinds hold exactly one item: "all"/"premium" pick a single
+      // winner (equipped first) instead of checking several at once.
+      const qualifies = (it: AnyItem) =>
+        mode === "all" ? true : mode === "none" ? false : it.price != null;
+      setSelection((s) => pickSingleSlot(kind, items, qualifies, s));
+      return;
+    }
     setSelection((s) => {
       const next = { ...s };
       for (const it of items) {
@@ -338,15 +351,25 @@ export default function App() {
       const nodes = Array.from(document.querySelectorAll<HTMLElement>("[data-export-page]"));
       const imgs = Array.from(document.querySelectorAll<HTMLImageElement>("[data-export-page] img"));
       const failed: string[] = [];
+      // Bounded: an image stuck in neither `load` nor `error` would otherwise
+      // leave `exporting` true forever with no way out but a reload.
       await Promise.all(
         imgs.map((i) =>
           i.complete && i.naturalWidth > 0
             ? Promise.resolve()
             : new Promise<void>((r) => {
+                const done = () => {
+                  clearTimeout(timer);
+                  r();
+                };
+                const timer = setTimeout(() => {
+                  failed.push(i.src);
+                  done();
+                }, 15_000);
                 i.addEventListener("load", () => r(), { once: true });
                 i.addEventListener("error", () => {
                   failed.push(i.src);
-                  r();
+                  done();
                 }, { once: true });
               })
         )
@@ -377,6 +400,7 @@ export default function App() {
   }
 
   async function exchangeRsoCode(code: string) {
+    const loadToken = beginLoad();
     setLoading("rso");
     setError(null);
     try {
@@ -390,7 +414,7 @@ export default function App() {
         setError(json.error ?? `Riot sign-in failed (${res.status})`);
         return;
       }
-      applyShowcase(json);
+      applyIfCurrent(loadToken, json);
     } catch {
       setError("Network error during Riot sign-in.");
     } finally {
@@ -423,22 +447,18 @@ export default function App() {
 
   async function submitLogin(e: FormEvent) {
     e.preventDefault();
+    const loadToken = beginLoad();
     if (auth.mode === "mfa") {
-      await submitMfaOtp();
+      await submitMfaOtp(loadToken);
       return;
     }
     const token = widgetToken(widgetIdRef.current);
     if (captchaNeeded && !captchaSolver) {
-      // Host-locked captcha — open remote browser with our form's email/password pre-filled.
-      // User only solves captcha/2FA on Riot's real page; no typing into the stream.
-      if (creds.email && creds.password) {
-        stashRemoteCreds(creds.email, creds.password);
-        openRemotePopup();
-        return;
-      }
+      // Host-locked captcha: Riot rejects tokens minted for our origin, so
+      // password mode can't complete here — point at the working paths.
       setError(
         "Password mode needs a server-side captcha solver on the hosted site (set CAPMONSTER_API_KEY), " +
-          "or use AUTO LOGIN (remote browser) / cookie paste."
+          "or use the access URL / AUTO LOGIN / cookie paste."
       );
       return;
     }
@@ -485,7 +505,7 @@ export default function App() {
         setError(msg);
         return;
       }
-      applyShowcase(json as ShowcasePayload);
+      applyIfCurrent(loadToken, json as ShowcasePayload);
       setCreds((c) => ({ ...c, password: "", otp: "" }));
     } catch {
       setError("Network error during sign-in.");
@@ -494,7 +514,12 @@ export default function App() {
     }
   }
 
-  async function submitMfaOtp() {
+  /**
+   * OTP submit. `token` lets the delegating `submitLogin` pass its own load id
+   * so the whole MFA round-trip stays one logical load; direct form/button
+   * invocations start (and therefore own) the newest one.
+   */
+  async function submitMfaOtp(token: number = beginLoad()) {
     if (!creds.otp.trim()) {
       setError("Enter the verification code from your email.");
       return;
@@ -512,7 +537,7 @@ export default function App() {
         setError(json?.error ?? `Verification failed (${res.status})`);
         return;
       }
-      applyShowcase(json as ShowcasePayload);
+      applyIfCurrent(token, json as ShowcasePayload);
       setAuth({ mode: "idle", sessionId: "", email: "" });
       setCreds((c) => ({ ...c, password: "", otp: "" }));
     } catch {
@@ -523,57 +548,30 @@ export default function App() {
   }
 
   async function submitAuto() {
+    const loadToken = beginLoad();
     setError(null);
     setLoading("auto");
-    // Prefill path: if email+password are on our form, skip local Chrome and go remote with fill.
-    const canPrefill = !!creds.email && !!creds.password;
     try {
-      if (!canPrefill) {
-        const res = await fetch("/api/login/auto", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ region: form.region }),
-        });
-        const json = (await res.json().catch(() => ({}))) as ShowcasePayload & { error?: string };
-        if (res.ok && !json.error) {
-          applyShowcase(json as ShowcasePayload);
-          return;
-        }
+      const res = await fetch("/api/login/auto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ region: form.region }),
+      });
+      const json = (await res.json().catch(() => ({}))) as ShowcasePayload & { error?: string };
+      if (!res.ok || json.error) {
+        setError(json.error ?? `Chrome login failed (${res.status})`);
+        return;
       }
-      if (canPrefill) stashRemoteCreds(creds.email, creds.password);
-      openRemotePopup();
+      applyIfCurrent(loadToken, json as ShowcasePayload);
     } catch {
-      if (canPrefill) stashRemoteCreds(creds.email, creds.password);
-      openRemotePopup();
+      setError("Network error during Chrome login.");
     } finally {
       setLoading(null);
     }
   }
 
-  function openRemotePopup() {
-    setError(null);
-    // Ensure popup child can pick up stashed credentials (openRemotePopup may be called alone).
-    if (creds.email && creds.password) stashRemoteCreds(creds.email, creds.password);
-    const url = `${window.location.origin}/?remote=1&region=${form.region}`;
-    const win = window.open(
-      url,
-      "valorant-remote-login",
-      "width=960,height=720,noopener=no,menubar=no,toolbar=no,location=no,status=no"
-    );
-    if (win) {
-      remoteWinRef.current = win;
-      setRemoteOpen(false);
-      setError("Remote login popup opened — email/password (if entered) are pre-filled; finish captcha/2FA there.");
-      return;
-    }
-    // Popup blocked → inline panel with the same credentials.
-    if (creds.email && creds.password) {
-      setRemoteCreds({ username: creds.email, password: creds.password });
-    }
-    setRemoteOpen(true);
-  }
-
   async function submitCookies(e?: { preventDefault(): void }) {
+    const loadToken = beginLoad();
     e?.preventDefault();
     const pasted = normalizeCookiePaste(cookieInput);
     if (!pasted) {
@@ -601,7 +599,7 @@ export default function App() {
         setError(json.error ?? `Cookie connect failed (${res.status})`);
         return;
       }
-      applyShowcase(json);
+      applyIfCurrent(loadToken, json);
       setCookieInput("");
     } catch {
       setCookieFailed(true);
@@ -625,6 +623,7 @@ export default function App() {
         </h3>
         {kind !== "skin" && (
           <div className="bulk">
+            {/* Cards/titles are one-slot: these pick a single item (see setSection). */}
             <button className="btn ghost" onClick={() => setSection(kind, "all")}>All</button>
             <button className="btn ghost" onClick={() => setSection(kind, "premium")}>Premium</button>
             <button className="btn ghost" onClick={() => setSection(kind, "none")}>None</button>
@@ -743,6 +742,24 @@ export default function App() {
                       "contentTierRank" in i ? (i as SkinItem).contentTierRank ?? null : null
                     ),
                   } as CSSProperties}
+                  onPointerEnter={
+                    kind === "card"
+                      ? (e) => openCardPeek(i as CardItem, e.currentTarget)
+                      : undefined
+                  }
+                  onPointerLeave={kind === "card" ? closeCardPeekSoon : undefined}
+                  onFocus={
+                    kind === "card"
+                      ? (e) => openCardPeek(i as CardItem, e.currentTarget)
+                      : undefined
+                  }
+                  onBlur={
+                    kind === "card"
+                      ? (e) => {
+                          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) closeCardPeekSoon();
+                        }
+                      : undefined
+                  }
                 >
                   <input type="checkbox" checked={on} onChange={() => toggle(kind, i.id)} />
                   {icon ? (
@@ -802,31 +819,6 @@ export default function App() {
       </div>
     );
   };
-
-  if (IS_REMOTE_POPUP) {
-    return (
-      <div className="app">
-        <div className="app-header">
-          <span className="brand-mark" aria-hidden="true" />
-          <h1>REMOTE LOGIN</h1>
-          <span className="sub">Riot&apos;s real page — captcha + 2FA work here · cookies stay on the server</span>
-        </div>
-        <RemoteBrowserPanel
-          region={POPUP_REGION}
-          credentials={remoteCreds}
-          onDone={(json) => {
-            if (window.opener && !window.opener.closed) {
-              window.opener.postMessage({ type: "valorant-showcase", payload: json }, window.location.origin);
-              window.close();
-            } else {
-              applyShowcase(json);
-            }
-          }}
-        />
-        {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
-      </div>
-    );
-  }
 
   if (!data || !pages) {
     return (
@@ -902,21 +894,6 @@ export default function App() {
               {loading === "url" ? "FETCHING…" : "LOAD COLLECTION"}
             </button>
           </form>
-
-          {remoteOpen && !IS_REMOTE_POPUP && (
-            <>
-              <div className="or-divider">remote browser</div>
-              <RemoteBrowserPanel
-                region={form.region}
-                credentials={remoteCreds}
-                onDone={(json) => {
-                  applyShowcase(json);
-                  setRemoteOpen(false);
-                  setRemoteCreds(undefined);
-                }}
-              />
-            </>
-          )}
 
           {/* ---- Everything else (collapsed) ---- */}
           <details className="other-ways">
@@ -1064,7 +1041,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="mfa-actions">
-                  <button className="btn" type="button" onClick={submitMfaOtp} disabled={loading !== null}>
+                  <button className="btn" type="button" onClick={() => void submitMfaOtp()} disabled={loading !== null}>
                     {loading === "mfa" ? "VERIFYING…" : "VERIFY & FETCH"}
                   </button>
                   <button
@@ -1094,7 +1071,7 @@ export default function App() {
               If your Chrome is already logged into Riot, this usually just works — macOS will ask
               once for Keychain access (click <em>Always Allow</em>). Otherwise a window opens: log
               in there once (tick <em>Remember me</em>), and later clicks reuse the saved session
-              with no copying. On the hosted site this falls back to a remote browser.
+              with no copying.
             </p>
 
             {rso?.configured && (
@@ -1129,6 +1106,7 @@ export default function App() {
     setSelection({});
     setChromaSel({});
     setBringToFront({});
+    setCardPeek(null);
     setError(null);
     setLoading(null);
     setPage(0);
@@ -1145,8 +1123,6 @@ export default function App() {
     setCaptchaNeeded(false);
     setCaptchaStatus("loading");
     setCaptchaSolver(false);
-    setRemoteOpen(false);
-    setRemoteCreds(undefined);
     if (captchaDivRef.current) captchaDivRef.current.innerHTML = "";
     widgetIdRef.current = null;
   };
@@ -1289,9 +1265,24 @@ export default function App() {
             {data.store && (
               <StorePanel store={data.store} generatedAt={data.generatedAt} width={Math.round(CANVAS_W * previewScale)} />
             )}
+            {data.matches && data.matches.length > 0 && (
+              <MatchesStrip matches={data.matches} width={Math.round(CANVAS_W * previewScale)} />
+            )}
           </div>
         </div>
       </div>
+
+      {/* Sidebar CARDS panel: hover/focus a chip → the full portrait peek. */}
+      {cardPeek && (
+        <CardPeek
+          key={cardPeek.item.id}
+          item={cardPeek.item}
+          anchor={cardPeek.el}
+          onEnter={keepCardPeekOpen}
+          onLeave={closeCardPeekSoon}
+          onClose={closeCardPeek}
+        />
+      )}
 
       <div className="hidden-export" aria-hidden="true">
         {pages.gridPages.map((_, i) => (

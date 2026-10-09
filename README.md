@@ -8,7 +8,7 @@ See `SPEC.md` for the full product/technical specification (§6–§8 = UI/layou
 
 ```bash
 npm install
-npm test          # vitest (selection defaults, pagination, stack layout, auth parsers) — expect 112 tests green
+npm test          # vitest (selection defaults, pagination, stack layout, auth parsers, match strip) — expect 148 tests green
 npm run build     # tsc --noEmit + production bundle → dist/
 npm start         # serves API + built frontend on http://localhost:3001
 # or for development with hot reload:
@@ -21,7 +21,7 @@ npm run dev       # Express :3001 + Vite :5173 (proxied)
 npx tsc --noEmit && npx vitest run && npm run build
 ```
 
-All three must pass (112 tests). Then `git add … && git commit && git push` to `main`.
+All three must pass (148 tests). Then `git add … && git commit && git push` to `main`.
 
 ## Architecture
 
@@ -33,12 +33,12 @@ src/                      # React frontend (Vite + TS)
   logic.test.ts           # UI-logic tests
   styles.css              # all styles; fixed 1280×720 `.sc-root` canvas
   types.ts                # SkinItem, ShowcasePayload, …
-  rso.ts, captcha.ts, RemoteBrowser.tsx, StorePanel.tsx
+  rso.ts, captcha.ts, StorePanel.tsx, MatchesStrip.tsx, CardPeek.tsx
 server/                   # Express (tsx, no build step)
   index.ts                # routes + /img proxy + static dist/ in production
-  valorant.ts             # Riot pipeline: entitlements/storefront/wallet/MMR → buildShowcase
+  valorant.ts             # Riot pipeline: entitlements/storefront/wallet/MMR/match history → buildShowcase
   riotAuth.ts, rso.ts     # token-paste / RSO auth
-  browserLogin.ts, chromeCookies.ts, remoteBrowser.ts, captchaSolver.ts
+  browserLogin.ts, chromeCookies.ts, captchaSolver.ts
   *.test.ts               # vitest suite
 SPEC.md                   # product + technical spec (UI sections must stay in sync)
 ```
@@ -54,7 +54,7 @@ SPEC.md                   # product + technical spec (UI sections must stay in s
 
 ## Deploy
 
-- Hosted via **Dokploy** with **Nixpacks** (`nixpacks.toml`: nodejs_20 + Chromium for remote-browser login); push to `main`, then redeploy in Dokploy.
+- Hosted via **Dokploy** with **Nixpacks** (`nixpacks.toml`: nodejs_20); push to `main`, then redeploy in Dokploy.
 - Production: `npm start` → `NODE_ENV=production tsx server/index.ts` on **:3001**.
 - Config via `.env` (see `.env.example`): `RSO_*`, `PORT`, `CAPMONSTER_API_KEY`.
 
@@ -95,8 +95,8 @@ but deliberately **not stored** in v1.
 ## Sign-in modes
 
 1. **Access URL (recommended)** — open the Riot sign-in link in your own browser (captcha/2FA happen on Riot's real page), then copy the entire redirect URL (`playvalorant.com/opt_in#access_token=…` — the `#…` fragment matters) and paste it. Server mints entitlements, auto-detects region/PUUID (no region picker anywhere); the token is used once in request memory, never stored.
-2. **Email/password + email OTP** — server performs Riot's 2026 authenticate flow in memory (challenge → captcha → password PUT → OTP → entitlements). Credentials never stored. **Hosted caveat:** hCaptcha Enterprise tokens minted in our widget are host-locked to `authenticate.riotgames.com` and Riot rejects tokens from `valorant.muur.app` / `localhost`. Fix options: set `CAPMONSTER_API_KEY` (server solves for the correct origin) or use AUTO LOGIN remote browser / cookie paste.
-3. **Browser cookie** — log in at playvalorant.com yourself, copy the `ssid` cookie, paste it. Server mints tokens via Cookie Reauth (~1 week stable). **AUTO LOGIN:** desktop harvests your installed Chrome session (macOS Keychain / Windows DPAPI) or opens a local Chrome window. **On the hosted VPS** AUTO LOGIN falls back to a **remote Chromium** streamed into the page — you log in on Riot's real domain inside the frame (captcha + 2FA work), cookies are harvested server-side, showcase loads automatically. Chromium is installed by nixpacks (`nixPkgs`) and discovered on `PATH` at runtime.
+2. **Email/password + email OTP** — server performs Riot's 2026 authenticate flow in memory (challenge → captcha → password PUT → OTP → entitlements). Credentials never stored. **Hosted caveat:** hCaptcha Enterprise tokens minted in our widget are host-locked to `authenticate.riotgames.com` and Riot rejects tokens from `valorant.muur.app` / `localhost`. Fix options: set `CAPMONSTER_API_KEY` (server solves for the correct origin) or use the access URL / AUTO LOGIN / cookie paste.
+3. **Browser cookie** — log in at playvalorant.com yourself, copy the `ssid` cookie, paste it. Server mints tokens via Cookie Reauth (~1 week stable). **AUTO LOGIN:** desktop harvests your installed Chrome session (macOS Keychain / Windows DPAPI) or opens a local Chrome window. On the hosted VPS there is no interactive fallback — use the access URL or cookie paste there.
 4. **Paste session tokens (advanced)** — PowerShell/lockfile method (below).
 5. **RSO "Sign in with Riot"** — activates via `.env` after Riot approves the OAuth client.
 

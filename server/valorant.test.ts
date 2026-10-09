@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseEntitlements, parseRanks, rankBadge, buildPriceMapFromStorefront, buildStoreSection, tierVpPrice } from "./valorant";
+import { parseEntitlements, parseRanks, rankBadge, buildPriceMapFromStorefront, buildStoreSection, tierVpPrice, projectRecentMatch, fetchRecentMatches } from "./valorant";
 
 const CARDS = "3f296c07-64c3-494c-923b-fe692a4fa1bd";
 
@@ -228,5 +228,152 @@ describe("tierVpPrice", () => {
   it("null / unknown rank → null (battlepass or free skins)", () => {
     expect(tierVpPrice(null)).toBeNull();
     expect(tierVpPrice(99)).toBeNull();
+  });
+});
+
+describe("projectRecentMatch", () => {
+  const MAP_URL = "/Game/Maps/Ascent/Ascent";
+  const cat = () => ({
+    maps: new Map([[MAP_URL.toLowerCase(), { name: "Ascent", icon: "map.png" }]]),
+    gameModes: new Map([
+      ["hurm", "Team Deathmatch"],
+      ["bomb", "Standard"],
+    ]),
+    agents: new Map([["jett-uuid", { name: "Jett", icon: "jett.png" }]]),
+  });
+  const detail = (infoOver: Record<string, unknown> = {}, topOver: Record<string, unknown> = {}) => ({
+    matchInfo: {
+      matchId: "m1",
+      mapId: MAP_URL,
+      gameStartMillis: 1760000000000,
+      gameLengthMillis: 1_920_000,
+      queueID: "competitive",
+      gameMode: "/Game/GameModes/Bomb/BombGameMode.BombGameMode",
+      isCompleted: true,
+      ...infoOver,
+    },
+    players: [
+      { subject: "PUUID", teamId: "Blue", characterId: "jett-uuid", stats: { score: 3120, roundsPlayed: 20, kills: 18, deaths: 12, assists: 6 } },
+      { subject: "other", teamId: "Red", characterId: "sova-uuid", stats: { score: 2100, roundsPlayed: 20, kills: 10, deaths: 15, assists: 4 } },
+    ],
+    teams: [
+      { teamId: "Blue", won: true, roundsWon: 13 },
+      { teamId: "Red", won: false, roundsWon: 7 },
+    ],
+    ...topOver,
+  });
+  const ctx = (rr: [string, number][] = []) => ({ puuid: "puuid", rrByMatch: new Map(rr), ...cat() });
+
+  it("projects self stats, W/L + score, and catalog labels", () => {
+    const m = projectRecentMatch(detail(), ctx());
+    expect(m).toMatchObject({
+      id: "m1",
+      start: new Date(1760000000000).toISOString(),
+      queue: "competitive",
+      mode: "COMPETITIVE",
+      map: "Ascent",
+      mapIcon: "map.png",
+      agent: "Jett",
+      agentIcon: "jett.png",
+      won: true,
+      score: { mine: 13, theirs: 7 },
+      kills: 18, deaths: 12, assists: 6,
+      acs: 156, // 3120 score / 20 rounds
+      durationMs: 1_920_000,
+      rr: null,
+    });
+  });
+
+  it("mode falls back to the gamemode catalog, then the raw queue ID", () => {
+    const tdm = projectRecentMatch(
+      detail({ queueID: "hurm", gameMode: "/Game/GameModes/HURM/HURM.HURM" }),
+      ctx()
+    );
+    expect(tdm?.mode).toBe("Team Deathmatch");
+    const unknown = projectRecentMatch(
+      detail({ queueID: "ootb", gameMode: "/Game/GameModes/Nope/Nope.Nope" }),
+      ctx()
+    );
+    expect(unknown?.mode).toBe("OOTB");
+  });
+
+  it("attaches RR only for competitive/premier", () => {
+    const rr = ctx([["m1", 18]]);
+    expect(projectRecentMatch(detail(), rr)?.rr).toBe(18);
+    const unrated = projectRecentMatch(detail({ queueID: "unrated" }), rr);
+    expect(unrated?.rr).toBeNull();
+  });
+
+  it("unknown map falls back to the raw last path segment", () => {
+    const m = projectRecentMatch(detail({ mapId: "/Game/Maps/Foo/Foo_Bar" }), ctx());
+    expect(m?.map).toBe("Foo_Bar");
+    expect(m?.mapIcon).toBeNull();
+  });
+
+  it("returns null for incomplete, self-less, stat-less, or timeless matches", () => {
+    expect(projectRecentMatch(detail({ isCompleted: false }), ctx())).toBeNull();
+    expect(projectRecentMatch(detail({ gameStartMillis: 0 }), ctx())).toBeNull();
+    expect(projectRecentMatch({ ...detail(), players: [] }, ctx())).toBeNull();
+    expect(
+      projectRecentMatch(
+        {
+          ...detail(),
+          players: [{ subject: "PUUID", teamId: "Blue", characterId: "jett-uuid", stats: null }],
+        },
+        ctx()
+      )
+    ).toBeNull();
+  });
+
+  it("null teams → null result, no score", () => {
+    const m = projectRecentMatch(detail({}, { teams: null }), ctx());
+    expect(m?.won).toBeNull();
+    expect(m?.score).toBeNull();
+  });
+});
+
+describe("fetchRecentMatches", () => {
+  const cat = () => ({
+    maps: new Map([["/game/maps/ascent/ascent", { name: "Ascent", icon: null }]]),
+    gameModes: new Map([["bomb", "Standard"]]),
+    agents: new Map([["jett-uuid", { name: "Jett", icon: null }]]),
+  });
+  const detail = (id: string, queueID: string) => ({
+    matchInfo: {
+      matchId: id, mapId: "/Game/Maps/Ascent/Ascent", gameStartMillis: 1760000000000,
+      gameLengthMillis: 1000, queueID, gameMode: "/Game/GameModes/Bomb/BombGameMode.BombGameMode",
+      isCompleted: true,
+    },
+    players: [{ subject: "PUUID", teamId: "Blue", characterId: "jett-uuid", stats: { score: 100, roundsPlayed: 10, kills: 1, deaths: 1, assists: 1 } }],
+    teams: [{ teamId: "Blue", won: true, roundsWon: 13 }, { teamId: "Red", won: false, roundsWon: 9 }],
+  });
+
+  it("history + MMR + ≤10 detail calls, RR joined, order kept, failures skipped", async () => {
+    const ids = Array.from({ length: 12 }, (_, i) => `m${i + 1}`);
+    const calls: string[] = [];
+    const pdGet = async (p: string) => {
+      calls.push(p);
+      if (p.startsWith("/match-history/")) return { History: ids.map((MatchID) => ({ MatchID, QueueID: "competitive" })) };
+      if (p.startsWith("/mmr/")) return { Matches: [{ MatchID: "m1", RankedRatingEarned: 12 }, { MatchID: "m2", RankedRatingEarned: -7 }] };
+      if (p.includes("/match-details/")) {
+        const id = p.split("/").pop()!;
+        if (id === "m3") return null; // one failed detail
+        return detail(id, id === "m2" ? "unrated" : "competitive");
+      }
+      return null;
+    };
+    const out = await fetchRecentMatches(pdGet, "puuid", cat());
+    expect(calls.some((c) => c.startsWith("/match-history/") && c.includes("endIndex=15"))).toBe(true);
+    expect(calls.filter((c) => c.includes("/match-details/"))).toHaveLength(10);
+    expect(out.map((m) => m.id)).toEqual(["m1", "m2", "m4", "m5", "m6", "m7", "m8", "m9", "m10"]);
+    expect(out[0].rr).toBe(12);
+    // m2 is unrated — the joined -7 must not leak outside ranked queues.
+    expect(out[1].rr).toBeNull();
+    expect(out[1].mode).toBe("UNRATED");
+  });
+
+  it("upstream failures → []", async () => {
+    const out = await fetchRecentMatches(async () => null, "puuid", cat());
+    expect(out).toEqual([]);
   });
 });

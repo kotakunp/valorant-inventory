@@ -38,7 +38,8 @@ function hhmmss(totalSec: number): string {
   return [h, m, sec].map((v) => String(v).padStart(2, "0")).join(":");
 }
 
-function SectionHead({ label, time }: { label: string; time?: string | null }) {
+/** Game-style section rule: — LABEL 06:43:04 — (shared with MatchesStrip). */
+export function SectionHead({ label, time }: { label: string; time?: string | null }) {
   return (
     <div className="sstore-head">
       <span className="sstore-head-line" />
@@ -174,7 +175,8 @@ export function StorePanel({
 
   const keepOpen = () => clearTimeout(closeTimer.current);
   /** The cell for a peek key (`data-peek-key` is stamped by `cellProps`). */
-  const cellEl = (key: string) => document.querySelector<HTMLElement>(`[data-peek-key="${key}"]`);
+  const cellEl = (key: string) =>
+    document.querySelector<HTMLElement>(`[data-peek-key="${CSS.escape(key)}"]`);
   /** Show the selected card again — a hover preview just ended. */
   const showSelected = () => {
     const sel = selectedRef.current;

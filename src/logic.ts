@@ -1,8 +1,44 @@
-import type { BuddyItem, CardItem, ItemKind, Selection, ShowcasePayload, SkinItem, TitleItem } from "./types";
+import type { BuddyItem, CardItem, ItemKind, RecentMatch, Selection, ShowcasePayload, SkinItem, TitleItem } from "./types";
 import { selKey } from "./types";
 
 export const PREMIUM_PRICE = 1775;
 export const MAX_GRID_ITEMS = 120;
+
+/** Gap between a trigger and its floating peek, and the viewport inset. */
+export const PEEK_GAP = 8;
+export const PEEK_INSET = 12;
+
+/** Minimal geometry the peek placement needs (DOMRect satisfies it). */
+export interface RectLike {
+  left: number;
+  top: number;
+  right: number;
+  width: number;
+}
+
+/**
+ * Where to put a floating peek panel of `size` for a trigger at `rect`: beside
+ * it on the right when that fits, else on the left, else centred over it —
+ * always clamped inside the viewport. Shared by the store-card peek
+ * (`StorePanel.tsx`) and the sidebar card peek (`App.tsx`).
+ */
+export function peekPosition(
+  rect: RectLike,
+  size: { width: number; height: number },
+  viewport: { width: number; height: number }
+): { left: number; top: number } {
+  const left =
+    viewport.width - rect.right >= size.width + PEEK_GAP * 2
+      ? rect.right + PEEK_GAP
+      : rect.left >= size.width + PEEK_GAP * 2
+        ? rect.left - size.width - PEEK_GAP
+        : Math.max(
+            PEEK_INSET,
+            Math.min(rect.left + rect.width / 2 - size.width / 2, viewport.width - size.width - PEEK_INSET)
+          );
+  const top = Math.max(PEEK_INSET, Math.min(rect.top, viewport.height - size.height - PEEK_INSET));
+  return { left, top };
+}
 
 /** Content-tier ranks ≥ this are "premium" (Premium Edition=2, Exclusive=3, Ultra=4). */
 export const PREMIUM_TIER = 2;
@@ -153,10 +189,32 @@ export function buildSelection(payload: ShowcasePayload): Selection {
     sel[selKey(kind, item.id)] = defaultChecked(kind, item, payload.pricesAvailable);
   };
   payload.skins.forEach((i) => add("skin", i));
-  payload.cards.forEach((i) => add("card", i));
-  payload.titles.forEach((i) => add("title", i));
   payload.buddies.forEach((i) => add("buddy", i));
+  // Cards/titles hold ONE slot each on the showcase: default to a single pick
+  // (equipped first, else the first qualifying item) so the sidebar starts
+  // radio-clean instead of showing several checkmarks that the preview
+  // resolves down to one anyway.
+  Object.assign(sel, pickSingleSlot("card", payload.cards, (i) => defaultChecked("card", i, payload.pricesAvailable)));
+  Object.assign(sel, pickSingleSlot("title", payload.titles, (i) => defaultChecked("title", i, payload.pricesAvailable)));
   return sel;
+}
+
+/**
+ * One-slot kinds (card/title): collapse `items` to the single item that should
+ * be checked — the equipped one when any qualifies, else the first that does —
+ * and write that choice into `sel` (every other slot of the kind cleared).
+ * Used by `buildSelection` (defaults) and by `setSection`'s all/premium modes.
+ */
+export function pickSingleSlot(
+  kind: ItemKind,
+  items: AnyItem[],
+  qualifies: (item: AnyItem) => boolean,
+  sel: Selection = {}
+): Selection {
+  const pick = items.find((i) => i.equipped && qualifies(i)) ?? items.find(qualifies) ?? null;
+  const out: Selection = { ...sel };
+  for (const i of items) out[selKey(kind, i.id)] = i === pick;
+  return out;
 }
 
 export function collectionValue(payload: ShowcasePayload, sel: Selection): number {
@@ -372,4 +430,47 @@ export function paginate(allSkins: SkinItem[], selection: Selection): Pages {
   }
   if (gridPages.length === 0) gridPages.push([]);
   return { density, gridPages, knifeItems, totalSelected: total, truncated };
+}
+
+/* ---- Recent-matches strip: queue tabs (client-side filter over the fetched
+      window — no per-tab refetch). ---- */
+
+/** Tab order for known queues; other queues follow in first-seen order. */
+const QUEUE_ORDER = [
+  "competitive",
+  "premier",
+  "unrated",
+  "swiftplay",
+  "spikerush",
+  "deathmatch",
+];
+
+export interface QueueTab {
+  /** Raw QueueID; "" = ALL. */
+  id: string;
+  /** Display label — the matches' server-resolved mode. */
+  label: string;
+  /** Matches in this tab. */
+  count: number;
+}
+
+/** ALL + one tab per distinct queue present in the fetched window. */
+export function queueTabs(matches: RecentMatch[]): QueueTab[] {
+  const byQueue = new Map<string, { label: string; count: number }>();
+  for (const m of matches) {
+    const cur = byQueue.get(m.queue);
+    if (cur) cur.count++;
+    else byQueue.set(m.queue, { label: m.mode, count: 1 });
+  }
+  const rest = [...byQueue.keys()].filter((q) => !QUEUE_ORDER.includes(q));
+  const ordered = [...QUEUE_ORDER.filter((q) => byQueue.has(q)), ...rest];
+  return [
+    { id: "", label: "ALL", count: matches.length },
+    ...ordered.map((q) => ({ id: q, label: byQueue.get(q)!.label, count: byQueue.get(q)!.count })),
+  ];
+}
+
+/** Matches for a tab ("" = all). */
+export function filterMatches(matches: RecentMatch[], queue: string): RecentMatch[] {
+  return queue ? matches.filter((m) => m.queue === queue) : matches;
 }

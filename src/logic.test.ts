@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, orderStack, paginate, rarityColor, rarityLabel, skinTierScore, stackDirectionForColumn, stackLayers, stackSteps, STACK_SPREAD, tierInfo, vpToUsd, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
-import type { CardItem, ShowcasePayload, SkinItem } from "./types";
-import { selKey } from "./types";
+import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, filterMatches, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, orderStack, paginate, peekPosition, pickSingleSlot, queueTabs, rarityColor, rarityLabel, skinTierScore, stackDirectionForColumn, stackLayers, stackSteps, STACK_SPREAD, tierInfo, vpToUsd, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
+import type { AnyItem } from "./logic";
+import type { CardItem, RecentMatch, ShowcasePayload, SkinItem, TitleItem } from "./types";
+import { isSingleSlot, selKey } from "./types";
 
 const skin = (over: Partial<SkinItem> = {}): SkinItem => ({
   id: over.id ?? "s1", name: "X", weaponName: "Vandal", icon: null, price: null,
@@ -10,6 +11,121 @@ const skin = (over: Partial<SkinItem> = {}): SkinItem => ({
 });
 const card = (over: Partial<CardItem> = {}): CardItem =>
   ({ id: "c1", name: "Card", icon: null, price: null, equipped: false, ...over });
+const title = (over: Partial<TitleItem> = {}): TitleItem =>
+  ({ id: "t1", name: "Title", text: "T", price: null, equipped: false, ...over });
+
+describe("isSingleSlot", () => {
+  it("treats card + title as single slots (the showcase renders one of each)", () => {
+    expect(isSingleSlot("card")).toBe(true);
+    expect(isSingleSlot("title")).toBe(true);
+  });
+  it("leaves skins and buddies multi-select", () => {
+    expect(isSingleSlot("skin")).toBe(false);
+    expect(isSingleSlot("buddy")).toBe(false);
+  });
+});
+
+describe("pickSingleSlot", () => {
+  const cards = [
+    card({ id: "c1", price: 375 }),
+    card({ id: "c2", price: null }),
+    card({ id: "c3", price: 875, equipped: true }),
+  ];
+  const qualifies = (i: AnyItem) => i.equipped || i.price != null;
+
+  it("checks exactly one item: equipped wins over the first qualifying", () => {
+    expect(pickSingleSlot("card", cards, qualifies)).toEqual({
+      "card:c1": false,
+      "card:c2": false,
+      "card:c3": true,
+    });
+  });
+
+  it("falls back to the first qualifying item when none is equipped", () => {
+    expect(pickSingleSlot("card", [cards[0], cards[1]], qualifies)).toEqual({
+      "card:c1": true,
+      "card:c2": false,
+    });
+  });
+
+  it("clears every slot of the kind when nothing qualifies", () => {
+    const sel = pickSingleSlot("card", cards, (i) => i.price != null && i.price > 5000);
+    expect(Object.keys(sel)).toHaveLength(cards.length);
+    expect(Object.values(sel)).toEqual([false, false, false]);
+  });
+
+  it("merges over the existing selection without touching other kinds", () => {
+    const sel = pickSingleSlot(
+      "title",
+      [title({ id: "t1" }), title({ id: "t2", equipped: true })],
+      () => true,
+      { "skin:s1": true }
+    );
+    expect(sel).toEqual({ "skin:s1": true, "title:t1": false, "title:t2": true });
+  });
+});
+
+describe("buildSelection single-slot defaults", () => {
+  const payload = (cards: CardItem[], titles: TitleItem[]) =>
+    ({
+      puuid: "p", gameName: "G", tagLine: "T", region: "na",
+      accountLevel: 1, ranks: { current: null, peak: null }, wallet: { vp: null, rp: null },
+      skins: [], cards, titles, buddies: [], pricesAvailable: true, generatedAt: "2026-10-02",
+    }) as ShowcasePayload;
+
+  it("keeps at most one card and one title checked (equipped first)", () => {
+    const sel = buildSelection(
+      payload(
+        [card({ id: "c1", price: 375 }), card({ id: "c2", price: 1775 }), card({ id: "c3", price: null, equipped: true })],
+        [title({ id: "t1", price: 300 }), title({ id: "t2", equipped: true })]
+      )
+    );
+    expect(Object.entries(sel).filter(([, v]) => v)).toEqual([
+      ["card:c3", true],
+      ["title:t2", true],
+    ]);
+  });
+
+  it("picks the first qualifying card when none is equipped", () => {
+    const sel = buildSelection(payload([card({ id: "c1", price: null }), card({ id: "c2", price: 375 })], []));
+    expect(sel["card:c1"]).toBe(false);
+    expect(sel["card:c2"]).toBe(true);
+  });
+
+  it("leaves both slots empty when no card or title qualifies", () => {
+    const sel = buildSelection(payload([card({ id: "c1", price: null })], [title({ id: "t1", price: null })]));
+    expect(sel["card:c1"]).toBe(false);
+    expect(sel["title:t1"]).toBe(false);
+  });
+});
+
+describe("peekPosition", () => {
+  const rect = (left: number, top: number, width = 200, height = 200) => ({
+    left, top, right: left + width, width,
+  });
+  const size = { width: 300, height: 400 };
+  const viewport = { width: 1280, height: 900 };
+
+  it("sits to the right of the trigger when that fits", () => {
+    expect(peekPosition(rect(400, 300), size, viewport)).toEqual({ left: 608, top: 300 });
+  });
+
+  it("flips to the left when the right side would overflow", () => {
+    expect(peekPosition(rect(1000, 300), size, viewport)).toEqual({ left: 692, top: 300 });
+  });
+
+  it("centres over the trigger and clamps when neither side fits", () => {
+    // Wide trigger with <316px of viewport either side → centred over it.
+    expect(peekPosition(rect(300, 300, 700), size, viewport)).toEqual({ left: 500, top: 300 });
+    // Same trigger in a 700px viewport: centring would overflow → clamped.
+    expect(peekPosition(rect(300, 300, 700), size, { width: 700, height: 900 }).left).toBe(388);
+  });
+
+  it("keeps the panel inside the viewport vertically", () => {
+    expect(peekPosition(rect(400, 800), size, viewport).top).toBe(900 - 400 - 12);
+    expect(peekPosition(rect(400, -50), size, viewport).top).toBe(12);
+  });
+});
 
 describe("defaultChecked", () => {
   it("checks premium (>=1775) skins", () => {
@@ -356,5 +472,44 @@ describe("presentation helpers", () => {
     expect(vpToUsd(0)).toBe(0);
     expect(vpToUsd(1000)).toBe(10);
     expect(vpToUsd(45230)).toBe(452);
+  });
+});
+
+describe("queueTabs / filterMatches", () => {
+  const m = (queue: string, mode: string, id: string): RecentMatch => ({
+    id, start: "2026-10-01T00:00:00.000Z", queue, mode,
+    map: "Ascent", mapIcon: null, agent: "Jett", agentIcon: null,
+    won: true, score: { mine: 13, theirs: 9 },
+    kills: 10, deaths: 5, assists: 3, acs: 200,
+    durationMs: 1_500_000, rr: null,
+  });
+
+  it("ALL first; known queues in QUEUE_ORDER, unknown queues after (first-seen)", () => {
+    const matches = [
+      m("hurm", "TEAM DEATHMATCH", "a"),
+      m("unrated", "UNRATED", "b"),
+      m("competitive", "COMPETITIVE", "c"),
+      m("ootb", "OOTB", "d"),
+      m("hurm", "TEAM DEATHMATCH", "e"),
+      m("competitive", "COMPETITIVE", "f"),
+    ];
+    expect(queueTabs(matches)).toEqual([
+      { id: "", label: "ALL", count: 6 },
+      { id: "competitive", label: "COMPETITIVE", count: 2 },
+      { id: "unrated", label: "UNRATED", count: 1 },
+      { id: "hurm", label: "TEAM DEATHMATCH", count: 2 },
+      { id: "ootb", label: "OOTB", count: 1 },
+    ]);
+  });
+
+  it("empty matches → just ALL with count 0", () => {
+    expect(queueTabs([])).toEqual([{ id: "", label: "ALL", count: 0 }]);
+  });
+
+  it("filterMatches: '' returns everything, a queue filters it", () => {
+    const matches = [m("hurm", "TEAM DEATHMATCH", "a"), m("unrated", "UNRATED", "b"), m("hurm", "TEAM DEATHMATCH", "c")];
+    expect(filterMatches(matches, "")).toHaveLength(3);
+    expect(filterMatches(matches, "hurm").map((x) => x.id)).toEqual(["a", "c"]);
+    expect(filterMatches(matches, "deathmatch")).toEqual([]);
   });
 });

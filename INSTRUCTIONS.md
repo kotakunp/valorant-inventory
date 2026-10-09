@@ -12,7 +12,7 @@ A web app that turns a VALORANT account's cosmetics into a **single downloadable
 loadout screen** — for the account owner to attach to a listing or show off.
 Output is a PNG file only: no share links, no gallery, nothing stored.
 
-The user signs in (cookie paste / remote browser / password / access URL / RSO),
+The user signs in (cookie paste / password / access URL / RSO),
 the server pulls their inventory from Riot's unofficial endpoints, and the app
 renders a pixel-faithful loadout preview they can curate and export.
 
@@ -23,7 +23,7 @@ renders a pixel-faithful loadout preview they can curate and export.
    link** (Riot's real page, captcha + 2FA), then paste the whole
    `…opt_in#access_token=…` address-bar URL (`LOAD COLLECTION`); region + PUUID are
    **auto-detected** — there is **no server picker anywhere**. Everything else
-   under **Other sign-in methods ▾** (ssid cookie paste + how-to, remote login,
+   under **Other sign-in methods ▾** (ssid cookie paste + how-to,
    password, Chrome auto, RSO when configured). Cookie failures show
    human-readable copy + **Try again**.
 2. **Workspace** loads with the account's inventory (~75% preview / ~25% sidebar).
@@ -59,7 +59,11 @@ renders a pixel-faithful loadout preview they can curate and export.
     so a small pistol is never drawn as large as a rifle and every surface
     shows the same relative size (`src/skinArt.tsx` → `img.skin-art`).
   - **Cards / Titles / Buddies** panels: chip rows with checkboxes + prices
-    (+ per-section *All / Premium / None*).
+    (+ per-section *All / Premium / None*). Cards and titles are
+    **single-select** — checking one releases the others of that kind and the
+    showcase updates instantly (All/Premium pick a single item, equipped
+    first; None clears). Hovering or focusing a **card** chip reveals an
+    enlarged portrait peek beside the chip.
   - (No FM / PROOF footer-fields panel — removed.)
 - **Preview bar:** download button (with export phase text), page pager
   `◀ 1/N ▶` when multi-page, hint *"Hover a stack to browse its skins"*,
@@ -85,6 +89,16 @@ renders a pixel-faithful loadout preview they can curate and export.
   the peek holding while you hover others. Re-selecting the same card, a click
   away or `Escape` clears it; scrolling re-anchors the peek to its card instead
   of dismissing it.
+- **Recent matches strip** (below the store strip, same editor-only rules —
+  hidden in fullscreen, never exported): `RECENT MATCHES` rule header with the
+  current tab's record (`nW nL`), queue tabs (`ALL` + one per queue present,
+  known queues first, others first-seen — a client-side filter over the
+  fetched window, no refetch) and a horizontally scrolling row of compact
+  cards: `WIN`/`LOSS` pill + mode label, map + round score, agent icon +
+  K/D/A + ACS, `±n RR` (competitive/premier only) and duration + relative
+  time. Fed by the match-history + competitive-updates endpoints and ≤10
+  match-details calls (all non-critical) — with no playable history the strip
+  simply isn't rendered.
 
 ### The showcase itself (this IS the exported image)
 
@@ -147,6 +161,6 @@ Must NOT be visible:
 - Tokens/credentials: request memory only, never stored, never logged, never
   committed. Repo must stay free of secrets.
 - Verify before every commit: `npx tsc --noEmit && npx vitest run && npm run build`
-  (112 tests). Push to `main`, redeploy in Dokploy.
+  (150 tests). Push to `main`, redeploy in Dokploy.
 - Keep `SPEC.md` §6–§8 in sync with `src/Showcase.tsx` / `src/logic.ts` /
   `src/styles.css` when UI changes.

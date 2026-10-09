@@ -456,6 +456,82 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .store-strip section { min-width: 0; }
 
+/* ---- Recent-match strip (editor-only, sibling of the store strip;
+      never exported): queue tabs + compact W/L cards. ---- */
+.matches-strip {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+}
+.matches-strip section { min-width: 0; }
+/* Tab row uses the base .seg styling; wrap so a long queue list never squeezes. */
+.smatch-tabs {
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.smatch-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  transition: border-color 120ms;
+}
+.smatch-card:hover { border-color: var(--line-strong); }
+.smatch-card.win { border-color: rgba(126, 231, 135, 0.35); }
+.smatch-card.loss { border-color: rgba(255, 70, 85, 0.35); }
+.smatch-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.smatch-result {
+  font: 700 10px/1 var(--font-ui);
+  letter-spacing: 0.1em;
+  padding: 3px 6px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  flex: 0 0 auto;
+}
+.smatch-result.win { color: #7ee787; background: rgba(126, 231, 135, 0.12); }
+.smatch-result.loss { color: var(--accent); background: var(--accent-dim); }
+.smatch-result.draw { color: var(--muted); background: rgba(255, 255, 255, 0.05); }
+.smatch-mode {
+  margin-left: auto;
+  color: var(--faint);
+  font: 600 10px/1 var(--font-ui);
+  letter-spacing: 0.08em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.smatch-map-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.smatch-map {
+  font: 600 15px/1.1 var(--font-ui);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.smatch-score {
+  margin-left: auto;
+  font: 700 15px/1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.smatch-stat { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.smatch-agent { width: 18px; height: 18px; object-fit: contain; flex: 0 0 auto; }
+.smatch-kda {
+  font: 600 13px/1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.smatch-acs { color: var(--faint); font-size: 11px; }
+.smatch-foot { display: flex; align-items: center; gap: 8px; margin-top: auto; min-width: 0; }
+.smatch-rr { font: 700 11px/1 var(--font-ui); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.smatch-rr.up { color: #7ee787; }
+.smatch-rr.down { color: var(--accent); }
+.smatch-when { margin-left: auto; color: var(--faint); font-size: 11px; white-space: nowrap; }
+
 /* game-style section rule: — LABEL 06:43:04 — */
 .sstore-head {
   display: flex;
@@ -633,6 +709,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 /* fullscreen = showcase only (editor chrome hidden) */
 .preview-area:fullscreen .store-strip { display: none; }
+.preview-area:fullscreen .matches-strip { display: none; }
 
 /* ---- Store card peek: enlarged on hover/tap so the art can be inspected.
       Anchored beside the card (centered when space is tight); the art keeps
@@ -932,6 +1009,61 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .chip.on { border-color: var(--rarity, var(--accent)); background: rgba(255, 255, 255, 0.03); }
 .chip .price { color: var(--faint); font-size: 10px; font-weight: 600; }
 .chip img { display: block; border-radius: 2px; object-fit: contain; width: 16px; height: 16px; }
+
+/* Sidebar card peek — the CARDS chip only carries a 16px avatar, so hovering
+   (or focusing) one reveals the full 268×640 portrait beside the chip.
+   Portaled z-index: 100 overlay that follows the chip on scroll (CardPeek.tsx);
+   `.sstore-peek` is the store strip's sibling. */
+@keyframes chip-peek-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.chip-peek {
+  position: fixed;
+  z-index: 100;
+  /* Portrait is 268×640 (ratio 0.41875): cap the width so the image + name
+     bar always fit the viewport height, then keep it off the edges. */
+  width: min(240px, calc((100vh - 96px) * 0.41875), calc(100vw - 24px));
+  background: #121c27;
+  border: 1px solid #46525f;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.55);
+  color: var(--text);
+  font-family: var(--font-ui);
+  animation: chip-peek-in 0.12s ease;
+}
+.chip-peek img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 268 / 640;
+  background: var(--void);
+}
+.chip-peek-fb {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 268 / 640;
+  padding: 16px;
+  background: var(--void);
+  color: var(--muted);
+  font-size: 15px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.chip-peek-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+}
+.chip-peek-name { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.chip-peek-meta { display: flex; align-items: baseline; gap: 8px; flex-shrink: 0; }
+.chip-peek-eq { color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; }
+.chip-peek-price { color: var(--faint); font-size: 12px; font-weight: 600; }
 
 /* chroma strip */
 .chroma-panel {
@@ -1712,33 +1844,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* ===== hCaptcha ===== */
 .captcha-box { display: flex; justify-content: center; margin: 4px 0 14px; }
 .captcha-box.captcha-hidden { display: none; }
-
-/* ===== remote browser ===== */
-.remote-browser {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  margin-bottom: 12px;
-}
-.remote-browser:focus { outline: 1px solid var(--accent); }
-.remote-frame-wrap {
-  background: #000;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  overflow: auto;
-  max-height: 520px;
-  display: flex;
-  justify-content: center;
-}
-.remote-frame { display: block; user-select: none; }
-.remote-placeholder {
-  color: var(--muted);
-  padding: 48px 16px;
-  font-size: 13px;
-  text-align: center;
-}
-.remote-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
 
 /* ===== responsive (export canvas stays fixed 1280×720) ===== */
 @media (max-width: 1100px) {
