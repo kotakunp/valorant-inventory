@@ -7,15 +7,6 @@ import { getRsoConfig, buildAuthorizeUrl, handleRsoExchange } from "./rso";
 import { startLogin, submitMfa, rateLimit, AuthFlowError, loginWithCookies, normalizeRegion, requestCaptchaChallenge, parseCookieInput, detectRegion, requestEntitlements, subFromIdToken } from "./riotAuth";
 import { extractAccessUrl } from "./accessUrl";
 import { autoLoginWithBrowser } from "./browserLogin";
-import {
-  startRemoteBrowser,
-  status as remoteStatus,
-  takeResult as remoteTakeResult,
-  latestFrame as remoteLatestFrame,
-  sendInput as remoteSendInput,
-  stopRemoteBrowser,
-  type RemoteInput,
-} from "./remoteBrowser";
 import { captchaSolverEnabled } from "./captchaSolver";
 
 try {
@@ -26,6 +17,11 @@ try {
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3001);
+// Behind the Dokploy/Traefik reverse proxy: trust exactly one hop so `req.ip`
+// becomes the real client instead of the shared proxy socket — otherwise every
+// visitor shares one rate-limit bucket. With no XFF header (direct/local call)
+// the socket address is used, so spoofing isn't possible on the local path.
+app.set("trust proxy", 1);
 app.use(express.json({ limit: "32kb" }));
 
 app.get("/api/health", (_req, res) => {
@@ -36,6 +32,10 @@ app.get("/api/health", (_req, res) => {
 // the server mints entitlements + resolves region/PUUID from it (never stored).
 app.post("/api/account/access-url", async (req, res) => {
   const { url, region } = req.body ?? {};
+  if (!rateLimit(`account:${req.ip}`, 10, 60_000)) {
+    res.status(429).json({ error: "Too many requests — wait a minute and try again." });
+    return;
+  }
   try {
     const { accessToken, idToken } = extractAccessUrl(url);
     const entitlementsToken = await requestEntitlements(accessToken);
@@ -64,6 +64,10 @@ app.post("/api/account/access-url", async (req, res) => {
 
 app.post("/api/account", async (req, res) => {
   const { region, accessToken, entitlementsToken, puuid } = req.body ?? {};
+  if (!rateLimit(`account:${req.ip}`, 10, 60_000)) {
+    res.status(429).json({ error: "Too many requests — wait a minute and try again." });
+    return;
+  }
   if (typeof accessToken !== "string" || !accessToken.trim() || typeof entitlementsToken !== "string" || !entitlementsToken.trim()) {
     res.status(400).json({ error: "Both access token and entitlements token are required." });
     return;
@@ -87,6 +91,32 @@ app.post("/api/account", async (req, res) => {
 });
 
 const IMG_HOST_ALLOWLIST = new Set(["media.valorant-api.com"]);
+const IMG_MAX_BYTES = 8 * 1024 * 1024;
+const IMG_CONTENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"]);
+const IMG_MAX_REDIRECTS = 3;
+
+/**
+ * Fetch an allowlisted asset, following redirects one hop at a time and
+ * re-validating every hop — a default `redirect: "follow"` on user-supplied
+ * input can walk an allowlisted host off-allowlist.
+ */
+async function fetchAllowlisted(start: URL): Promise<Response> {
+  let target = start;
+  for (let hops = 0; ; hops++) {
+    const res = await fetch(target, { redirect: "manual", signal: AbortSignal.timeout(15000) });
+    if (res.status < 300 || res.status >= 400) return res;
+    const loc = res.headers.get("location");
+    if (!loc || hops >= IMG_MAX_REDIRECTS) return res;
+    let next: URL;
+    try {
+      next = new URL(loc, target);
+    } catch {
+      return res;
+    }
+    if (next.protocol !== "https:" || !IMG_HOST_ALLOWLIST.has(next.hostname)) return res;
+    target = next;
+  }
+}
 
 app.get("/img/:encoded", async (req, res) => {
   let target: URL;
@@ -101,14 +131,28 @@ app.get("/img/:encoded", async (req, res) => {
     return;
   }
   try {
-    const upstream = await fetch(target, { signal: AbortSignal.timeout(15000) });
+    const upstream = await fetchAllowlisted(target);
     if (!upstream.ok) {
       res.status(502).end();
       return;
     }
-    const type = upstream.headers.get("content-type") ?? "image/png";
+    const declared = (upstream.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    if (!IMG_CONTENT_TYPES.has(declared)) {
+      res.status(415).end();
+      return;
+    }
+    const len = Number(upstream.headers.get("content-length") ?? 0);
+    if (len > IMG_MAX_BYTES) {
+      res.status(413).end();
+      return;
+    }
     const buf = Buffer.from(await upstream.arrayBuffer());
-    res.setHeader("Content-Type", type);
+    if (buf.byteLength > IMG_MAX_BYTES) {
+      res.status(413).end();
+      return;
+    }
+    res.setHeader("Content-Type", declared);
+    res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "public, max-age=604800, immutable");
     res.send(buf);
   } catch {
@@ -159,6 +203,12 @@ function respondAuthError(res: import("express").Response, e: unknown): void {
 }
 
 app.get("/api/login/captcha-challenge", async (_req, res) => {
+  // Each unauthenticated hit costs 2–3 outbound Riot calls, so it needs the
+  // same throttling as the login itself.
+  if (!rateLimit(`captcha:${_req.ip}`, 10, 60_000)) {
+    res.status(429).json({ error: "Too many captcha requests — wait a minute and try again." });
+    return;
+  }
   try {
     const challenge = await requestCaptchaChallenge();
     res.json({
@@ -168,72 +218,6 @@ app.get("/api/login/captcha-challenge", async (_req, res) => {
   } catch {
     res.json({ sitekey: "019f1553-3845-481c-a6f5-5a60ccf6d830", rqdata: null, solver: captchaSolverEnabled() });
   }
-});
-
-// ---- remote browser (hosted AUTO LOGIN) ----
-app.post("/api/browser/start", async (req, res) => {
-  const { region, username, password } = req.body ?? {};
-  // Reattaching to a live session must not burn the rate limit (page reload / retry).
-  const existing = remoteStatus();
-  if (!existing.active) {
-    if (!rateLimit(`browser:${req.ip}`, 8, 60_000)) {
-      res.status(429).json({ error: "Too many browser attempts — wait a minute." });
-      return;
-    }
-  }
-  try {
-    const st = await startRemoteBrowser(normalizeRegion(region) ?? "na", {
-      // Request memory only — filled into Riot's form, then dropped. Never logged.
-      username: typeof username === "string" ? username : undefined,
-      password: typeof password === "string" ? password : undefined,
-    });
-    res.json(st);
-  } catch (e) {
-    respondAuthError(res, e);
-  }
-});
-
-app.get("/api/browser/status", (_req, res) => {
-  res.json(remoteStatus());
-});
-
-app.get("/api/browser/frame", (_req, res) => {
-  const buf = remoteLatestFrame();
-  if (!buf) {
-    res.status(404).json({ error: "No frame yet." });
-    return;
-  }
-  res.setHeader("Content-Type", "image/jpeg");
-  res.setHeader("Cache-Control", "no-store");
-  res.send(buf);
-});
-
-app.post("/api/browser/input", async (req, res) => {
-  const input = req.body as RemoteInput | undefined;
-  if (!input || typeof input.type !== "string") {
-    res.status(400).json({ error: "Input payload required." });
-    return;
-  }
-  try {
-    await remoteSendInput(input);
-    res.json({ ok: true });
-  } catch (e) {
-    respondAuthError(res, e);
-  }
-});
-
-app.get("/api/browser/result", (_req, res) => {
-  const result = remoteTakeResult();
-  if (!result) {
-    res.status(404).json({ error: "Not ready." });
-    return;
-  }
-  res.json(result);
-});
-
-app.post("/api/browser/stop", async (_req, res) => {
-  await stopRemoteBrowser();
-  res.json({ ok: true });
 });
 
 app.post("/api/login", async (req, res) => {
@@ -277,8 +261,9 @@ app.post("/api/login/mfa", async (req, res) => {
     res.status(400).json({ error: "Verification code is required." });
     return;
   }
-  if (!rateLimit(`login:${req.ip}`)) {
-    res.status(429).json({ error: "Too many sign-in attempts — wait a minute and try again." });
+  // Separate bucket: a wrong password must not consume the OTP retry quota.
+  if (!rateLimit(`mfa:${req.ip}`)) {
+    res.status(429).json({ error: "Too many verification attempts — wait a minute and try again." });
     return;
   }
   try {
@@ -303,8 +288,7 @@ app.post("/api/login/auto", async (req, res) => {
     return;
   }
   try {
-    // Prefer local Chrome harvest/window when a GUI browser exists (dev/desktop).
-    // On headless VPS, fall back is an explicit error — UI uses /api/browser/* instead.
+    // Local Chrome harvest/window (dev/desktop). On a headless VPS this errors explicitly.
     const out = await autoLoginWithBrowser();
     res.json(
       await buildShowcase({

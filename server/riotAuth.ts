@@ -111,14 +111,10 @@ export function classifyAuthResponse(body: any): AuthPrompt {
       message:
         "Riot rejected the sign-in (auth_failure). Check the email + password you use for VALORANT (not name#tag). " +
         "Accounts that only sign in via Google/Apple cannot use this mode. " +
-        "If a captcha is shown below, solve it and try again — otherwise use cookie / AUTO LOGIN." +
-        `\n\nRaw response: ${JSON.stringify(body ?? {}).slice(0, 400)}`,
+        "If a captcha is shown below, solve it and try again — otherwise use cookie / AUTO LOGIN.",
     };
   }
-  return {
-    kind: "error",
-    message: `Riot login was rejected (${err}).` + `\n\nRaw response: ${JSON.stringify(body ?? {}).slice(0, 400)}`,
-  };
+  return { kind: "error", message: `Riot login was rejected (${err}).` };
 }
 
 export function parseTokenLocation(location: string): { accessToken: string; idToken: string } | null {
@@ -293,17 +289,39 @@ export function destroySession(id: string): void {
   SESSIONS.delete(id);
 }
 
-// ---- naive per-IP rate limit for login attempts ----
+// ---- per-IP rate limit for auth attempts ----
+// In-memory and per-process by design (single Node process behind the deploy
+// proxy); `keys()` are swept on a timer so a long-running process can't grow an
+// entry per distinct peer forever.
 const attempts = new Map<string, number[]>();
+const MAX_TRACKED_KEYS = 5_000;
+const LAST_SWEEP_MS = 60_000;
+let lastSweepAt = 0;
+
+function sweepExpired(now: number): void {
+  if (now - lastSweepAt < LAST_SWEEP_MS) return;
+  lastSweepAt = now;
+  for (const [key, times] of attempts) {
+    const live = times.filter((t) => now - t < 60_000);
+    if (live.length) attempts.set(key, live);
+    else attempts.delete(key);
+  }
+}
 
 export function rateLimit(key: string, limit = 5, windowMs = 60_000): boolean {
   const now = Date.now();
+  sweepExpired(now);
   const arr = (attempts.get(key) ?? []).filter((t) => now - t < windowMs);
   if (arr.length >= limit) {
     attempts.set(key, arr);
     return false;
   }
   arr.push(now);
+  // Hard cap on tracked keys: evict the oldest insertion when it overflows.
+  if (attempts.size >= MAX_TRACKED_KEYS && !attempts.has(key)) {
+    const oldest = attempts.keys().next().value;
+    if (oldest) attempts.delete(oldest);
+  }
   attempts.set(key, arr);
   return true;
 }
@@ -708,6 +726,15 @@ async function afterAuthenticatePut(
     await exchangeLoginToken(jar, build, loginToken);
     return finishLogin(await tokensFromAuthorization(jar, build), null);
   }
+  // Success without a login_token still leaves `ssid` on the jar — resolve the
+  // tokens straight from an authorization call instead of reporting a failure.
+  if (mfaPrompt.kind === "success") {
+    try {
+      return finishLogin(await tokensFromAuthorization(jar, build), null);
+    } catch {
+      /* fall through to the structured error below */
+    }
+  }
 
   const errBody = put.body ?? {};
   const errCode = String(errBody.error ?? errBody.error_description ?? "").slice(0, 120);
@@ -720,8 +747,7 @@ async function afterAuthenticatePut(
   const cookies = cookieNamesHint(jar);
   if (isCaptchaIssue) {
     throw new AuthFlowError(
-      "Riot rejected the captcha token (expired, already used, or wrong challenge). Solve the new captcha and try again." +
-        `\n\nRaw: ${JSON.stringify(errBody).slice(0, 300)} [session cookies: ${cookies}]`,
+      "Riot rejected the captcha token (expired, already used, or wrong challenge). Solve the new captcha and try again.",
       401,
       {
         captchaRequired: true,
@@ -733,7 +759,7 @@ async function afterAuthenticatePut(
     );
   }
   if (mfaPrompt.kind === "error") {
-    throw new AuthFlowError(`${mfaPrompt.message} [session cookies: ${cookies}]`, 401, {
+    throw new AuthFlowError(mfaPrompt.message, 401, {
       captchaRequired: true,
       sitekey: fresh.challenge.sitekey,
       rqdata: fresh.challenge.rqdata,
@@ -742,7 +768,7 @@ async function afterAuthenticatePut(
     });
   }
   throw new AuthFlowError(
-    `Riot login failed (${errCode || put.status}). Try again or use cookie / AUTO LOGIN.\n\nRaw: ${JSON.stringify(errBody).slice(0, 300)}`,
+    `Riot login failed (${errCode || put.status}). Try again or use cookie / AUTO LOGIN.`,
     401,
     {
       captchaRequired: true,

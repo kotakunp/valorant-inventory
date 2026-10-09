@@ -228,7 +228,13 @@ async function readRiotRows(profileDir: string): Promise<{ rows: CookieRow[]; pr
   try {
     for (const f of ["Cookies", "Cookies-wal", "Cookies-shm"]) {
       const p = path.join(dir, f);
-      if (fs.existsSync(p)) fs.copyFileSync(p, path.join(tmp, f));
+      if (fs.existsSync(p)) {
+        const dest = path.join(tmp, f);
+        // mkdtempSync gives us 0700 on the dir; the copy itself needs to be
+        // owner-only too, since it holds the (ciphertext) cookie store.
+        fs.copyFileSync(p, dest);
+        fs.chmodSync(dest, 0o600);
+      }
     }
     const db = new DatabaseSync(path.join(tmp, "Cookies"));
     try {
