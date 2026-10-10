@@ -246,9 +246,44 @@ export class MemoryShareStore implements ShareStore {
   }
 }
 
+/**
+ * Pool settings from DATABASE_URL. `pg` reads `sslmode=require` as full
+ * certificate verification, which hosted poolers such as Supabase's fail
+ * ("self-signed certificate in certificate chain"). Keep libpq semantics:
+ * `require`/`prefer` encrypt without verifying; only `verify-ca`/`verify-full`
+ * verify. Supabase hosts always get TLS. The string's own sslmode is removed
+ * because parsed URL params override the explicit `ssl` option.
+ */
+export function pgPoolConfig(connectionString: string): {
+  connectionString: string;
+  ssl?: false | { rejectUnauthorized: boolean };
+} {
+  let url: URL;
+  try {
+    url = new URL(connectionString);
+  } catch {
+    return { connectionString };
+  }
+  const mode = url.searchParams.get("sslmode")?.toLowerCase() ?? null;
+  if (mode === "verify-ca" || mode === "verify-full") return { connectionString };
+  const supabase = /(^|\.)supabase\.(co|com)$/i.test(url.hostname);
+  url.searchParams.delete("sslmode");
+  const rest = url.toString();
+  if (mode === "disable") return { connectionString: rest, ssl: false };
+  if (mode === "require" || mode === "prefer" || mode === "no-verify" || supabase) {
+    return { connectionString: rest, ssl: { rejectUnauthorized: false } };
+  }
+  return { connectionString };
+}
+
 export async function createPgShareStore(connectionString: string): Promise<ShareStore> {
   const { default: pg } = await import("pg");
-  const pool = new pg.Pool({ connectionString, max: 5, idleTimeoutMillis: 30_000 });
+  const pool = new pg.Pool({
+    ...pgPoolConfig(connectionString),
+    max: 5,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
   pool.on("error", (e) => console.error("[share] postgres pool error:", e.message));
   await pool.query(`
     create table if not exists showcase_shares (

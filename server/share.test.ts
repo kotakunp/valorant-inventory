@@ -16,6 +16,7 @@ import {
   newShareId,
   parsePicks,
   parsePreview,
+  pgPoolConfig,
   SHARE_ID_RE,
   SHARE_TTL_MS,
   ShareError,
@@ -207,5 +208,25 @@ describe("memory store", () => {
     now = SHARE_TTL_MS + 1;
     expect(await store.get("Abcdefgh")).toBeNull();
     expect(await store.purgeExpired()).toBe(1);
+  });
+});
+
+describe("pgPoolConfig", () => {
+  it("encrypts without verifying for sslmode=require and drops the param", () => {
+    const c = pgPoolConfig("postgresql://u:p%40ss@aws-0-eu.pooler.supabase.com:5432/postgres?sslmode=require");
+    expect(c.ssl).toEqual({ rejectUnauthorized: false });
+    expect(c.connectionString).not.toContain("sslmode");
+    expect(c.connectionString).toContain("p%40ss@");
+  });
+
+  it("forces TLS for Supabase hosts without sslmode", () => {
+    expect(pgPoolConfig("postgresql://u:p@db.abc.supabase.co:5432/postgres").ssl).toEqual({ rejectUnauthorized: false });
+  });
+
+  it("leaves verify modes, disable and plain hosts alone", () => {
+    const full = "postgresql://u:p@h:5432/db?sslmode=verify-full";
+    expect(pgPoolConfig(full)).toEqual({ connectionString: full });
+    expect(pgPoolConfig("postgresql://u:p@h/db?sslmode=disable").ssl).toBe(false);
+    expect(pgPoolConfig("postgresql://u:p@localhost/db").ssl).toBeUndefined();
   });
 });

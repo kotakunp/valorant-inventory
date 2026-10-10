@@ -42,6 +42,8 @@ const shareJson = express.json({ limit: "1mb" });
 app.use((req, res, next) => (req.path === "/api/share" ? shareJson : smallJson)(req, res, next));
 
 let shareStore: ShareStore | null = null;
+/** Why sharing is off, as a fixed code (never the raw error, which can echo the host). */
+let shareStatus: "ready" | "not_configured" | "db_unreachable" = "not_configured";
 const shareReady = (async () => {
   const url = process.env.DATABASE_URL?.trim();
   if (url) {
@@ -49,6 +51,7 @@ const shareReady = (async () => {
       shareStore = await createPgShareStore(url);
       console.log("[share] postgres store ready");
     } catch (e) {
+      shareStatus = "db_unreachable";
       console.error("[share] postgres unavailable, share links disabled:", e instanceof Error ? e.message : e);
     }
   } else if (process.env.NODE_ENV !== "production") {
@@ -56,6 +59,7 @@ const shareReady = (async () => {
     console.log("[share] DATABASE_URL not set: share links live in memory (dev only)");
   }
   if (shareStore) {
+    shareStatus = "ready";
     const store = shareStore;
     setInterval(() => void store.purgeExpired().catch(() => undefined), 60 * 60 * 1000).unref();
   }
@@ -376,7 +380,7 @@ app.post("/api/login/cookies", async (req, res) => {
 
 app.get("/api/share/config", async (_req, res) => {
   await shareReady;
-  res.json({ enabled: !!shareStore });
+  res.json({ enabled: !!shareStore, status: shareStatus });
 });
 
 app.post("/api/share", async (req, res) => {
