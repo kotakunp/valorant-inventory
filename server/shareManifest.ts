@@ -25,6 +25,8 @@ export interface ShareManifest {
   cards: [string, number | null, 0 | 1][];
   titles: [string, number | null, 0 | 1][];
   buddies: [string, number | null][];
+  /** Owned agent ids (validates the one "main agent" slot; absent on old manifests). */
+  agents?: string[];
 }
 
 export const MANIFEST_TTL_MS = 24 * 60 * 60 * 1000;
@@ -70,6 +72,7 @@ export function manifestFromPayload(p: ShowcasePayload, now = Date.now()): Share
     cards: p.cards.map((c) => [c.id, c.price, c.equipped ? 1 : 0]),
     titles: p.titles.map((t) => [t.id, t.price, t.equipped ? 1 : 0]),
     buddies: p.buddies.map((b) => [b.id, b.price]),
+    agents: (p.agents ?? []).map((a) => a.id),
   };
 }
 

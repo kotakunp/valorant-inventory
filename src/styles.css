@@ -763,6 +763,43 @@ img.skin-art {
 .lib-buddy-name { font-size: 11px; line-height: 1.25; text-align: center; color: var(--muted); }
 .lib-buddy.on .lib-buddy-name { color: var(--text); }
 
+/* agents (single "main agent" pick; the most-played one carries a badge) */
+.lib-agents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-top: 14px; }
+.lib-agent {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 8px 10px;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.lib-agent:hover { border-color: var(--line-strong); }
+.lib-agent.on { border-color: rgba(255, 70, 85, 0.6); background: var(--accent-dim); }
+.lib-agent-art { width: 52px; height: 52px; flex-shrink: 0; display: flex; align-items: flex-end; justify-content: center; }
+.lib-agent-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.lib-agent-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lib-agent-name { font-size: 12px; font-weight: 600; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-agent.on .lib-agent-name { color: var(--text); }
+.lib-agent-role { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--faint); }
+.lib-agent-role img { width: 10px; height: 10px; object-fit: contain; }
+.lib-agent-fav {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  z-index: 2;
+  font: 600 9px/1 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
 /* ===== stage (center) ===== */
 .stage-wrap {
   min-width: 0;
@@ -1777,9 +1814,11 @@ img.skin-art {
   border: 2px solid rgba(255, 70, 85, 0.55);
   overflow: hidden;
   width: 100%;
-  /* Do not stretch — lock to official card art ratio so art is not cropped/squashed. */
+  /* Do not stretch — lock to official card art ratio so art is not cropped/squashed.
+     Shrinks only when the "main agent" tile below needs the space (art crops, never squashes). */
   aspect-ratio: 268 / 640;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-height: 0;
   background: #0c141d;
   clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
@@ -1870,6 +1909,45 @@ img.skin-art {
   color: var(--text);
   z-index: 1;
 }
+/* "main agent" tile (right rail, under the player card): only rendered when an
+   agent is selected. Space is taken from the card art above, never the grid. */
+.sc-agent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  flex-shrink: 0;
+  background: rgba(236, 232, 225, 0.035);
+  border: 1px solid rgba(236, 232, 225, 0.08);
+}
+.sc-agent-art {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+}
+.sc-agent-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.sc-agent-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sc-agent-label {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8b97a0;
+}
+.sc-agent-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sc-agent-role { font-size: 9px; letter-spacing: 0.04em; color: #8b97a0; }
 /* collection stats under the card: 4 counts in a row, VALUE spans below */
 .sc-stats {
   display: grid;
@@ -1964,4 +2042,133 @@ img.skin-art {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ===== profile view (editor-only, like the store view; never exported) ===== */
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-bottom: 26px;
+}
+.profile-card {
+  min-width: 0;
+  padding: 16px 18px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.profile-head {
+  margin: 0 0 12px;
+  font: 600 11px/1 var(--font-ui);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.profile-rank-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.profile-rank-icon { width: 46px; height: 46px; object-fit: contain; flex-shrink: 0; }
+.profile-rank-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.profile-rank-name { font: 20px/1 var(--font-display); letter-spacing: 0.05em; }
+.profile-rank-rr { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.profile-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 10px; margin: 0 0 10px; }
+.profile-stats > div { display: flex; flex-direction: column; gap: 3px; }
+.profile-stats dt { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.profile-stats dd { margin: 0; font: 26px/1 var(--font-display); color: var(--text); font-variant-numeric: tabular-nums; }
+.profile-stats dd small { font: 600 11px/1 var(--font-ui); color: var(--muted); margin-left: 2px; }
+.profile-line { margin: 6px 0 0; font-size: 12px; color: var(--text-2); }
+.profile-muted { color: var(--muted); }
+.profile-none { margin: 0; font-size: 12px; color: var(--muted); }
+.profile-tier-wins { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.profile-tier-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.profile-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.profile-pill { font-size: 11px; font-weight: 600; padding: 3px 8px; border: 1px solid; border-radius: 999px; white-space: nowrap; }
+.profile-form { display: flex; gap: 5px; margin-bottom: 12px; }
+.profile-form-chip {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-2);
+  background: var(--surface-3);
+  color: var(--muted);
+  font: 600 11px/1 var(--font-ui);
+}
+.profile-form-chip.is-w { background: rgba(46, 230, 168, 0.12); border-color: rgba(46, 230, 168, 0.4); color: #2ee6a8; }
+.profile-form-chip.is-l { background: var(--accent-dim); border-color: rgba(255, 70, 85, 0.4); color: #ff8a94; }
+.profile-agents { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.profile-agent { display: flex; align-items: center; gap: 8px; }
+.profile-agent-art {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm);
+}
+.profile-agent-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.profile-agent-name { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-agent-stat { font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.profile-agent-kd { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 62px; text-align: right; }
+.profile-matches { margin-bottom: 24px; }
+.profile-match-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.profile-match {
+  display: grid;
+  grid-template-columns: 46px 108px minmax(110px, 1.2fr) 52px minmax(110px, 1fr) 64px 62px 56px 64px 98px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--surface-2);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.profile-result {
+  font: 600 10px/1 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-align: center;
+  padding: 4px 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-2);
+  color: var(--muted);
+}
+.profile-result.is-win { color: #2ee6a8; border-color: rgba(46, 230, 168, 0.45); background: rgba(46, 230, 168, 0.1); }
+.profile-result.is-loss { color: #ff8a94; border-color: rgba(255, 70, 85, 0.45); background: var(--accent-dim); }
+.profile-match-mode { font-size: 10px; letter-spacing: 0.08em; color: var(--faint); }
+.profile-match-map,
+.profile-match-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.profile-match-map img,
+.profile-match-agent img { width: 16px; height: 16px; object-fit: contain; flex-shrink: 0; }
+.profile-match-score { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.profile-match-kda,
+.profile-match-num { font-variant-numeric: tabular-nums; color: var(--muted); }
+.profile-match-rr { font-variant-numeric: tabular-nums; font-weight: 600; }
+.profile-match-rr.is-up { color: #2ee6a8; }
+.profile-match-rr.is-down { color: #ff8a94; }
+.profile-match-time { font-size: 11px; color: var(--faint); text-align: right; white-space: nowrap; }
+
+@media (max-width: 1100px) {
+  .profile-match { grid-template-columns: 46px 1fr 1fr; row-gap: 4px; }
+  .profile-match-time { text-align: left; }
 }

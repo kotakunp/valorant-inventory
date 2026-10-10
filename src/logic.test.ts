@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, orderStack, paginate, peekPosition, pickSingleSlot, rarityColor, rarityLabel, skinTierScore, stackDirectionForColumn, stackLayers, stackSteps, STACK_SPREAD, tierInfo, vpToUsd, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
+import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, favoriteAgent, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, matchDuration, orderStack, paginate, peekPosition, pickSingleSlot, rarityColor, rarityLabel, relTime, skinTierScore, stackDirectionForColumn, stackLayers, stackSteps, STACK_SPREAD, tierInfo, vpToUsd, winratePct, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
 import type { AnyItem } from "./logic";
-import type { CardItem, ShowcasePayload, SkinItem, TitleItem } from "./types";
+import type { AgentItem, CardItem, ProfileStats, ShowcasePayload, SkinItem, TitleItem } from "./types";
 import { isSingleSlot, selKey } from "./types";
 
 const skin = (over: Partial<SkinItem> = {}): SkinItem => ({
@@ -15,9 +15,10 @@ const title = (over: Partial<TitleItem> = {}): TitleItem =>
   ({ id: "t1", name: "Title", text: "T", price: null, equipped: false, ...over });
 
 describe("isSingleSlot", () => {
-  it("treats card + title as single slots (the showcase renders one of each)", () => {
+  it("treats card, title + agent as single slots (the showcase renders one of each)", () => {
     expect(isSingleSlot("card")).toBe(true);
     expect(isSingleSlot("title")).toBe(true);
+    expect(isSingleSlot("agent")).toBe(true);
   });
   it("leaves skins and buddies multi-select", () => {
     expect(isSingleSlot("skin")).toBe(false);
@@ -472,5 +473,93 @@ describe("presentation helpers", () => {
     expect(vpToUsd(0)).toBe(0);
     expect(vpToUsd(1000)).toBe(10);
     expect(vpToUsd(45230)).toBe(452);
+  });
+});
+
+const agent = (over: Partial<AgentItem> = {}): AgentItem =>
+  ({ id: "a1", name: "Jett", icon: null, role: "Duelist", roleIcon: null, price: null, equipped: false, ...over });
+
+const profileWith = (topAgents: { id: string; name: string; games: number; wins: number }[]): ProfileStats => ({
+  ranked: { act: null, career: null, winsByTier: [], leaderboardRank: null },
+  matches: [],
+  window: {
+    games: topAgents.reduce((n, a) => n + a.games, 0),
+    wins: 0, losses: 0, draws: 0, kd: null, hsPct: null, acs: null,
+    topAgents: topAgents.map((a) => ({ ...a, icon: null, kills: 0, deaths: 0, assists: 0 })),
+    topMap: null,
+    form: [],
+  },
+  accountCreatedAt: null,
+});
+
+const agentPayload = (agents: AgentItem[], profile: ProfileStats | null) =>
+  ({
+    puuid: "p", gameName: "G", tagLine: "T", region: "na",
+    accountLevel: 1, ranks: { current: null, peak: null }, wallet: { vp: null, rp: null },
+    skins: [], cards: [], titles: [], buddies: [], agents, profile,
+    pricesAvailable: true, generatedAt: "2026-10-10",
+  }) as ShowcasePayload;
+
+describe("buildSelection agent default", () => {
+  it("checks the most-played owned agent", () => {
+    const sel = buildSelection(
+      agentPayload(
+        [agent({ id: "sova", name: "Sova" }), agent({ id: "jett" })],
+        profileWith([{ id: "jett", name: "Jett", games: 4, wins: 3 }])
+      )
+    );
+    expect(sel["agent:jett"]).toBe(true);
+    expect(sel["agent:sova"]).toBe(false);
+  });
+
+  it("checks nothing when there is no profile or the favorite is unowned", () => {
+    const none = buildSelection(agentPayload([agent({ id: "jett" })], null));
+    expect(none["agent:jett"]).toBe(false);
+    const unowned = buildSelection(
+      agentPayload([agent({ id: "sova", name: "Sova" })], profileWith([{ id: "jett", name: "Jett", games: 4, wins: 3 }]))
+    );
+    expect(Object.values(unowned).every((v) => !v)).toBe(true);
+  });
+});
+
+describe("favoriteAgent", () => {
+  it("resolves the top window agent against owned agents only", () => {
+    expect(
+      favoriteAgent(agentPayload([agent({ id: "sova", name: "Sova" })], profileWith([{ id: "jett", name: "Jett", games: 9, wins: 5 }])))
+    ).toBeNull();
+    expect(
+      favoriteAgent(agentPayload([agent({ id: "jett", name: "Jett" })], profileWith([{ id: "jett", name: "Jett", games: 9, wins: 5 }])))?.name
+    ).toBe("Jett");
+  });
+
+  it("no profile / no matches → null", () => {
+    expect(favoriteAgent(agentPayload([agent()], null))).toBeNull();
+    expect(favoriteAgent(agentPayload([agent()], profileWith([])))).toBeNull();
+  });
+});
+
+describe("profile helpers", () => {
+  it("winratePct rounds to whole percent and rejects empty records", () => {
+    expect(winratePct(13, 20)).toBe(65);
+    expect(winratePct(1, 3)).toBe(33);
+    expect(winratePct(0, 0)).toBeNull();
+    expect(winratePct(0, 7)).toBe(0);
+  });
+
+  it("relTime buckets into minutes/hours/days, then a date", () => {
+    const now = Date.parse("2026-10-10T12:00:00Z");
+    expect(relTime("2026-10-10T11:59:30Z", now)).toBe("just now");
+    expect(relTime("2026-10-10T11:45:00Z", now)).toBe("15m ago");
+    expect(relTime("2026-10-10T09:00:00Z", now)).toBe("3h ago");
+    expect(relTime("2026-10-07T12:00:00Z", now)).toBe("3d ago");
+    expect(relTime("2026-09-01T12:00:00Z", now)).toBe("Sep 1");
+    expect(relTime("nonsense", now)).toBe("");
+  });
+
+  it("matchDuration formats mm:ss and hides missing data", () => {
+    expect(matchDuration(1_920_000)).toBe("32:00");
+    expect(matchDuration(95_000)).toBe("1:35");
+    expect(matchDuration(null)).toBeNull();
+    expect(matchDuration(0)).toBeNull();
   });
 });

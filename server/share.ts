@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
-import type { BuddyItem, CardItem, ChromaSelection, SharedShowcase, SharePicks, SkinItem, TitleItem } from "../src/types";
+import type { AgentItem, BuddyItem, CardItem, ChromaSelection, SharedShowcase, SharePicks, SkinItem, TitleItem } from "../src/types";
 import type { Catalog } from "./catalog";
 import type { ShareManifest } from "./shareManifest";
-import { rankBadge, skinItemFromCatalog } from "./valorant";
+import { agentItemFromCatalog, rankBadge, skinItemFromCatalog } from "./valorant";
 
 export const SHARE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const PREVIEW_MAX_BYTES = 512 * 1024;
@@ -61,6 +61,7 @@ export function parsePicks(raw: any): SharePicks {
     card: isId(raw.card) ? lc(raw.card) : null,
     title: isId(raw.title) ? lc(raw.title) : null,
     buddies,
+    agent: isId(raw.agent) ? lc(raw.agent) : null,
   };
 }
 
@@ -131,6 +132,15 @@ export function buildSnapshot(
     buddies.push({ id, name: b.name, icon: b.icon, price: ownedBuddies.get(id) ?? null, equipped: false });
   }
 
+  // One "main agent" slot; stored like the card/title — only the shown pick.
+  const agents: AgentItem[] = [];
+  if (picks.agent) {
+    const owned = (m.agents ?? []).some((id) => lc(id) === picks.agent);
+    const a = catalog.agents.get(picks.agent);
+    if (!owned || !a) throw new ShareError("That selection includes an item this account doesn't own.");
+    agents.push(agentItemFromCatalog(picks.agent, a));
+  }
+
   return {
     showcase: {
       puuid: "",
@@ -149,6 +159,7 @@ export function buildSnapshot(
       cards,
       titles,
       buddies,
+      agents,
       pricesAvailable: m.pricesAvailable,
       defaultIcons: Object.fromEntries(catalog.weaponIcons),
       store: null,

@@ -1,13 +1,13 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import type { ChromaSelection, ItemKind, Selection, ShowcasePayload, SkinItem } from "./types";
 import { selKey } from "./types";
-import { groupByGun, rarityColor, rarityLabel, WEAPON_CATEGORIES } from "./logic";
+import { favoriteAgent, groupByGun, rarityColor, rarityLabel, WEAPON_CATEGORIES } from "./logic";
 import { SkinArt } from "./skinArt";
 
 const img = (u: string | null | undefined) => (u ? `/img/${encodeURIComponent(u)}` : undefined);
 const fmt = (n: number) => n.toLocaleString("en-US");
 
-export type LibraryTab = "skin" | "card" | "title" | "buddy";
+export type LibraryTab = "skin" | "card" | "title" | "buddy" | "agent";
 type SkinFilter = "all" | "selected" | "equipped";
 
 const CLASS_LABEL: Record<string, string> = {
@@ -49,8 +49,15 @@ export function Library({ data, tab, onTab, selection, chromaSel, onToggle, onSe
     card: data.cards.filter((s) => isOn("card", s.id)).length,
     title: data.titles.filter((s) => isOn("title", s.id)).length,
     buddy: data.buddies.filter((s) => isOn("buddy", s.id)).length,
+    agent: (data.agents ?? []).filter((a) => isOn("agent", a.id)).length,
   };
-  const totals = { skin: data.skins.length, card: data.cards.length, title: data.titles.length, buddy: data.buddies.length };
+  const totals = {
+    skin: data.skins.length,
+    card: data.cards.length,
+    title: data.titles.length,
+    buddy: data.buddies.length,
+    agent: data.agents?.length ?? 0,
+  };
 
   const q = query.trim().toLowerCase();
   const skinGroups = useMemo(() => {
@@ -107,6 +114,7 @@ export function Library({ data, tab, onTab, selection, chromaSel, onToggle, onSe
             ["card", "Cards"],
             ["title", "Titles"],
             ["buddy", "Buddies"],
+            ["agent", "Agents"],
           ] as const
         ).map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "on" : ""} onClick={() => onTab(id)}>
@@ -253,6 +261,52 @@ export function Library({ data, tab, onTab, selection, chromaSel, onToggle, onSe
               );
             })}
             {data.buddies.length === 0 && <p className="lib-empty">No buddies on this account.</p>}
+          </div>
+        )}
+
+        {tab === "agent" && (
+          <div className="lib-agents">
+            {(() => {
+              const favId = favoriteAgent(data)?.id ?? null;
+              // Most-played agent first (badge + default pick), then A→Z.
+              const agents = [...(data.agents ?? [])].sort(
+                (a, b) => (a.id === favId ? -1 : 0) - (b.id === favId ? -1 : 0) || a.name.localeCompare(b.name)
+              );
+              const list = agents.filter(
+                (a) => !q || a.name.toLowerCase().includes(q) || (a.role ?? "").toLowerCase().includes(q)
+              );
+              if (!list.length) {
+                return <p className="lib-empty">{totals.agent === 0 ? "No agents on this account." : "No agents match these filters."}</p>;
+              }
+              return list.map((a) => {
+                const on = isOn("agent", a.id);
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    className={`lib-agent${on ? " on" : ""}`}
+                    onClick={() => onToggle("agent", a.id)}
+                    aria-pressed={on}
+                    title={`${a.name}${a.role ? ` · ${a.role}` : ""}`}
+                  >
+                    <span className="lib-check" aria-hidden="true" />
+                    <span className="lib-agent-art">
+                      {a.icon ? <img src={img(a.icon)} alt="" loading="lazy" /> : null}
+                    </span>
+                    <span className="lib-agent-info">
+                      <span className="lib-agent-name">{a.name}</span>
+                      {a.role && (
+                        <span className="lib-agent-role">
+                          {a.roleIcon && <img src={img(a.roleIcon)} alt="" />}
+                          {a.role}
+                        </span>
+                      )}
+                    </span>
+                    {a.id === favId && <span className="lib-agent-fav">Most played</span>}
+                  </button>
+                );
+              });
+            })()}
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-import type { BuddyItem, CardItem, ItemKind, Selection, ShowcasePayload, SkinItem, TitleItem } from "./types";
+import type { AgentItem, BuddyItem, CardItem, ItemKind, Selection, ShowcasePayload, SkinItem, TitleItem } from "./types";
 import { selKey } from "./types";
 
 export const PREMIUM_PRICE = 1775;
@@ -174,13 +174,21 @@ export function buildLoadoutSlots(gunsOnly: SkinItem[]): GunGroup[] {
   return out;
 }
 
-export type AnyItem = SkinItem | CardItem | TitleItem | BuddyItem;
+export type AnyItem = SkinItem | CardItem | TitleItem | BuddyItem | AgentItem;
 
 export function defaultChecked(kind: ItemKind, item: AnyItem, pricesAvailable: boolean): boolean {
   void pricesAvailable; // price-map coverage is partial; null price always uses the level heuristic for skins
+  if (kind === "agent") return false; // "main agent" defaults come from the profile, not pricing
   if (item.equipped) return true;
   if (kind === "skin") return isPremiumSkin(item as SkinItem);
   return item.price != null;
+}
+
+/** The owned agent with the most games in the profile window, else null. */
+export function favoriteAgent(payload: ShowcasePayload): AgentItem | null {
+  const favId = payload.profile?.window?.topAgents?.[0]?.id;
+  if (!favId) return null;
+  return (payload.agents ?? []).find((a) => a.id === favId) ?? null;
 }
 
 export function buildSelection(payload: ShowcasePayload): Selection {
@@ -190,12 +198,14 @@ export function buildSelection(payload: ShowcasePayload): Selection {
   };
   payload.skins.forEach((i) => add("skin", i));
   payload.buddies.forEach((i) => add("buddy", i));
-  // Cards/titles hold ONE slot each on the showcase: default to a single pick
-  // (equipped first, else the first qualifying item) so the sidebar starts
-  // radio-clean instead of showing several checkmarks that the preview
-  // resolves down to one anyway.
+  // Cards/titles/agents hold ONE slot each on the showcase: default to a single
+  // pick (equipped first, else the first qualifying item; the agent defaults to
+  // the most-played one) so the sidebar starts radio-clean instead of showing
+  // several checkmarks that the preview resolves down to one anyway.
   Object.assign(sel, pickSingleSlot("card", payload.cards, (i) => defaultChecked("card", i, payload.pricesAvailable)));
   Object.assign(sel, pickSingleSlot("title", payload.titles, (i) => defaultChecked("title", i, payload.pricesAvailable)));
+  const fav = favoriteAgent(payload);
+  for (const a of payload.agents ?? []) sel[selKey("agent", a.id)] = a.id === fav?.id;
   return sel;
 }
 
@@ -232,6 +242,34 @@ export function collectionValue(payload: ShowcasePayload, sel: Selection): numbe
 /** Estimate USD for VP at the base tier (1,000 VP = $9.99), whole dollars. */
 export function vpToUsd(vp: number): number {
   return Math.round(vp * 0.00999);
+}
+
+/** Whole-percent winrate; null when there are no games. */
+export function winratePct(wins: number, games: number): number | null {
+  return games > 0 ? Math.round((wins / games) * 100) : null;
+}
+
+/** Compact relative time for match rows ("just now" … "6d ago" … "Mar 4"). */
+export function relTime(iso: string, now = Date.now()): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "";
+  const minutes = Math.floor(Math.max(0, now - t) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(t));
+}
+
+/** Match length as "mm:ss" (null when the details carried no duration). */
+export function matchDuration(ms: number | null): string | null {
+  if (ms == null || ms <= 0) return null;
+  const total = Math.round(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 export function rarityColor(

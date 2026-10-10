@@ -6,11 +6,12 @@ import { buildSelection, isPremiumSkin, paginate, pickSingleSlot } from "./logic
 import type { AnyItem } from "./logic";
 import { Showcase, CANVAS_W, CANVAS_H } from "./Showcase";
 import { StorePanel } from "./StorePanel";
+import { ProfilePanel } from "./ProfilePanel";
 import { SignIn } from "./SignIn";
 import { Library, type LibraryTab } from "./Library";
 import { Inspector, type ShareUi } from "./Inspector";
 import { useFitScale } from "./useFitScale";
-import { IconExpand, IconFit, IconShowcase, IconStore, IconSwitch } from "./icons";
+import { IconExpand, IconFit, IconProfile, IconShowcase, IconStore, IconSwitch } from "./icons";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 const img = (u: string) => `/img/${encodeURIComponent(u)}`;
@@ -20,7 +21,7 @@ const VP_ICON =
 const RP_ICON =
   "https://media.valorant-api.com/currencies/e59aa87c-4cbf-517a-5983-6e81511be9b7/displayicon.png";
 
-type View = "showcase" | "store";
+type View = "showcase" | "store" | "profile";
 
 /**
  * Wait for every image matching `selector`; resolves with the sources that failed.
@@ -162,6 +163,17 @@ export default function App() {
 
   const setSection = (kind: ItemKind, mode: "all" | "none" | "premium") => {
     if (!data) return;
+    if (kind === "agent") {
+      // The "main agent" is an identity pick, not a priced collection item:
+      // Clear releases it; Premium+/Everything leave the chosen agent alone.
+      if (mode !== "none") return;
+      setSelection((s) => {
+        const next = { ...s };
+        for (const a of data.agents ?? []) next[selKey("agent", a.id)] = false;
+        return next;
+      });
+      return;
+    }
     const items: AnyItem[] = { skin: data.skins, card: data.cards, title: data.titles, buddy: data.buddies }[kind];
     if (isSingleSlot(kind)) {
       // One-slot kinds hold exactly one item: "all"/"premium" pick a single
@@ -187,7 +199,7 @@ export default function App() {
   };
 
   const allSections = (mode: "all" | "none" | "premium") =>
-    (["skin", "card", "title", "buddy"] as ItemKind[]).forEach((k) => setSection(k, mode));
+    (["skin", "card", "title", "buddy", "agent"] as ItemKind[]).forEach((k) => setSection(k, mode));
 
   async function exportImages() {
     if (!data || !pages) return;
@@ -240,6 +252,8 @@ export default function App() {
         card: (cards.find((c) => c.equipped) ?? cards[0])?.id ?? null,
         title: (titles.find((t) => t.equipped) ?? titles[0])?.id ?? null,
         buddies: data.buddies.filter((b) => on("buddy", b.id)).map((b) => b.id),
+        // The single "main agent" slot (radio-style selection).
+        agent: (data.agents ?? []).find((a) => on("agent", a.id))?.id ?? null,
       };
       let preview: string | null = null;
       const node = document.querySelector<HTMLElement>("[data-export-page]");
@@ -295,6 +309,16 @@ export default function App() {
   const hasStore =
     !!data.store && (data.store.offers.length > 0 || data.store.nightMarket.length > 0 || data.store.accessories.length > 0);
 
+  // Profile view: ranked record and/or recent matches (all non-critical data).
+  const prof = data.profile;
+  const hasProfile =
+    !!prof &&
+    (!!prof.ranked.act ||
+      !!prof.ranked.career ||
+      prof.ranked.winsByTier.length > 0 ||
+      prof.matches.length > 0 ||
+      !!prof.accountCreatedAt);
+
   return (
     <div className="studio">
       <header className="nav">
@@ -311,6 +335,12 @@ export default function App() {
             <button type="button" className={view === "store" ? "on" : ""} aria-current={view === "store" ? "page" : undefined} onClick={() => setView("store")}>
               <IconStore />
               Store
+            </button>
+          )}
+          {hasProfile && (
+            <button type="button" className={view === "profile" ? "on" : ""} aria-current={view === "profile" ? "page" : undefined} onClick={() => setView("profile")}>
+              <IconProfile />
+              Profile
             </button>
           )}
         </nav>
@@ -429,7 +459,7 @@ export default function App() {
             onShare={createShareLink}
           />
         </div>
-      ) : (
+      ) : view === "store" ? (
         <main className="store-view pane-scroll">
           <header className="page-head">
             <h1>Store</h1>
@@ -437,6 +467,12 @@ export default function App() {
           </header>
           {data.store && <StorePanel store={data.store} generatedAt={data.generatedAt} />}
         </main>
+      ) : (
+        data.profile && (
+          <main className="store-view pane-scroll">
+            <ProfilePanel profile={data.profile} ranks={data.ranks} />
+          </main>
+        )
       )}
 
       <div className="hidden-export" aria-hidden="true">

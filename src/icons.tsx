@@ -28,6 +28,13 @@ export const IconStore = (p: P) => (
   </svg>
 );
 
+export const IconProfile = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="8" cy="5.5" r="2.75" />
+    <path d="M2.75 13.25c.9-2.4 2.9-3.75 5.25-3.75s4.35 1.35 5.25 3.75" />
+  </svg>
+);
+
 export const IconDownload = (p: P) => (
   <svg {...base} {...p}>
     <path d="M8 2.25v8M4.75 7 8 10.25 11.25 7M2.75 13.25h10.5" />

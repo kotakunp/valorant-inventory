@@ -60,6 +60,7 @@ export function SharedView({ id }: { id: string }) {
     p.cards.forEach((i) => (sel[selKey("card", i.id)] = true));
     p.titles.forEach((i) => (sel[selKey("title", i.id)] = true));
     p.buddies.forEach((i) => (sel[selKey("buddy", i.id)] = true));
+    (p.agents ?? []).forEach((a) => (sel[selKey("agent", a.id)] = true));
     return sel;
   }, [p]);
   const pages = useMemo(() => (p ? paginate(p.skins, selection) : null), [p, selection]);

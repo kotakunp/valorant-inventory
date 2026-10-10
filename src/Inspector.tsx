@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import type { ChromaSelection, Selection, ShowcasePayload, SkinItem } from "./types";
+import type { ChromaSelection, ItemKind, Selection, ShowcasePayload, SkinItem } from "./types";
 import { selKey } from "./types";
 import type { Pages } from "./logic";
-import { collectionValue, isPremiumSkin, vpToUsd } from "./logic";
+import { collectionValue, favoriteAgent, isPremiumSkin, vpToUsd } from "./logic";
 import type { LibraryTab } from "./Library";
 import { SkinArt } from "./skinArt";
 import { IconCheck, IconCopy, IconDownload, IconLink } from "./icons";
@@ -150,13 +150,15 @@ export function Inspector({
   share,
   onShare,
 }: Props) {
-  const isOn = (kind: "skin" | "card" | "title" | "buddy", id: string) => !!selection[selKey(kind, id)];
+  const isOn = (kind: ItemKind, id: string) => !!selection[selKey(kind, id)];
   const skins = data.skins.filter((s) => isOn("skin", s.id));
   const premium = skins.filter((s) => isPremiumSkin(s)).length;
   const knives = skins.filter((s) => s.isKnife).length;
   const buddies = data.buddies.filter((b) => isOn("buddy", b.id)).length;
   const card = data.cards.find((c) => isOn("card", c.id));
   const title = data.titles.find((t) => isOn("title", t.id));
+  const agent = (data.agents ?? []).find((a) => isOn("agent", a.id));
+  const favAgent = favoriteAgent(data);
   const vp = collectionValue(data, selection);
   const pageCount = pages.gridPages.length;
   const withChromas = skins.filter((s): s is SkinItem => s.chromas.length > 1);
@@ -236,6 +238,7 @@ export function Inspector({
           </div>
           <p className="insp-note">
             Premium+ and equipped items were picked for you.
+            {agent && favAgent && agent.id === favAgent.id && " Your most-played agent was picked for you."}
             {!data.pricesAvailable && " Prices are unavailable, so premium is estimated from skin levels."}
           </p>
         </section>
@@ -256,6 +259,16 @@ export function Inspector({
             <span className="insp-profile-text">
               <span className="insp-profile-label">Title</span>
               <span className="insp-profile-value">{title ? title.text || title.name : "None"}</span>
+            </span>
+            <span className="insp-change">Change</span>
+          </button>
+          <button type="button" className="insp-profile" onClick={() => onOpenTab("agent")}>
+            <span className="insp-profile-art">
+              {agent?.icon ? <img src={img(agent.icon)} alt="" /> : <span className="insp-profile-empty" />}
+            </span>
+            <span className="insp-profile-text">
+              <span className="insp-profile-label">Agent</span>
+              <span className="insp-profile-value">{agent ? agent.name : "None"}</span>
             </span>
             <span className="insp-change">Change</span>
           </button>

@@ -17,6 +17,12 @@ The user signs in (cookie paste / password / access URL / RSO),
 the server pulls their inventory from Riot's unofficial endpoints, and the app
 renders a pixel-faithful loadout preview they can curate and export.
 
+Beyond cosmetics, the payload also carries **owned agents** (Agents tab; a
+radio-picked "main agent" renders on the showcase) and an editor-only
+**Profile view** with the ranked record (winrate, RR, wins by tier, career
+totals) and the last ≤10 matches (agent, K/D/A, ACS, HS%, ±RR, form). Stats
+never reach the PNG or share links.
+
 ## User journey (what happens, in order)
 
 1. **Sign-in gate** — split screen: a typographic hero on the left
@@ -57,12 +63,14 @@ with count pills** (library sections, sign-in methods) → **pill chips**
 (weapon classes).
 
 - **Nav bar:** V mark + `COLLECTION` wordmark, a segmented switch with icons
-  **Showcase / Store** (Store only when the storefront has offers), VP/RP
+  **Showcase / Store / Profile** (Store only when the storefront has offers,
+  Profile only when the account has ranked or match data), VP/RP
   wallet pill, account block (equipped-card avatar, `Name#TAG` over
   `Level n · REGION`) and a **Switch account** icon button (confirm dialog
   clears the selection).
-- **Library (left pane):** underline tabs *Skins / Cards / Titles / Buddies*,
-  each with a pill showing the selected count (tooltip `x of y selected`).
+- **Library (left pane):** underline tabs *Skins / Cards / Titles / Buddies /
+  Agents*, each with a pill showing the selected count (tooltip `x of y
+  selected`).
   - Skins: search, *All / Selected / Equipped* segmented filter, weapon-class
     pill chips (scrollable, fading edge), per-gun groups with sticky headers
     (default-gun icon + `NAME ── sel/total`), 2-column rounded tiles with a
@@ -88,8 +96,9 @@ with count pills** (library sections, sign-in methods) → **pill chips**
   **Summary** (lead *Collection value* in large display digits + `VP`,
   `≈ $n USD`, then a 4-up stat row: skins x/y, premium, melee, buddies);
   **Quick select** *Premium+ / Everything / Clear* + the auto-pick
-  note; **Profile** (current card + title, *Change* jumps to that library
-  tab); **Variants** (per selected skin: thumbnail, name, chroma swatches).
+  note (mentions the most-played agent pick while it's still checked);
+  **Profile** (current card + title + main agent, *Change* jumps to that
+  library tab); **Variants** (per selected skin: thumbnail, name, chroma swatches).
   Hovering or focusing a swatch opens an enlarged **variant peek** left of
   the inspector (skin name, chroma name, *Shown* / *Click to show*, `i / n`);
   display-only, never takes the pointer.
@@ -102,7 +111,16 @@ with count pills** (library sections, sign-in methods) → **pill chips**
   ellipsized mid-name). Hover opens an enlarged peek; click / tap / `Enter`
   selects one card at a time (accent ring, `aria-pressed`); `Escape` or a
   click away clears it.
-- There is **no recent-matches strip** (removed, along with its server calls).
+- The editor-only **Profile view** (nav switch, like Store; never exported)
+  carries the ranked record and recent-match stats: **Ranked** card (badge +
+  tier + RR, act winrate / W-L, career totals, wins-by-tier pills, leaderboard
+  rank), **Recent form** (last ≤10 results as W/L/D chips, winrate / K/D / HS%
+  / ACS, most-played map) and **Top agents** (up to 5: bust, name,
+  games · winrate, K/D), then one **Recent matches** row per match (result
+  pill, mode, map + icon, round score, agent + icon, K/D/A, ACS, HS%, ±RR,
+  duration · relative time). Missing data renders "No ranked games…" /
+  "No recent matches available."; the nav entry hides when everything is
+  empty. There is no recent-matches strip on the showcase view.
 
 ### The showcase itself (this IS the exported image)
 
@@ -110,10 +128,11 @@ with count pills** (library sections, sign-in methods) → **pill chips**
 (no header — the grid starts at the top edge)
 CENTER                                    │ RIGHT RAIL
 SIDEARMS column (full height)            │ player card (tall art, dominant)
-SMGS over SMGs, then SHOTGUNS            │ STATS: SKINS │ PREMIUM │ MELEE │ BUDDIES
-RIFLES column                            │        VALUE n VP ~$n (full row)
-SNIPERS over snipers, then HEAVIES       │ RANK: PEAK + CURRENT medallions
-── MELEE strip (cols 2–4, ~108px) ──     │ VP / RP wallet (one row)
+SMGS over SMGs, then SHOTGUNS            │ MAIN AGENT tile (only when picked)
+RIFLES column                            │ STATS: SKINS │ PREMIUM │ MELEE │ BUDDIES
+SNIPERS over snipers, then HEAVIES       │        VALUE n VP ~$n (full row)
+── MELEE strip (cols 2–4, ~108px) ──     │ RANK: PEAK + CURRENT medallions
+                                         │ VP / RP wallet (one row)
 ```
 
 Must be visible / true:
@@ -138,6 +157,13 @@ Must be visible / true:
   The spread is outside the scaled canvas and never included in PNG exports.
 - **Melee/knives** on their own full-width bottom strip (lighter plane than
   gun cells), never in the gun grid.
+- **Main agent tile**: when an agent is picked (Agents tab, radio select;
+  defaults to the most-played owned agent — most-played carries a "Most
+  played" badge and sorts first), the right rail shows a compact tile under
+  the player card: bust art, `MAIN AGENT` label, name + role. It is the only
+  element that shrinks the card art (card crops ~58px, never squashes); with
+  no agent picked the rail is pixel-identical to before. The pick rides share
+  links like the card/title.
 - Style (in-client look): `#0f1923` canvas with two hard-edged diagonal
   bands, `#ff4655` top-right wedge + solid 4px left bar, Bebas Neue labels,
   Inter body, **sharp** tiles (no clipped corners, no radial glows). Filled gun
@@ -194,6 +220,6 @@ Must NOT be visible:
   committed. Repo must stay free of secrets. Share links store only the
   trimmed showcase snapshot (no PUUID, no tokens).
 - Verify before every commit: `npx tsc --noEmit && npx vitest run && npm run build`
-  (158 tests). Push to `main`, redeploy in Dokploy.
+  (183 tests). Push to `main`, redeploy in Dokploy.
 - Keep `SPEC.md` §6–§8 in sync with `src/Showcase.tsx` / `src/logic.ts` /
   `src/styles.css` when UI changes.

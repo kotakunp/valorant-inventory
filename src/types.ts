@@ -51,6 +51,104 @@ export interface BuddyItem {
   equipped: boolean;
 }
 
+export interface AgentItem {
+  id: string;
+  name: string;
+  /** Bust art (catalog displayIcon, 256×256 transparent). */
+  icon: string | null;
+  /** Role display name (e.g. "Duelist"), when the catalog has one. */
+  role: string | null;
+  roleIcon: string | null;
+  /** Agents are never priced or equipped — the fields keep item unions total. */
+  price: null;
+  equipped: false;
+}
+
+/**
+ * One recent match — slim server-side projection of match-details (the raw
+ * round-by-round blob is never shipped). Powers the editor-only Profile view.
+ */
+export interface RecentMatch {
+  id: string;
+  /** Match start, ISO 8601. */
+  start: string;
+  /** Raw QueueID (competitive, unrated, hurm, …). */
+  queue: string;
+  /** Display label: queue name, else gamemode catalog name, else raw ID. */
+  mode: string;
+  map: string;
+  mapIcon: string | null;
+  /** Agent UUID (catalog agents key) when the details carried one. */
+  agentId: string | null;
+  agent: string;
+  agentIcon: string | null;
+  /** Win/loss (null when teams were missing — e.g. forfeits). */
+  won: boolean | null;
+  /** Rounds won: mine vs theirs (null when teams were missing). */
+  score: { mine: number; theirs: number } | null;
+  kills: number;
+  deaths: number;
+  assists: number;
+  /** Average combat score (score / roundsPlayed). */
+  acs: number;
+  /** Headshot share of hits (%), null when the round data carried no damage. */
+  hsPct: number | null;
+  durationMs: number | null;
+  /** RankedRating earned — competitive/premier only, null elsewhere. */
+  rr: number | null;
+}
+
+/** Aggregates over the fetched match window (≤10 recent matches). */
+export interface MatchWindow {
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  /** Total kills / total deaths. */
+  kd: number | null;
+  /** Headshot share across matches with damage data. */
+  hsPct: number | null;
+  acs: number | null;
+  /** Most-played first; ties broken by wins, then name. */
+  topAgents: {
+    id: string;
+    name: string;
+    icon: string | null;
+    games: number;
+    wins: number;
+    kills: number;
+    deaths: number;
+    assists: number;
+  }[];
+  topMap: { name: string; icon: string | null; games: number; wins: number } | null;
+  /** Newest first, "W" | "L" | "D" (draw/unknown). */
+  form: ("W" | "L" | "D")[];
+}
+
+/**
+ * Account stats for the editor-only Profile view: ranked record straight from
+ * the MMR payload we already fetch, plus aggregates over the recent-match
+ * fan-out. Everything non-critical — a failed part stays null/empty.
+ */
+export interface ProfileStats {
+  ranked: {
+    /** Current act ranked record + RR (ranked queues only). */
+    act: { wins: number; games: number; rr: number | null } | null;
+    /** Every act in the MMR payload, summed. */
+    career: { wins: number; games: number } | null;
+    /** Current-act wins per tier, most wins first. */
+    winsByTier: { tier: number; wins: number }[];
+    /** Act leaderboard position (Immortal/Radiant only). */
+    leaderboardRank: number | null;
+  };
+  /** Newest first, ≤10 (bounded fan-out). */
+  matches: RecentMatch[];
+  /** Aggregates over `matches`; null when nothing was projected. */
+  window: MatchWindow | null;
+  /** From userinfo `acct.created_at` (ISO 8601), null when absent. */
+  accountCreatedAt: string | null;
+}
+
 /** One row in the account's store (daily offer or night-market offer). */
 /**
  * Riot authorize link for one-paste sign-in: lands on playvalorant.com/opt_in
@@ -115,6 +213,10 @@ export interface ShowcasePayload {
   cards: CardItem[];
   titles: TitleItem[];
   buddies: BuddyItem[];
+  /** Owned agents (Agents library tab; the picked one shows on the showcase). */
+  agents?: AgentItem[];
+  /** Editor-only ranked + recent-match stats (never part of the PNG). */
+  profile?: ProfileStats | null;
   pricesAvailable: boolean;
   /** Uppercase gun label → official default-weapon render (empty-slot art). */
   defaultIcons?: Record<string, string>;
@@ -133,6 +235,8 @@ export interface SharePicks {
   card: string | null;
   title: string | null;
   buddies: string[];
+  /** The one agent shown as "main" on the showcase (null = no agent tile). */
+  agent: string | null;
 }
 
 /** A stored share: a trimmed payload holding only the shown items. */
@@ -159,16 +263,16 @@ export interface Ranks {
   peakBadge?: RankBadge | null;
 }
 
-export type ItemKind = "skin" | "card" | "title" | "buddy";
+export type ItemKind = "skin" | "card" | "title" | "buddy" | "agent";
 export type Selection = Record<string, boolean>;
 
 /**
- * Kinds the showcase renders as a single slot — one profile card, one title
- * (`Showcase.tsx` takes `checkedCards[0]` / `checkedTitles[0]`). Selecting one
- * therefore clears the others of that kind, radio-style; skins and buddies
- * (`BUDDIES +n`) stay multi-select.
+ * Kinds the showcase renders as a single slot — one profile card, one title,
+ * one "main" agent (`Showcase.tsx` picks the first checked of each kind).
+ * Selecting one therefore clears the others of that kind, radio-style; skins
+ * and buddies (`BUDDIES +n`) stay multi-select.
  */
-export const SINGLE_SLOT_KINDS: readonly ItemKind[] = ["card", "title"];
+export const SINGLE_SLOT_KINDS: readonly ItemKind[] = ["card", "title", "agent"];
 export const isSingleSlot = (kind: ItemKind): boolean => SINGLE_SLOT_KINDS.includes(kind);
 /** skinId → chosen chroma id (UI state only). */
 export type ChromaSelection = Record<string, string>;

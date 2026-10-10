@@ -170,6 +170,8 @@ export function Showcase({
   const checkedBuddies = payload.buddies.filter((b) => isOn("buddy", b.id));
   const card = checkedCards.find((c) => c.equipped) ?? checkedCards[0];
   const title = checkedTitles.find((t) => t.equipped) ?? checkedTitles[0];
+  // Single "main agent" slot (radio-style pick); absent → no tile at all.
+  const agent = (payload.agents ?? []).find((a) => isOn("agent", a.id));
   const pageCount = pages.gridPages.length;
   const slots = pages.gridPages[page] ?? [];
   const knifeItems = pages.knifeItems ?? [];
@@ -353,6 +355,18 @@ export function Showcase({
                 )}
               </div>
               {checkedCards.length > 1 && <div className="sc-more">+{checkedCards.length - 1} MORE</div>}
+            </div>
+          )}
+          {agent && (
+            <div className="sc-agent">
+              <span className="sc-agent-art">
+                {agent.icon ? <img src={imgUrl(agent.icon)!} alt="" /> : null}
+              </span>
+              <span className="sc-agent-meta">
+                <span className="sc-agent-label">Main agent</span>
+                <span className="sc-agent-name">{agent.name}</span>
+                {agent.role && <span className="sc-agent-role">{agent.role}</span>}
+              </span>
             </div>
           )}
           <dl className="sc-stats">

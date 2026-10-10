@@ -48,6 +48,9 @@ function catalog(): Catalog {
     titles: new Map([["title1", { name: "Title One", text: "Potato" }]]),
     buddies: new Map([["bud1", { name: "Buddy", icon: "https://media.valorant-api.com/bud1.png" }]]),
     sprays: new Map(),
+    agents: new Map([["agent1", { name: "Jett", icon: "https://media.valorant-api.com/jett.png", role: "Duelist", roleIcon: null }]]),
+    maps: new Map([["/game/maps/ascent/ascent", { name: "Ascent", icon: null }]]),
+    gameModes: new Map([["bomb", "Standard"]]),
     rankTiers: new Map([[24, { name: "IMMORTAL 1", icon: null, color: "#bb3d65" }]]),
     contentTiers: new Map([["tier-premium", { rank: 2, icon: null }]]),
     weaponIcons: new Map([["VANDAL", "https://media.valorant-api.com/vandal.png"]]),
@@ -70,13 +73,14 @@ function payload(): ShowcasePayload {
     cards: [{ id: "card1", name: "Card One", icon: null, price: 375, equipped: true }],
     titles: [{ id: "title1", name: "Title One", text: "Potato", price: null, equipped: true }],
     buddies: [{ id: "bud1", name: "Buddy", icon: null, price: 475, equipped: false }],
+    agents: [{ id: "agent1", name: "Jett", icon: null, role: "Duelist", roleIcon: null, price: null, equipped: false }],
     pricesAvailable: true,
     store: { offers: [], secondsToReset: 1, nightMarket: [], accessories: [] },
     generatedAt: "2026-10-10T00:00:00.000Z",
   };
 }
 
-const picksAll = { skins: [{ id: "s1", chroma: null }, { id: "s2", chroma: null }], front: { PHANTOM: "s2" }, card: "card1", title: "title1", buddies: ["bud1"] };
+const picksAll = { skins: [{ id: "s1", chroma: null }, { id: "s2", chroma: null }], front: { PHANTOM: "s2" }, card: "card1", title: "title1", buddies: ["bud1"], agent: "agent1" };
 
 beforeEach(() => setShareSecretForTests("test-secret-test-secret"));
 afterEach(() => setShareSecretForTests(null));
@@ -149,10 +153,22 @@ describe("share snapshot", () => {
     expect(snap.showcase.buddies[0].price).toBe(475);
   });
 
+  it("stores only the picked agent (one slot), rebuilt from the catalog", () => {
+    const snap = buildSnapshot(m(), parsePicks(picksAll), catalog());
+    expect(snap.showcase.agents).toEqual([
+      { id: "agent1", name: "Jett", icon: "https://media.valorant-api.com/jett.png", role: "Duelist", roleIcon: null, price: null, equipped: false },
+    ]);
+    const none = buildSnapshot(m(), parsePicks({ ...picksAll, agent: null }), catalog());
+    expect(none.showcase.agents).toEqual([]);
+    // The picked agent must be owned: manifest carries the owned agent ids.
+    expect(manifestFromPayload(payload()).agents).toEqual(["agent1"]);
+  });
+
   it("refuses items the account does not own", () => {
     expect(() => buildSnapshot(m(), parsePicks({ ...picksAll, skins: [{ id: "s3", chroma: null }] }), catalog())).toThrow(ShareError);
     expect(() => buildSnapshot(m(), parsePicks({ ...picksAll, card: "card2" }), catalog())).toThrow(ShareError);
     expect(() => buildSnapshot(m(), parsePicks({ ...picksAll, buddies: ["bud2"] }), catalog())).toThrow(ShareError);
+    expect(() => buildSnapshot(m(), parsePicks({ ...picksAll, agent: "agent2" }), catalog())).toThrow(ShareError);
   });
 
   it("validates pick shape", () => {
@@ -160,6 +176,8 @@ describe("share snapshot", () => {
     expect(() => parsePicks({ skins: [{ id: 5 }] })).toThrow(ShareError);
     expect(() => parsePicks({ skins: Array.from({ length: 601 }, () => ({ id: "s1" })) })).toThrow(/Too many/);
     expect(parsePicks({}).skins).toEqual([]);
+    expect(parsePicks({ agent: "AGENT1" }).agent).toBe("agent1");
+    expect(parsePicks({ agent: 7 }).agent).toBeNull();
   });
 });
 
