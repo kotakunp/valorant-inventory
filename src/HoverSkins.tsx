@@ -48,12 +48,21 @@ export function HoverSkins({ gun, items, rect, chromas, onEnter, onLeave, onFron
               <div className="skin-hover-art">{icon && <SkinArt src={image(icon)} alt={skin.name} weaponName={skin.weaponName} isKnife={skin.isKnife} />}</div>
               <div className="skin-hover-actions">
                 <div className="skin-hover-variants" role="group" aria-label={`${skin.name} variants`}>
-                  {skin.chromas.length > 1 && skin.chromas.map((chroma, i) => (
-                    <button key={chroma.id} aria-label={chroma.name} title={chroma.name}
-                      aria-pressed={active?.id === chroma.id} onClick={() => onChroma?.(skin.id, chroma.id)}>
-                      {chroma.icon ? <img src={image(chroma.icon)} alt="" /> : i + 1}
-                    </button>
-                  ))}
+                  {skin.chromas.length > 1 && skin.chromas.map((chroma, i) => {
+                    const art = chroma.icon ? <img src={image(chroma.icon)} alt="" /> : i + 1;
+                    // Without onChroma (shared links) swatches only show which variants exist.
+                    return onChroma ? (
+                      <button key={chroma.id} aria-label={chroma.name} title={chroma.name}
+                        aria-pressed={active?.id === chroma.id} onClick={() => onChroma(skin.id, chroma.id)}>
+                        {art}
+                      </button>
+                    ) : (
+                      <span key={chroma.id} className={`skin-hover-swatch${active?.id === chroma.id ? " is-on" : ""}`}
+                        title={chroma.name} aria-label={`${chroma.name}${active?.id === chroma.id ? " (shown)" : ""}`} role="img">
+                        {art}
+                      </span>
+                    );
+                  })}
                 </div>
                 {onFront && gun !== "MELEE" && <button disabled={index === 0} onClick={() => onFront(gun, skin.id)}>To front</button>}
                 {onRemove && <button onClick={() => onRemove(skin.id)} aria-label={`Remove ${skin.name}`}>Remove</button>}

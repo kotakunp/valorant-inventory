@@ -1957,6 +1957,9 @@ img.skin-art {
 .skin-hover-variants button { width: 30px; height: 26px; padding: 2px; border: 1px solid var(--line); background: #0a1017; color: var(--text); border-radius: 0; }
 .skin-hover-variants button[aria-pressed="true"] { border-color: var(--rarity); }
 .skin-hover-variants img { width: 100%; height: 100%; object-fit: contain; }
+.skin-hover-swatch { display: grid; place-items: center; width: 30px; height: 26px; padding: 2px; border: 1px solid var(--line); background: #0a1017; color: var(--text); font-size: 10px; cursor: default; }
+.skin-hover-swatch:not(.is-on) { opacity: 0.45; }
+.skin-hover-swatch.is-on { border-color: var(--rarity); }
 @media (prefers-reduced-motion: reduce) { .skin-hover-art img { transition: none; } }
 
 @media (prefers-reduced-motion: reduce) {

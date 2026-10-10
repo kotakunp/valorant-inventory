@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ChromaSelection, SharedShowcase, Selection } from "./types";
+import type { SharedShowcase, Selection } from "./types";
 import { selKey } from "./types";
 import { paginate } from "./logic";
 import { Showcase, CANVAS_W, CANVAS_H } from "./Showcase";
@@ -14,7 +14,6 @@ type State = { kind: "loading" } | { kind: "error"; message: string } | { kind: 
 /** Read-only page behind `/s/:id`: the shared showcase with hover browsing. */
 export function SharedView({ id }: { id: string }) {
   const [state, setState] = useState<State>({ kind: "loading" });
-  const [chromaSel, setChromaSel] = useState<ChromaSelection>({});
   const [page, setPage] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -29,7 +28,6 @@ export function SharedView({ id }: { id: string }) {
       })
       .then((share) => {
         if (!alive) return;
-        setChromaSel(share.chromaSel ?? {});
         setState({ kind: "ready", share });
       })
       .catch((e: unknown) => {
@@ -129,7 +127,7 @@ export function SharedView({ id }: { id: string }) {
           <div className="stage-bar">
             <div className="stage-title">
               <span>Collection</span>
-              <span className="stage-hint">Hover a weapon to see every skin and variant</span>
+              <span className="stage-hint">Hover a weapon to see every skin</span>
             </div>
             {pageCount > 1 && (
               <span className="pager" aria-label="Page">
@@ -152,10 +150,9 @@ export function SharedView({ id }: { id: string }) {
                   pages={pages}
                   page={page}
                   selection={selection}
-                  chromaSel={chromaSel}
+                  chromaSel={share!.chromaSel ?? {}}
                   bringToFront={share!.bringToFront}
                   hoverable
-                  onPickChroma={(skinId, chromaId) => setChromaSel((s) => ({ ...s, [skinId]: chromaId }))}
                 />
               </div>
             </div>

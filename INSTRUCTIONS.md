@@ -165,7 +165,9 @@ Must NOT be visible:
   stored.
 - **Visitor page** (`/s/:id`): nav with the owner's avatar, Riot ID and level,
   plus a red *Make your own* button; the same fitted showcase with the hover
-  spread and variant switching but **no** *To front* / *Remove* buttons;
+  spread, **view-only**: variant swatches show which variants exist and which
+  one the owner picked (others dimmed) but can't be clicked, and there are no
+  *To front* / *Remove* buttons;
   footer with shared and expiry dates. Expired or unknown links show a
   *Link unavailable* card.
 - Pasting a link into Discord/X/iMessage shows a 1200×675 JPEG preview of the
