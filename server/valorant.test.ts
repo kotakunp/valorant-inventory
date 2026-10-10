@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { RecentMatch } from "../src/types";
-import { parseEntitlements, parseRanks, parseRankedStats, rankBadge, buildPriceMapFromStorefront, buildStoreSection, tierVpPrice, projectRecentMatch, computeMatchWindow, fetchRecentMatches } from "./valorant";
+import { parseEntitlements, parseRanks, parseRankedStats, rankBadge, buildPriceMapFromStorefront, buildStoreSection, tierVpPrice, projectRecentMatch, computeMatchWindow, fetchRecentMatches, ownedAgents } from "./valorant";
 
 const CARDS = "3f296c07-64c3-494c-923b-fe692a4fa1bd";
 
@@ -461,5 +461,23 @@ describe("fetchRecentMatches", () => {
   it("upstream failures → []", async () => {
     const out = await fetchRecentMatches(async () => null, "puuid", cat());
     expect(out).toEqual([]);
+  });
+});
+
+describe("ownedAgents", () => {
+  const agent = (name: string, base = false) => ({ name, icon: null, role: "Duelist", roleIcon: null, base });
+  const catalog = new Map([
+    ["jett", agent("Jett", true)],
+    ["sage", agent("Sage", true)],
+    ["reyna", agent("Reyna")],
+    ["neon", agent("Neon")],
+  ]);
+
+  it("adds free starter agents that entitlements never list", () => {
+    expect(ownedAgents(["REYNA"], catalog).map((a) => a.name)).toEqual(["Jett", "Reyna", "Sage"]);
+  });
+
+  it("dedupes and drops ids missing from the catalog", () => {
+    expect(ownedAgents(["jett", "Jett", "ghost-id"], catalog).map((a) => a.id)).toEqual(["jett", "sage"]);
   });
 });

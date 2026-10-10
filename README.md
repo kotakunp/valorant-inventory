@@ -58,6 +58,7 @@ SPEC.md                   # product + technical spec (UI sections must stay in s
 - Stacks are two-axis: front-first order (`orderStack`: manual front → equipped → tier score → stable) with inline `translate/scale` per layer (`stackLayers`), cascade direction per column (`stackDirectionForColumn`), spread bounded by `STACK_SPREAD` — never CSS-fan transforms.
 - Rarity outline color comes from `--rarity` set per stack item (`rarityColor()` in `logic.ts`).
 - Images load through `/img` proxy (allowlist `media.valorant-api.com`) so the PNG export doesn't taint the canvas; failed image loads abort the export.
+- Small UI art (agent busts, map icons) uses `thumb(url, w)` from `src/thumb.ts` → `/img/…?w=64|128|256`, a WebP thumbnail resized server-side with `sharp` (`server/thumbnail.ts`, 48 MB in-memory LRU). The raw agent PNGs are 1024 px / ~400 KB each, so never render them at icon size without `thumb()`.
 
 ## Deploy
 

@@ -3,6 +3,7 @@ import type { ChromaSelection, ItemKind, Selection, ShowcasePayload, SkinItem } 
 import { selKey } from "./types";
 import { favoriteAgent, groupByGun, rarityColor, rarityLabel, WEAPON_CATEGORIES } from "./logic";
 import { SkinArt } from "./skinArt";
+import { thumb } from "./thumb";
 
 const img = (u: string | null | undefined) => (u ? `/img/${encodeURIComponent(u)}` : undefined);
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -291,7 +292,7 @@ export function Library({ data, tab, onTab, selection, chromaSel, onToggle, onSe
                   >
                     <span className="lib-check" aria-hidden="true" />
                     <span className="lib-agent-art">
-                      {a.icon ? <img src={img(a.icon)} alt="" loading="lazy" /> : null}
+                      {a.icon ? <img src={thumb(a.icon, 128)} alt="" loading="lazy" decoding="async" /> : null}
                     </span>
                     <span className="lib-agent-info">
                       <span className="lib-agent-name">{a.name}</span>

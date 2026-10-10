@@ -1,5 +1,6 @@
 import type { ProfileStats, Ranks } from "./types";
 import { matchDuration, relTime, tierInfo, winratePct } from "./logic";
+import { thumb } from "./thumb";
 
 const img = (u: string | null | undefined) => (u ? `/img/${encodeURIComponent(u)}` : undefined);
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -151,7 +152,7 @@ export function ProfilePanel({ profile, ranks }: { profile: ProfileStats; ranks:
               {topAgents.map((a) => (
                 <li key={a.id || a.name} className="profile-agent">
                   <span className="profile-agent-art">
-                    {a.icon ? <img src={img(a.icon)} alt="" loading="lazy" /> : null}
+                    {a.icon ? <img src={thumb(a.icon, 64)} alt="" loading="lazy" decoding="async" /> : null}
                   </span>
                   <span className="profile-agent-name">{a.name}</span>
                   <span className="profile-agent-stat">
@@ -180,14 +181,14 @@ export function ProfilePanel({ profile, ranks }: { profile: ProfileStats; ranks:
                 </span>
                 <span className="profile-match-mode">{m.mode}</span>
                 <span className="profile-match-map">
-                  {m.mapIcon ? <img src={img(m.mapIcon)} alt="" loading="lazy" /> : null}
+                  {m.mapIcon ? <img src={thumb(m.mapIcon, 64)} alt="" loading="lazy" decoding="async" /> : null}
                   {m.map}
                 </span>
                 <span className="profile-match-score">
                   {m.score ? `${m.score.mine}–${m.score.theirs}` : "—"}
                 </span>
                 <span className="profile-match-agent">
-                  {m.agentIcon ? <img src={img(m.agentIcon)} alt="" loading="lazy" /> : null}
+                  {m.agentIcon ? <img src={thumb(m.agentIcon, 64)} alt="" loading="lazy" decoding="async" /> : null}
                   {m.agent}
                 </span>
                 <span className="profile-match-kda">

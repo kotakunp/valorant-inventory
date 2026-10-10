@@ -54,7 +54,7 @@ export interface BuddyItem {
 export interface AgentItem {
   id: string;
   name: string;
-  /** Bust art (catalog displayIcon, 256×256 transparent). */
+  /** Bust art (catalog displayIcon, 1024×1024 transparent; draw via `thumb()`). */
   icon: string | null;
   /** Role display name (e.g. "Duelist"), when the catalog has one. */
   role: string | null;

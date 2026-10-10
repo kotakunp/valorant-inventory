@@ -7,6 +7,7 @@ import { collectionValue, favoriteAgent, isPremiumSkin, vpToUsd } from "./logic"
 import type { LibraryTab } from "./Library";
 import { SkinArt } from "./skinArt";
 import { IconCheck, IconCopy, IconDownload, IconLink } from "./icons";
+import { thumb } from "./thumb";
 
 const img = (u: string | null | undefined) => (u ? `/img/${encodeURIComponent(u)}` : undefined);
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -264,7 +265,7 @@ export function Inspector({
           </button>
           <button type="button" className="insp-profile" onClick={() => onOpenTab("agent")}>
             <span className="insp-profile-art">
-              {agent?.icon ? <img src={img(agent.icon)} alt="" /> : <span className="insp-profile-empty" />}
+              {agent?.icon ? <img src={thumb(agent.icon, 128)} alt="" /> : <span className="insp-profile-empty" />}
             </span>
             <span className="insp-profile-text">
               <span className="insp-profile-label">Agent</span>

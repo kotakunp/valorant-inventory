@@ -4,6 +4,7 @@ import type { ChromaSelection, RankBadge, ShowcasePayload, Selection, SkinItem, 
 import { selKey } from "./types";
 import type { GunGroup, Pages, StackDirection, StackLayer } from "./logic";
 import { SkinArt, skinArtStyle } from "./skinArt";
+import { thumb } from "./thumb";
 import {
   WEAPON_CATEGORIES,
   LOADOUT_GUNS,
@@ -360,7 +361,7 @@ export function Showcase({
           {agent && (
             <div className="sc-agent">
               <span className="sc-agent-art">
-                {agent.icon ? <img src={imgUrl(agent.icon)!} alt="" /> : null}
+                {agent.icon ? <img src={thumb(agent.icon, 128)} alt="" /> : null}
               </span>
               <span className="sc-agent-meta">
                 <span className="sc-agent-label">Main agent</span>

@@ -9,6 +9,7 @@ import { extractAccessUrl } from "./accessUrl";
 import { autoLoginWithBrowser } from "./browserLogin";
 import { captchaSolverEnabled } from "./captchaSolver";
 import { getCatalog } from "./catalog";
+import { canThumbnail, makeThumbnail, parseThumbWidth, ThumbCache } from "./thumbnail";
 import { verifyManifest, ManifestError } from "./shareManifest";
 import {
   buildSnapshot,
@@ -159,6 +160,17 @@ async function fetchAllowlisted(start: URL): Promise<Response> {
   }
 }
 
+function sendThumb(res: import("express").Response, buf: Buffer): void {
+  res.setHeader("Content-Type", "image/webp");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+  res.send(buf);
+}
+
+const thumbCache = new ThumbCache();
+/** Concurrent requests for the same thumbnail share one fetch + resize. */
+const thumbInFlight = new Map<string, Promise<Buffer | null>>();
+
 app.get("/img/:encoded", async (req, res) => {
   let target: URL;
   try {
@@ -170,6 +182,37 @@ app.get("/img/:encoded", async (req, res) => {
   if (target.protocol !== "https:" || !IMG_HOST_ALLOWLIST.has(target.hostname)) {
     res.status(403).end();
     return;
+  }
+  // `?w=` serves a small WebP instead of the original; agent art is 1024×1024
+  // (~400 KB each) but shown at ≤52 px.
+  const width = parseThumbWidth(req.query.w);
+  if (req.query.w !== undefined && width == null) {
+    res.status(400).end();
+    return;
+  }
+  const thumbKey = width ? `${width}|${target.href}` : "";
+  if (width) {
+    const cached = thumbCache.get(thumbKey);
+    if (cached) {
+      sendThumb(res, cached);
+      return;
+    }
+    const pending = thumbInFlight.get(thumbKey);
+    if (pending) {
+      const buf = await pending.catch(() => null);
+      if (buf) {
+        sendThumb(res, buf);
+        return;
+      }
+    }
+  }
+  let settle: ((b: Buffer | null) => void) | undefined;
+  if (width) {
+    const p = new Promise<Buffer | null>((r) => (settle = r));
+    thumbInFlight.set(thumbKey, p);
+    void p.finally(() => {
+      if (thumbInFlight.get(thumbKey) === p) thumbInFlight.delete(thumbKey);
+    });
   }
   try {
     const upstream = await fetchAllowlisted(target);
@@ -192,12 +235,22 @@ app.get("/img/:encoded", async (req, res) => {
       res.status(413).end();
       return;
     }
+    if (width && canThumbnail(declared)) {
+      const thumb = await makeThumbnail(buf, width);
+      thumbCache.set(thumbKey, thumb);
+      settle?.(thumb);
+      sendThumb(res, thumb);
+      return;
+    }
     res.setHeader("Content-Type", declared);
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "public, max-age=604800, immutable");
     res.send(buf);
   } catch {
     res.status(502).end();
+  } finally {
+    // Resolving twice is a no-op, so this only releases waiters on error paths.
+    settle?.(null);
   }
 });
 

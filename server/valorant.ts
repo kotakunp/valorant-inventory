@@ -221,6 +221,22 @@ export function skinItemFromCatalog(
 }
 
 /**
+ * Owned agents = entitlements + the free starter agents (Riot's agent
+ * entitlements only list unlocked agents, so Jett/Sage/… would otherwise be
+ * missing and could never be picked as the main agent). Sorted A→Z.
+ */
+export function ownedAgents(entitled: string[], agents: Catalog["agents"]): AgentItem[] {
+  const ids = new Set(entitled.map((id) => id.toLowerCase()));
+  for (const [id, a] of agents) if (a.base) ids.add(id);
+  return [...ids]
+    .flatMap((id) => {
+      const a = agents.get(id);
+      return a ? [agentItemFromCatalog(id, a)] : [];
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
  * Catalog agent entry → showcase item. Shared by sign-in and share-link
  * snapshots so both render the same name/art/role.
  */
@@ -765,11 +781,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
   });
   buddies.sort((a, b) => (b.price ?? -1) - (a.price ?? -1) || a.name.localeCompare(b.name));
 
-  const agents: AgentItem[] = uniq(parseEntitlements(entAgents, ITEM_TYPE.agents)).flatMap((id) => {
-    const a = catalog.agents.get(id);
-    return a ? [agentItemFromCatalog(id, a)] : [];
-  });
-  agents.sort((a, b) => a.name.localeCompare(b.name));
+  const agents = ownedAgents(parseEntitlements(entAgents, ITEM_TYPE.agents), catalog.agents);
 
   const balances = walletBody?.Balances ?? {};
   const vp =

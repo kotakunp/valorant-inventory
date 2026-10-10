@@ -33,7 +33,7 @@ export interface Catalog {
   /** gamemode folder segment (from assetPath) → displayName — joins matchInfo.gameMode. */
   gameModes: Map<string, string>;
   /** Playable agent uuid → name/bust/role (Agents tab + match-details characterId). */
-  agents: Map<string, { name: string; icon: string | null; role: string | null; roleIcon: string | null }>;
+  agents: Map<string, { name: string; icon: string | null; role: string | null; roleIcon: string | null; base?: boolean }>;
 }
 
 let cache: { at: number; data: Catalog } | null = null;
@@ -197,6 +197,8 @@ export async function getCatalog(): Promise<Catalog> {
       icon: a.displayIcon ?? a.bustPortrait ?? null,
       role: typeof a.role?.displayName === "string" && a.role.displayName ? a.role.displayName : null,
       roleIcon: typeof a.role?.displayIcon === "string" && a.role.displayIcon ? a.role.displayIcon : null,
+      // Free starter agents; Riot's agent entitlements never list them.
+      base: a.isBaseContent === true,
     });
   }
   cache = { at: Date.now(), data };
