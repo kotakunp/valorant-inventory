@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { HoverSkins } from "./HoverSkins";
 import type { ChromaSelection, RankBadge, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
 import { selKey } from "./types";
@@ -34,10 +34,8 @@ interface Props {
   onRemoveSkin?: (id: string) => void;
   onBringToFront?: (gunId: string, skinId: string) => void;
   onPickChroma?: (skinId: string, chromaId: string) => void;
-}
-
-function VLogo() {
-  return <div className="sc-logo" aria-hidden="true" />;
+  /** Hover spread without editing (shared links); defaults to `!!onRemoveSkin`. */
+  hoverable?: boolean;
 }
 
 function CatMark() {
@@ -129,8 +127,9 @@ export function Showcase({
   onRemoveSkin,
   onBringToFront,
   onPickChroma,
+  hoverable,
 }: Props) {
-  const interactive = !!onRemoveSkin;
+  const interactive = hoverable ?? !!onRemoveSkin;
   const [hovered, setHovered] = useState<{ gun: string; skin?: string; rect: DOMRect } | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout>>();
   const keepOpen = () => clearTimeout(closeTimer.current);
@@ -236,8 +235,13 @@ export function Showcase({
     const items = orderStack(gun.items, bringToFront[gun.id]);
     const empty = items.length === 0;
     const layers = stackLayers(items.length, dir);
+    const front = items[0];
     return (
-      <section className={`sc-cat${empty ? " sc-cat--empty" : ""}`} key={gun.id}>
+      <section
+        className={`sc-cat${empty ? " sc-cat--empty" : ""}`}
+        key={gun.id}
+        style={front ? ({ "--rarity": rarityColor(front.price, front.levelCount, front.contentTierRank ?? null) } as CSSProperties) : undefined}
+      >
         {interactive && !empty && (
           <button className="sc-hover-target" aria-label={`Browse ${gun.label}, ${items.length} skins`}
             onPointerEnter={e => openStack(e.currentTarget, gun.id)} onPointerLeave={closeSoon}
@@ -277,12 +281,6 @@ export function Showcase({
         />
       )}
       <div className="sc-wedge" />
-      <header className="sc-header">
-        <VLogo />
-        <span className="sc-header-div" aria-hidden="true" />
-        <div className="sc-title">COLLECTION</div>
-        <div className="sc-header-rule" aria-hidden="true" />
-      </header>
 
       <div className="sc-body">
         <main className={`sc-center density-${pages.density.name}`}>
@@ -357,6 +355,34 @@ export function Showcase({
               {checkedCards.length > 1 && <div className="sc-more">+{checkedCards.length - 1} MORE</div>}
             </div>
           )}
+          <dl className="sc-stats">
+            <div>
+              <dt>SKINS</dt>
+              <dd>{checkedSkins.length - knifeCount}</dd>
+            </div>
+            <div>
+              <dt>PREMIUM</dt>
+              <dd>{premCount}</dd>
+            </div>
+            <div>
+              <dt>MELEE</dt>
+              <dd>{knifeCount}</dd>
+            </div>
+            <div>
+              <dt>BUDDIES</dt>
+              <dd>{checkedBuddies.length}</dd>
+            </div>
+            {totalVp > 0 && (
+              <div className="sc-stat-value">
+                <dt>VALUE</dt>
+                <dd>
+                  {fmt(totalVp)}
+                  <small> VP</small>
+                  <span className="sc-stat-usd">~${fmt(vpToUsd(totalVp))}</span>
+                </dd>
+              </div>
+            )}
+          </dl>
           <div className="sc-ranks">
             <Medallion label="PEAK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
             <Medallion label="CURRENT" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
@@ -377,22 +403,6 @@ export function Showcase({
               )}
             </div>
           )}
-          {totalVp > 0 && (
-            <div className="sc-summary sc-value">
-              <span>SPENT</span>
-              <span aria-hidden="true">·</span>
-              <strong>{fmt(totalVp)} VP</strong>
-              <span aria-hidden="true">·</span>
-              <strong>~${fmt(vpToUsd(totalVp))}</strong>
-            </div>
-          )}
-          <div className="sc-summary">
-            <span>PREMIUM {premCount}</span>
-            <span aria-hidden="true">·</span>
-            <span>KNIFE {knifeCount}</span>
-            <span aria-hidden="true">·</span>
-            <span>BUDDIES +{checkedBuddies.length}</span>
-          </div>
         </aside>
       </div>
     </div>

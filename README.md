@@ -1,14 +1,14 @@
 # VALORANT Account Showcase Generator
 
 Generates a **2560×1440 (1440p) 16:9 PNG** of a VALORANT account's premium
-collection — downloadable only, no share links, nothing stored.
+collection, downloadable as a PNG or shared as a 30-day link with a live, hoverable view.
 See `SPEC.md` for the full product/technical specification (§6–§8 = UI/layout source of truth).
 
 ## Run
 
 ```bash
 npm install
-npm test          # vitest (selection defaults, pagination, stack layout, auth parsers, match strip) — expect 148 tests green
+npm test          # vitest (selection defaults, pagination, stack layout, auth parsers, share links) — expect 158 tests green
 npm run build     # tsc --noEmit + production bundle → dist/
 npm start         # serves API + built frontend on http://localhost:3001
 # or for development with hot reload:
@@ -21,22 +21,29 @@ npm run dev       # Express :3001 + Vite :5173 (proxied)
 npx tsc --noEmit && npx vitest run && npm run build
 ```
 
-All three must pass (148 tests). Then `git add … && git commit && git push` to `main`.
+All three must pass (158 tests). Then `git add … && git commit && git push` to `main`.
 
 ## Architecture
 
 ```
 src/                      # React frontend (Vite + TS)
-  App.tsx                 # state, auth gate, selection sidebar, preview + export Showcases, zoom/toolbar
+  App.tsx                 # workspace state, studio shell (nav, 3 panes), preview + export Showcases, zoom
+  SignIn.tsx              # sign-in gate: access URL (primary) + cookie / password / Chrome / RSO
+  Library.tsx             # left pane: skins / cards / titles / buddies selection
+  Inspector.tsx           # right pane: download, share link, summary, quick select, profile, variants
+  SharedView.tsx          # read-only /s/:id page (main.tsx routes there by path)
+  useFitScale.ts          # fits the 1280×720 canvas into a stage (studio + shared page)
   Showcase.tsx            # the showcase renderer (layout, two-axis stack, hover spread, right rail, knife row)
   logic.ts                # selection rules, rarityColor, WEAPON_CATEGORIES, paginate(), stack layout (stackLayers/orderStack)
   logic.test.ts           # UI-logic tests
   styles.css              # all styles; fixed 1280×720 `.sc-root` canvas
   types.ts                # SkinItem, ShowcasePayload, …
-  rso.ts, captcha.ts, StorePanel.tsx, MatchesStrip.tsx, CardPeek.tsx
+  rso.ts, captcha.ts, StorePanel.tsx (Store view)
 server/                   # Express (tsx, no build step)
-  index.ts                # routes + /img proxy + static dist/ in production
-  valorant.ts             # Riot pipeline: entitlements/storefront/wallet/MMR/match history → buildShowcase
+  index.ts                # routes + /img proxy + /s/:id (Open Graph tags) + static dist/ in production
+  share.ts                # share snapshots: ownership check, Postgres/in-memory store, OG meta, preview validation
+  shareManifest.ts        # signed ownership proof attached to every showcase payload
+  valorant.ts             # Riot pipeline: entitlements/storefront/wallet/MMR → buildShowcase
   riotAuth.ts, rso.ts     # token-paste / RSO auth
   browserLogin.ts, chromeCookies.ts, captchaSolver.ts
   *.test.ts               # vitest suite
@@ -46,7 +53,7 @@ SPEC.md                   # product + technical spec (UI sections must stay in s
 ### UI invariants (easy to break — read before touching `Showcase.tsx`)
 
 - Export canvas is **fixed 1280×720** — `.sc-root` must never become responsive; preview zoom (Fit/100%/Fullscreen) only scales the editor preview.
-- Hovering a preview stack opens its skins in a nearby scrollable spread with separate, stable hover targets (variants, front ordering, and removal remain available), they do not toggle selection; toggling lives in the sidebar.
+- Hovering a preview stack opens its skins in a nearby scrollable spread with separate, stable hover targets (variants, front ordering, and removal remain available), they do not toggle selection; toggling lives in the library pane.
 - `paginate(allSkins, selection)` always emits all 19 official gun slots + the knife row; empty guns render as empty cells (dimmed default-weapon render from `payload.defaultIcons`, no border).
 - Stacks are two-axis: front-first order (`orderStack`: manual front → equipped → tier score → stable) with inline `translate/scale` per layer (`stackLayers`), cascade direction per column (`stackDirectionForColumn`), spread bounded by `STACK_SPREAD` — never CSS-fan transforms.
 - Rarity outline color comes from `--rarity` set per stack item (`rarityColor()` in `logic.ts`).
@@ -56,7 +63,12 @@ SPEC.md                   # product + technical spec (UI sections must stay in s
 
 - Hosted via **Dokploy** with **Nixpacks** (`nixpacks.toml`: nodejs_20); push to `main`, then redeploy in Dokploy.
 - Production: `npm start` → `NODE_ENV=production tsx server/index.ts` on **:3001**.
-- Config via `.env` (see `.env.example`): `RSO_*`, `PORT`, `CAPMONSTER_API_KEY`.
+- Config via `.env` (see `.env.example`): `RSO_*`, `PORT`, `CAPMONSTER_API_KEY`, `DATABASE_URL`, `SHARE_SECRET`, `PUBLIC_URL`.
+- **Share links** need `DATABASE_URL` (any Postgres, e.g. Supabase; use the session pooler URL). The
+  `showcase_shares` table is created on startup; expired rows are deleted hourly. Without
+  `DATABASE_URL`, production hides the share button; `npm run dev` keeps links in memory.
+  Set `SHARE_SECRET` (32+ random chars) so share proofs survive restarts and redeploys.
+  Set `PUBLIC_URL` (e.g. `https://valorant.muur.app`) so link previews use the public origin.
 
 ## Getting tokens (current mode — no app approval needed)
 

@@ -63,7 +63,7 @@ function SkinCard({ o, nightMarket }: { o: StoreOffer; nightMarket?: boolean }) 
     <article
       className="sstore-card"
       title={o.name}
-      style={{ borderColor: hexA(rarity, 0.55), "--rarity": rarity } as React.CSSProperties}
+      style={{ borderColor: hexA(rarity, 0.32), "--rarity": rarity } as React.CSSProperties}
     >
       <div className="sstore-art">
         {art ? <SkinArt src={art} alt="" loading="lazy" weaponName={o.weaponName} /> : <span className="sstore-art-fb">?</span>}

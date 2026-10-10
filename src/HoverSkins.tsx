@@ -55,8 +55,8 @@ export function HoverSkins({ gun, items, rect, chromas, onEnter, onLeave, onFron
                     </button>
                   ))}
                 </div>
-                {gun !== "MELEE" && <button disabled={index === 0} onClick={() => onFront?.(gun, skin.id)}>To front</button>}
-                <button onClick={() => onRemove?.(skin.id)} aria-label={`Remove ${skin.name}`}>Remove</button>
+                {onFront && gun !== "MELEE" && <button disabled={index === 0} onClick={() => onFront(gun, skin.id)}>To front</button>}
+                {onRemove && <button onClick={() => onRemove(skin.id)} aria-label={`Remove ${skin.name}`}>Remove</button>}
               </div>
             </article>
           );

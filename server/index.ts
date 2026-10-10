@@ -8,6 +8,20 @@ import { startLogin, submitMfa, rateLimit, AuthFlowError, loginWithCookies, norm
 import { extractAccessUrl } from "./accessUrl";
 import { autoLoginWithBrowser } from "./browserLogin";
 import { captchaSolverEnabled } from "./captchaSolver";
+import { getCatalog } from "./catalog";
+import { verifyManifest, ManifestError } from "./shareManifest";
+import {
+  buildSnapshot,
+  createPgShareStore,
+  injectShareMeta,
+  MemoryShareStore,
+  newShareId,
+  parsePicks,
+  parsePreview,
+  ShareError,
+  SHARE_ID_RE,
+  type ShareStore,
+} from "./share";
 
 try {
   (process as any).loadEnvFile?.();
@@ -22,7 +36,30 @@ const PORT = Number(process.env.PORT ?? 3001);
 // visitor shares one rate-limit bucket. With no XFF header (direct/local call)
 // the socket address is used, so spoofing isn't possible on the local path.
 app.set("trust proxy", 1);
-app.use(express.json({ limit: "32kb" }));
+const smallJson = express.json({ limit: "32kb" });
+// Share creation carries the signed ownership proof plus a JPEG preview.
+const shareJson = express.json({ limit: "1mb" });
+app.use((req, res, next) => (req.path === "/api/share" ? shareJson : smallJson)(req, res, next));
+
+let shareStore: ShareStore | null = null;
+const shareReady = (async () => {
+  const url = process.env.DATABASE_URL?.trim();
+  if (url) {
+    try {
+      shareStore = await createPgShareStore(url);
+      console.log("[share] postgres store ready");
+    } catch (e) {
+      console.error("[share] postgres unavailable, share links disabled:", e instanceof Error ? e.message : e);
+    }
+  } else if (process.env.NODE_ENV !== "production") {
+    shareStore = new MemoryShareStore();
+    console.log("[share] DATABASE_URL not set: share links live in memory (dev only)");
+  }
+  if (shareStore) {
+    const store = shareStore;
+    setInterval(() => void store.purgeExpired().catch(() => undefined), 60 * 60 * 1000).unref();
+  }
+})();
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, at: new Date().toISOString() });
@@ -337,8 +374,101 @@ app.post("/api/login/cookies", async (req, res) => {
   }
 });
 
+app.get("/api/share/config", async (_req, res) => {
+  await shareReady;
+  res.json({ enabled: !!shareStore });
+});
+
+app.post("/api/share", async (req, res) => {
+  await shareReady;
+  if (!shareStore) {
+    res.status(503).json({ error: "Share links aren't available on this server." });
+    return;
+  }
+  if (!rateLimit(`share:${req.ip}`, 10, 10 * 60_000)) {
+    res.status(429).json({ error: "Too many links created — wait a few minutes and try again." });
+    return;
+  }
+  try {
+    const { proof, picks, preview } = req.body ?? {};
+    const manifest = verifyManifest(proof);
+    const snapshot = buildSnapshot(manifest, parsePicks(picks), await getCatalog());
+    const image = parsePreview(preview);
+    let id = newShareId();
+    try {
+      await shareStore.create(id, snapshot, image);
+    } catch {
+      id = newShareId();
+      await shareStore.create(id, snapshot, image);
+    }
+    res.json({ id, path: `/s/${id}`, expiresAt: snapshot.expiresAt });
+  } catch (e) {
+    if (e instanceof ManifestError) {
+      res.status(401).json({ error: e.message });
+      return;
+    }
+    if (e instanceof ShareError) {
+      res.status(e.status).json({ error: e.message });
+      return;
+    }
+    console.error("[api/share] internal error:", e instanceof Error ? e.message : e);
+    res.status(500).json({ error: "Couldn't create the link. Try again." });
+  }
+});
+
+app.get("/api/share/:id", async (req, res) => {
+  await shareReady;
+  const missing = () => res.status(404).json({ error: "This link has expired or doesn't exist." });
+  if (!shareStore || !SHARE_ID_RE.test(req.params.id)) return void missing();
+  try {
+    const share = await shareStore.get(req.params.id);
+    if (!share) return void missing();
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.json(share);
+  } catch (e) {
+    console.error("[api/share/:id] internal error:", e instanceof Error ? e.message : e);
+    res.status(500).json({ error: "Couldn't load this showcase. Try again." });
+  }
+});
+
+app.get("/s/:id/preview.jpg", async (req, res) => {
+  await shareReady;
+  if (!shareStore || !SHARE_ID_RE.test(req.params.id)) return void res.status(404).end();
+  try {
+    const buf = await shareStore.preview(req.params.id);
+    if (!buf) return void res.status(404).end();
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(buf);
+  } catch {
+    res.status(500).end();
+  }
+});
+
 const distDir = path.resolve(process.cwd(), "dist");
 if (fs.existsSync(distDir)) {
+  const indexHtml = fs.readFileSync(path.join(distDir, "index.html"), "utf8");
+  // Link previews (Discord, X, iMessage) read the HTML only, so share pages
+  // get their Open Graph tags server-side.
+  app.get("/s/:id", async (req, res) => {
+    await shareReady;
+    let html = indexHtml;
+    if (shareStore && SHARE_ID_RE.test(req.params.id)) {
+      try {
+        const share = await shareStore.get(req.params.id);
+        if (share) {
+          const origin = process.env.PUBLIC_URL?.replace(/\/+$/, "") || `${req.protocol}://${req.get("host")}`;
+          const hasPreview = !!(await shareStore.preview(req.params.id));
+          html = injectShareMeta(indexHtml, share, origin, req.params.id, hasPreview);
+        }
+      } catch {
+        /* fall back to the plain SPA shell */
+      }
+    }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+  });
   app.use(express.static(distDir));
   app.get("*", (_req, res) => res.sendFile(path.join(distDir, "index.html")));
 }

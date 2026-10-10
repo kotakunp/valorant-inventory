@@ -1,5 +1,6 @@
-import type { ChromaOption, RankBadge, RecentMatch, Region, ShowcasePayload, SkinItem, CardItem, TitleItem, BuddyItem, StoreOffer, StoreSection, AccessoryOffer } from "../src/types";
-import { getCatalog, getClientVersion, type Catalog } from "./catalog";
+import type { ChromaOption, RankBadge, Region, ShowcasePayload, SkinItem, CardItem, TitleItem, BuddyItem, StoreOffer, StoreSection, AccessoryOffer } from "../src/types";
+import { getCatalog, getClientVersion, type Catalog, type SkinIndexEntry } from "./catalog";
+import { withShareProof } from "./shareManifest";
 
 export class UpstreamError extends Error {
   constructor(message: string, readonly httpStatus = 502) {
@@ -148,6 +149,77 @@ function skinArt(skin: any): string | null {
 }
 
 /**
+ * Catalog skin entry → showcase item. `price` falls back to the content-tier
+ * list price; `equippedChromaId` becomes the default variant when it belongs
+ * to the skin. Shared by sign-in and share-link snapshots so both render the
+ * same art, variants and rarity.
+ */
+export function skinItemFromCatalog(
+  entry: SkinIndexEntry,
+  catalog: Catalog,
+  opts: { price?: number | null; equipped?: boolean; equippedChromaId?: string | null } = {}
+): SkinItem {
+  const skinUuid = String(entry.skin.uuid ?? "").toLowerCase();
+  const levels: any[] = entry.skin.levels ?? [];
+  const chromasRaw: any[] = entry.skin.chromas ?? [];
+  // Full catalog chroma list for owned skins (matches the client's variant
+  // picker — variant entitlements under-return and are display-only here).
+  const chromas: ChromaOption[] = chromasRaw
+    .map((ch: any, idx: number) => {
+      const id = typeof ch?.uuid === "string" ? ch.uuid.toLowerCase() : "";
+      if (!id) return null;
+      const name = (
+        typeof ch?.displayName === "string" && ch.displayName.trim()
+          ? ch.displayName
+          : idx === 0
+            ? "Default"
+            : `Variant ${idx + 1}`
+      )
+        .replace(/\s+/g, " ")
+        .trim();
+      // Variant art: many skins (e.g. Recon Phantom) ship displayIcon only on
+      // the base chroma — variants carry fullRender instead. A null icon makes
+      // every renderer fall back to the default art, so the picker looks
+      // selectable but never changes.
+      const icon =
+        typeof ch?.displayIcon === "string" && ch.displayIcon
+          ? ch.displayIcon
+          : typeof ch?.fullRender === "string" && ch.fullRender
+            ? ch.fullRender
+            : null;
+      return { id, name, icon } satisfies ChromaOption;
+    })
+    .filter((c): c is ChromaOption => c !== null);
+
+  const equippedChroma = opts.equippedChromaId?.toLowerCase();
+  const defaultChromaId =
+    (equippedChroma && chromas.some((c) => c.id === equippedChroma) && equippedChroma) ||
+    chromas[0]?.id ||
+    null;
+  const baseIcon = skinArt(entry.skin);
+  const activeChroma = chromas.find((c) => c.id === defaultChromaId);
+  const isKnife =
+    entry.category.toLowerCase().includes("knife") || /knife|melee/i.test(entry.weaponName);
+
+  const tierUuid = typeof entry.skin.contentTierUuid === "string" ? entry.skin.contentTierUuid.toLowerCase() : "";
+  const contentTierRank = tierUuid ? catalog.contentTiers.get(tierUuid)?.rank ?? null : null;
+  return {
+    id: skinUuid,
+    name: entry.skin.displayName ?? "Unknown skin",
+    weaponName: entry.weaponName,
+    icon: activeChroma?.icon ?? baseIcon,
+    price: opts.price ?? tierVpPrice(contentTierRank),
+    levelCount: levels.length,
+    variantCount: chromas.length,
+    isKnife,
+    equipped: !!opts.equipped,
+    contentTierRank,
+    chromas,
+    defaultChromaId,
+  };
+}
+
+/**
  * Daily store + night market + accessory store from the storefront response
  * (already fetched for the price map). Skin offers whose item isn't in the
  * catalog are skipped.
@@ -246,161 +318,6 @@ export function rankBadge(
   return { tier, name: info.name, icon: info.icon, color: info.color };
 }
 
-/* ---- Recent matches (editor-only strip): history + MMR updates + bounded
-      match-details fan-out. Everything below is non-critical — any failure
-      yields [] so the showcase still renders without the strip. ---- */
-
-const MATCH_HISTORY_COUNT = 15;
-const MATCH_DETAIL_LIMIT = 10;
-const MATCH_DETAIL_CONCURRENCY = 5;
-/** Queues whose matches carry a RankedRating change. */
-const RR_QUEUES = new Set(["competitive", "premier"]);
-/** Known queue IDs → user-facing label (others: gamemode catalog, then raw ID). */
-const QUEUE_LABEL: Record<string, string> = {
-  competitive: "COMPETITIVE",
-  premier: "PREMIER",
-  unrated: "UNRATED",
-  swiftplay: "SWIFTPLAY",
-  spikerush: "SPIKE RUSH",
-  deathmatch: "DEATHMATCH",
-};
-
-/** Run `fn` over `items` with at most `limit` in flight; results keep input order. */
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const i = next++;
-      out[i] = await fn(items[i]);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker));
-  return out;
-}
-
-/**
- * Slim projection of a match-details response → RecentMatch (the raw blob is
- * round-by-round and never shipped). Returns null for incomplete matches or
- * when the player isn't in the lobby.
- */
-export function projectRecentMatch(
-  detail: any,
-  ctx: {
-    puuid: string;
-    rrByMatch: ReadonlyMap<string, number>;
-    maps: Catalog["maps"];
-    gameModes: Catalog["gameModes"];
-    agents: Catalog["agents"];
-  }
-): RecentMatch | null {
-  const info = detail?.matchInfo;
-  if (!info || info.isCompleted === false) return null;
-  const matchId = typeof info.matchId === "string" ? info.matchId : "";
-  const startMs = typeof info.gameStartMillis === "number" ? info.gameStartMillis : 0;
-  if (!matchId || !(startMs > 0)) return null;
-
-  const players: any[] = Array.isArray(detail?.players) ? detail.players : [];
-  const self = players.find(
-    (p) => typeof p?.subject === "string" && p.subject.toLowerCase() === ctx.puuid.toLowerCase()
-  );
-  const stats = self?.stats;
-  if (!self || !stats) return null;
-
-  const queue = typeof info.queueID === "string" && info.queueID ? info.queueID : "unknown";
-  // mapId is the map asset path — exactly valorant-api's mapUrl shape.
-  const rawMap = typeof info.mapId === "string" ? info.mapId : "";
-  const mapEntry = ctx.maps.get(rawMap.toLowerCase());
-  const map = mapEntry?.name ?? rawMap.split("/").pop() ?? "Unknown map";
-  // gameMode asset path shares its folder segment with gamemodes assetPath.
-  const modeKey = (typeof info.gameMode === "string" ? info.gameMode.split("/")[3] ?? "" : "").toLowerCase();
-  const mode =
-    QUEUE_LABEL[queue] ?? (modeKey ? ctx.gameModes.get(modeKey) : undefined) ?? queue.toUpperCase();
-
-  const teams: any[] = Array.isArray(detail?.teams) ? detail.teams : [];
-  const mine = teams.find((t) => t?.teamId === self.teamId);
-  const theirs = teams.find((t) => t && t.teamId !== self.teamId);
-  const rounds =
-    typeof stats.roundsPlayed === "number" && stats.roundsPlayed > 0 ? stats.roundsPlayed : 0;
-  const agent = ctx.agents.get(typeof self.characterId === "string" ? self.characterId.toLowerCase() : "");
-
-  return {
-    id: matchId,
-    start: new Date(startMs).toISOString(),
-    queue,
-    mode,
-    map,
-    mapIcon: mapEntry?.icon ?? null,
-    agent: agent?.name ?? "Unknown agent",
-    agentIcon: agent?.icon ?? null,
-    won: typeof mine?.won === "boolean" ? mine.won : null,
-    score: mine ? { mine: mine.roundsWon ?? 0, theirs: theirs?.roundsWon ?? 0 } : null,
-    kills: typeof stats.kills === "number" ? stats.kills : 0,
-    deaths: typeof stats.deaths === "number" ? stats.deaths : 0,
-    assists: typeof stats.assists === "number" ? stats.assists : 0,
-    acs: rounds > 0 && typeof stats.score === "number" ? Math.round(stats.score / rounds) : 0,
-    durationMs: typeof info.gameLengthMillis === "number" ? info.gameLengthMillis : null,
-    rr: RR_QUEUES.has(queue) ? ctx.rrByMatch.get(matchId) ?? null : null,
-  };
-}
-
-type PdGet = (path: string, critical?: boolean, label?: string) => Promise<any | null>;
-
-/**
- * Recent matches: 1 history + 1 competitive-updates call, then a bounded
- * fan-out over the latest match IDs (10 detail calls at ≤5 in flight). All
- * non-critical — upstream failures resolve to [] instead of failing the
- * showcase. Newest-first, matching the history index order.
- */
-export async function fetchRecentMatches(
-  pdGet: PdGet,
-  puuid: string,
-  catalog: Pick<Catalog, "maps" | "gameModes" | "agents">
-): Promise<RecentMatch[]> {
-  try {
-    const [history, mmr] = await Promise.all([
-      pdGet(`/match-history/v1/history/${puuid}?startIndex=0&endIndex=${MATCH_HISTORY_COUNT}`, false, "Match history"),
-      pdGet(`/mmr/v1/players/${puuid}/competitiveupdates?startIndex=0&endIndex=${MATCH_HISTORY_COUNT}`, false, "Competitive updates"),
-    ]);
-    if (!history) console.log("[matches] match-history request failed");
-    else if (!Array.isArray(history.History)) {
-      console.log(`[matches] unexpected history shape: ${Object.keys(history).join(",")}`);
-    }
-    if (!mmr) console.log("[matches] competitiveupdates request failed (RR chips will be missing)");
-    const rrByMatch = new Map<string, number>();
-    for (const m of mmr?.Matches ?? []) {
-      if (typeof m?.MatchID === "string" && typeof m?.RankedRatingEarned === "number") {
-        rrByMatch.set(m.MatchID, m.RankedRatingEarned);
-      }
-    }
-    const entries: any[] = Array.isArray(history?.History) ? history.History : [];
-    const ids = entries
-      .map((e: any) => (typeof e?.MatchID === "string" ? e.MatchID : ""))
-      .filter((id: string) => !!id)
-      .slice(0, MATCH_DETAIL_LIMIT);
-    if (!ids.length) {
-      console.log(`[matches] history=${entries.length} → 0 matches (no match IDs)`);
-      return [];
-    }
-    const details = await mapLimit(ids, MATCH_DETAIL_CONCURRENCY, (id) =>
-      pdGet(`/match-details/v1/matches/${id}`, false, "Match details")
-    );
-    const out: RecentMatch[] = [];
-    for (const d of details) {
-      const m = d ? projectRecentMatch(d, { puuid, rrByMatch, ...catalog }) : null;
-      if (m) out.push(m);
-    }
-    // One line per showcase: how far the chain got (0 → check [upstream] lines).
-    console.log(
-      `[matches] history=${entries.length} details=${details.filter((d) => d).length}/${ids.length} → ${out.length} projected`
-    );
-    return out;
-  } catch (e) {
-    console.log(`[matches] failed: ${e instanceof Error ? e.message : String(e)}`);
-    return [];
-  }
-}
-
 export interface AccountInput {
   region: Region;
   accessToken: string;
@@ -432,11 +349,6 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
   const pdGet = (p: string, critical = false, label = p) =>
     requestJson(`${pdBase}${p}`, { init: { headers: pdHeaders }, critical, label });
 
-  // Start before the entitlement batches so the detail fan-out overlaps them.
-  const matchesPromise: Promise<RecentMatch[]> = fetchRecentMatches(pdGet, puuid, catalog).catch(
-    () => [] as RecentMatch[]
-  );
-
   const [entSkins, entCards, entTitles, entBuddies] = await Promise.all([
     pdGet(`/store/v1/entitlements/${puuid}/${ITEM_TYPE.skins}`, true, "Owned skins"),
     pdGet(`/store/v1/entitlements/${puuid}/${ITEM_TYPE.cards}`, true, "Owned player cards"),
@@ -444,7 +356,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     pdGet(`/store/v1/entitlements/${puuid}/${ITEM_TYPE.buddies}`, true, "Owned buddies"),
   ]);
 
-  const [storefrontBody, walletBody, xpBody, mmrBody, loadoutV3, nameBody, matches] = await Promise.all([
+  const [storefrontBody, walletBody, xpBody, mmrBody, loadoutV3, nameBody] = await Promise.all([
     // offers endpoint removed by Riot — storefront (POST v3) is the current source
     requestJson(`${pdBase}/store/v3/storefront/${puuid}`, {
       init: { method: "POST", headers: pdHeaders, body: "{}" },
@@ -458,7 +370,6 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
       init: { method: "PUT", headers: pdHeaders, body: JSON.stringify([puuid]) },
       label: "Name service",
     }),
-    matchesPromise,
   ]);
   // personalization moved v2 → v3; keep v2 as fallback
   const loadoutBody = loadoutV3 ?? (await pdGet(`/personalization/v2/players/${puuid}/playerloadout`, false, "Loadout"));
@@ -494,69 +405,20 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     if (!skinUuid || skinUuid === entry.defaultSkinUuid) continue;
     if (bySkinUuid.has(skinUuid)) continue;
 
-    const levels: any[] = entry.skin.levels ?? [];
-    const chromasRaw: any[] = entry.skin.chromas ?? [];
-    // Full catalog chroma list for owned skins (matches the client's variant
-    // picker — variant entitlements under-return and are display-only here).
-    const chromas: ChromaOption[] = chromasRaw
-      .map((ch: any, idx: number) => {
-        const id = typeof ch?.uuid === "string" ? ch.uuid.toLowerCase() : "";
-        if (!id) return null;
-        const name = (
-          typeof ch?.displayName === "string" && ch.displayName.trim()
-            ? ch.displayName
-            : idx === 0
-              ? "Default"
-              : `Variant ${idx + 1}`
-        )
-          .replace(/\s+/g, " ")
-          .trim();
-        // Variant art: many skins (e.g. Recon Phantom) ship displayIcon only on
-        // the base chroma — variants carry fullRender instead. A null icon makes
-        // every renderer fall back to the default art, so the picker looks
-        // selectable but never changes.
-        const icon =
-          typeof ch?.displayIcon === "string" && ch.displayIcon
-            ? ch.displayIcon
-            : typeof ch?.fullRender === "string" && ch.fullRender
-              ? ch.fullRender
-              : null;
-        return { id, name, icon } satisfies ChromaOption;
+    bySkinUuid.set(
+      skinUuid,
+      skinItemFromCatalog(entry, catalog, {
+        price: priceMap?.get(skinUuid),
+        equipped: equippedSkins.has(skinUuid),
+        equippedChromaId: equippedChromaBySkin.get(skinUuid),
       })
-      .filter((c): c is ChromaOption => c !== null);
-
-    const equippedChroma = equippedChromaBySkin.get(skinUuid);
-    const defaultChromaId =
-      (equippedChroma && chromas.some((c) => c.id === equippedChroma) && equippedChroma) ||
-      chromas[0]?.id ||
-      null;
-    const baseIcon = skinArt(entry.skin);
-    const activeChroma = chromas.find((c) => c.id === defaultChromaId);
-    const isKnife =
-      entry.category.toLowerCase().includes("knife") || /knife|melee/i.test(entry.weaponName);
-
-    const tierUuid = typeof entry.skin.contentTierUuid === "string" ? entry.skin.contentTierUuid.toLowerCase() : "";
-    const contentTierRank = tierUuid ? catalog.contentTiers.get(tierUuid)?.rank ?? null : null;
-    bySkinUuid.set(skinUuid, {
-      id: skinUuid,
-      name: entry.skin.displayName ?? "Unknown skin",
-      weaponName: entry.weaponName,
-      icon: activeChroma?.icon ?? baseIcon,
-      price: priceMap?.get(skinUuid) ?? tierVpPrice(contentTierRank),
-      levelCount: levels.length,
-      variantCount: chromas.length,
-      isKnife,
-      equipped: equippedSkins.has(skinUuid),
-      contentTierRank,
-      chromas,
-      defaultChromaId,
-    });
+    );
   }
   const skins = [...bySkinUuid.values()];
   skins.sort((a, b) => (b.price ?? -1) - (a.price ?? -1) || a.name.localeCompare(b.name));
   // Counts only — no tokens/puuid — to diagnose empty joins after cookie login.
   console.log(
-    `[showcase] shard=${shard} region=${input.region} entSkins=${rawSkinIds.length} joined=${skins.length} catalogMiss=${catalogMissed} catalogSkins=${catalog.skins.size} sampleMiss=${rawSkinIds.find((id) => !catalog.skins.has(id))?.slice(0, 13) ?? "-"} prices=${priceMap?.size ?? 0} pricesAvailable=${pricesAvailable} matches=${matches.length}`
+    `[showcase] shard=${shard} region=${input.region} entSkins=${rawSkinIds.length} joined=${skins.length} catalogMiss=${catalogMissed} catalogSkins=${catalog.skins.size} sampleMiss=${rawSkinIds.find((id) => !catalog.skins.has(id))?.slice(0, 13) ?? "-"} prices=${priceMap?.size ?? 0} pricesAvailable=${pricesAvailable}`
   );
 
   const equippedCardId: string | null = loadoutBody?.Identity?.PlayerCardID?.toLowerCase?.() ?? null;
@@ -614,7 +476,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     ? buildStoreSection(storefrontBody, catalog, new Set(bySkinUuid.keys()))
     : null;
 
-  return {
+  return withShareProof({
     puuid,
     gameName: name0?.GameName ?? userinfo?.gameName ?? "UNKNOWN",
     tagLine: name0?.TagLine ?? userinfo?.tagLine ?? "",
@@ -631,8 +493,7 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     // Uppercase gun label → official default-weapon render (empty-slot art).
     defaultIcons: Object.fromEntries(catalog.weaponIcons),
     store,
-    matches,
     generatedAt: new Date().toISOString(),
-  };
+  });
 }
 

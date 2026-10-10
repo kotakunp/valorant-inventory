@@ -1,4 +1,4 @@
-import type { BuddyItem, CardItem, ItemKind, RecentMatch, Selection, ShowcasePayload, SkinItem, TitleItem } from "./types";
+import type { BuddyItem, CardItem, ItemKind, Selection, ShowcasePayload, SkinItem, TitleItem } from "./types";
 import { selKey } from "./types";
 
 export const PREMIUM_PRICE = 1775;
@@ -430,47 +430,4 @@ export function paginate(allSkins: SkinItem[], selection: Selection): Pages {
   }
   if (gridPages.length === 0) gridPages.push([]);
   return { density, gridPages, knifeItems, totalSelected: total, truncated };
-}
-
-/* ---- Recent-matches strip: queue tabs (client-side filter over the fetched
-      window — no per-tab refetch). ---- */
-
-/** Tab order for known queues; other queues follow in first-seen order. */
-const QUEUE_ORDER = [
-  "competitive",
-  "premier",
-  "unrated",
-  "swiftplay",
-  "spikerush",
-  "deathmatch",
-];
-
-export interface QueueTab {
-  /** Raw QueueID; "" = ALL. */
-  id: string;
-  /** Display label — the matches' server-resolved mode. */
-  label: string;
-  /** Matches in this tab. */
-  count: number;
-}
-
-/** ALL + one tab per distinct queue present in the fetched window. */
-export function queueTabs(matches: RecentMatch[]): QueueTab[] {
-  const byQueue = new Map<string, { label: string; count: number }>();
-  for (const m of matches) {
-    const cur = byQueue.get(m.queue);
-    if (cur) cur.count++;
-    else byQueue.set(m.queue, { label: m.mode, count: 1 });
-  }
-  const rest = [...byQueue.keys()].filter((q) => !QUEUE_ORDER.includes(q));
-  const ordered = [...QUEUE_ORDER.filter((q) => byQueue.has(q)), ...rest];
-  return [
-    { id: "", label: "ALL", count: matches.length },
-    ...ordered.map((q) => ({ id: q, label: byQueue.get(q)!.label, count: byQueue.get(q)!.count })),
-  ];
-}
-
-/** Matches for a tab ("" = all). */
-export function filterMatches(matches: RecentMatch[], queue: string): RecentMatch[] {
-  return queue ? matches.filter((m) => m.queue === queue) : matches;
 }

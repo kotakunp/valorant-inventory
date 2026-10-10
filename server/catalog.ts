@@ -28,12 +28,6 @@ export interface Catalog {
   contentTiers: Map<string, { rank: number; icon: string | null }>;
   /** Uppercase weapon displayName → official default-weapon render (displayIcon). */
   weaponIcons: Map<string, string>;
-  /** valorant-api `mapUrl` (asset path, same shape as matchInfo.mapId) → name/icon. */
-  maps: Map<string, { name: string; icon: string | null }>;
-  /** gamemode folder segment (from assetPath) → displayName — joins matchInfo.gameMode. */
-  gameModes: Map<string, string>;
-  /** playable agent uuid → name/icon (match-details characterId). */
-  agents: Map<string, { name: string; icon: string | null }>;
 }
 
 let cache: { at: number; data: Catalog } | null = null;
@@ -86,7 +80,7 @@ function indexContentTiers(raw: any): Map<string, { rank: number; icon: string |
 
 export async function getCatalog(): Promise<Catalog> {
   if (cache && Date.now() - cache.at < CATALOG_TTL_MS) return cache.data;
-  const [weapons, cards, titles, buddies, ranks, contentTiers, sprays, maps, gameModes, agents] = await Promise.all([
+  const [weapons, cards, titles, buddies, ranks, contentTiers, sprays] = await Promise.all([
     getJson("https://valorant-api.com/v1/weapons"),
     getJson("https://valorant-api.com/v1/playercards"),
     getJson("https://valorant-api.com/v1/playertitles"),
@@ -94,9 +88,6 @@ export async function getCatalog(): Promise<Catalog> {
     getJson("https://valorant-api.com/v1/competitivetiers").catch(() => null),
     getJson("https://valorant-api.com/v1/contenttiers").catch(() => null),
     getJson("https://valorant-api.com/v1/sprays").catch(() => null),
-    getJson("https://valorant-api.com/v1/maps").catch(() => null),
-    getJson("https://valorant-api.com/v1/gamemodes").catch(() => null),
-    getJson("https://valorant-api.com/v1/agents").catch(() => null),
   ]);
   const data: Catalog = {
     skins: new Map(),
@@ -105,9 +96,6 @@ export async function getCatalog(): Promise<Catalog> {
     rankTiers: indexRankTiers(ranks),
     contentTiers: indexContentTiers(contentTiers),
     weaponIcons: new Map(),
-    maps: new Map(),
-    gameModes: new Map(),
-    agents: new Map(),
   };
   const lc = (s: unknown) => (typeof s === "string" ? s.toLowerCase() : "");
   for (const w of weapons.data ?? []) {
@@ -173,24 +161,6 @@ export async function getCatalog(): Promise<Catalog> {
       const id = lc(lvl.uuid);
       if (id) data.sprays.set(id, entry);
     }
-  }
-  // match-details mapId is the map asset path (`/Game/Maps/Ascent/Ascent`) —
-  // exactly valorant-api's mapUrl; lowercase for case-insensitive joins.
-  for (const m of maps?.data ?? []) {
-    const key = lc(m.mapUrl);
-    if (key) data.maps.set(key, { name: m.displayName ?? "Unknown map", icon: m.displayIcon ?? null });
-  }
-  // Both asset paths share the folder segment: `/Game/GameModes/{Folder}/…` vs
-  // `ShooterGame/Content/GameModes/{Folder}/…`.
-  const modeFolder = (s: unknown) => (typeof s === "string" ? s.split("/")[3] ?? "" : "").toLowerCase();
-  for (const g of gameModes?.data ?? []) {
-    const key = modeFolder(g.assetPath);
-    if (key) data.gameModes.set(key, g.displayName ?? "");
-  }
-  for (const a of agents?.data ?? []) {
-    if (a.isPlayableCharacter === false) continue;
-    const id = lc(a.uuid);
-    if (id) data.agents.set(id, { name: a.displayName ?? "Unknown", icon: a.displayIcon ?? a.bustPortrait ?? null });
   }
   cache = { at: Date.now(), data };
   return data;

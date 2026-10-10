@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, filterMatches, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, orderStack, paginate, peekPosition, pickSingleSlot, queueTabs, rarityColor, rarityLabel, skinTierScore, stackDirectionForColumn, stackLayers, stackSteps, STACK_SPREAD, tierInfo, vpToUsd, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
+import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, orderStack, paginate, peekPosition, pickSingleSlot, rarityColor, rarityLabel, skinTierScore, stackDirectionForColumn, stackLayers, stackSteps, STACK_SPREAD, tierInfo, vpToUsd, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
 import type { AnyItem } from "./logic";
-import type { CardItem, RecentMatch, ShowcasePayload, SkinItem, TitleItem } from "./types";
+import type { CardItem, ShowcasePayload, SkinItem, TitleItem } from "./types";
 import { isSingleSlot, selKey } from "./types";
 
 const skin = (over: Partial<SkinItem> = {}): SkinItem => ({
@@ -472,44 +472,5 @@ describe("presentation helpers", () => {
     expect(vpToUsd(0)).toBe(0);
     expect(vpToUsd(1000)).toBe(10);
     expect(vpToUsd(45230)).toBe(452);
-  });
-});
-
-describe("queueTabs / filterMatches", () => {
-  const m = (queue: string, mode: string, id: string): RecentMatch => ({
-    id, start: "2026-10-01T00:00:00.000Z", queue, mode,
-    map: "Ascent", mapIcon: null, agent: "Jett", agentIcon: null,
-    won: true, score: { mine: 13, theirs: 9 },
-    kills: 10, deaths: 5, assists: 3, acs: 200,
-    durationMs: 1_500_000, rr: null,
-  });
-
-  it("ALL first; known queues in QUEUE_ORDER, unknown queues after (first-seen)", () => {
-    const matches = [
-      m("hurm", "TEAM DEATHMATCH", "a"),
-      m("unrated", "UNRATED", "b"),
-      m("competitive", "COMPETITIVE", "c"),
-      m("ootb", "OOTB", "d"),
-      m("hurm", "TEAM DEATHMATCH", "e"),
-      m("competitive", "COMPETITIVE", "f"),
-    ];
-    expect(queueTabs(matches)).toEqual([
-      { id: "", label: "ALL", count: 6 },
-      { id: "competitive", label: "COMPETITIVE", count: 2 },
-      { id: "unrated", label: "UNRATED", count: 1 },
-      { id: "hurm", label: "TEAM DEATHMATCH", count: 2 },
-      { id: "ootb", label: "OOTB", count: 1 },
-    ]);
-  });
-
-  it("empty matches → just ALL with count 0", () => {
-    expect(queueTabs([])).toEqual([{ id: "", label: "ALL", count: 0 }]);
-  });
-
-  it("filterMatches: '' returns everything, a queue filters it", () => {
-    const matches = [m("hurm", "TEAM DEATHMATCH", "a"), m("unrated", "UNRATED", "b"), m("hurm", "TEAM DEATHMATCH", "c")];
-    expect(filterMatches(matches, "")).toHaveLength(3);
-    expect(filterMatches(matches, "hurm").map((x) => x.id)).toEqual(["a", "c"]);
-    expect(filterMatches(matches, "deathmatch")).toEqual([]);
   });
 });
