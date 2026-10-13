@@ -351,10 +351,14 @@ img.skin-art {
   margin-right: -96px;
   perspective: 1600px;
 }
+/* One fixed size on every screen; the hero's overflow:hidden crops whatever
+   doesn't fit instead of scaling the shot with the viewport. */
 .gate-hero-shot img {
   display: block;
-  width: min(100%, 760px);
-  aspect-ratio: 5 / 4;
+  width: 760px;
+  height: 608px;
+  max-width: none;
+  flex-shrink: 0;
   object-fit: cover;
   object-position: left top;
   border: 1px solid rgba(236, 232, 225, 0.14);
@@ -483,8 +487,7 @@ img.skin-art {
   .gate { grid-template-columns: 1fr; height: auto; min-height: 100%; }
   .gate-hero { padding: 28px 24px 32px; min-height: 0; gap: 32px; }
   .gate-hero-title { font-size: 64px; }
-  .gate-hero-shot { margin-right: -24px; }
-  .gate-hero-shot img { width: 100%; transform: none; }
+  .gate-hero-shot { margin: 0 -24px -32px 0; height: 420px; flex: none; overflow: hidden; }
   .gate-panel { border-left: none; border-top: 1px solid var(--line); }
   .gate-panel-inner { padding: 32px 20px 40px; }
 }
