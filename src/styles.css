@@ -351,14 +351,14 @@ img.skin-art {
   margin-right: -96px;
   perspective: 1600px;
 }
-/* One fixed size on every screen; the hero's overflow:hidden crops whatever
-   doesn't fit instead of scaling the shot with the viewport. */
+/* Same share of the hero on every screen: the shot spans the hero's content
+   width (plus the right bleed), so it grows on big screens and shrinks on
+   small ones, never capped; the bottom bleeds off when the screen is short. */
 .gate-hero-shot img {
   display: block;
-  width: 760px;
-  height: 608px;
-  max-width: none;
-  flex-shrink: 0;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5 / 4;
   object-fit: cover;
   object-position: left top;
   border: 1px solid rgba(236, 232, 225, 0.14);
@@ -487,7 +487,8 @@ img.skin-art {
   .gate { grid-template-columns: 1fr; height: auto; min-height: 100%; }
   .gate-hero { padding: 28px 24px 32px; min-height: 0; gap: 32px; }
   .gate-hero-title { font-size: 64px; }
-  .gate-hero-shot { margin: 0 -24px -32px 0; height: 420px; flex: none; overflow: hidden; }
+  .gate-hero-shot { margin-right: 0; flex: none; }
+  .gate-hero-shot img { transform: none; border-radius: 8px; }
   .gate-panel { border-left: none; border-top: 1px solid var(--line); }
   .gate-panel-inner { padding: 32px 20px 40px; }
 }
