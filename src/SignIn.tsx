@@ -380,25 +380,24 @@ export function SignIn({ onLoaded }: { onLoaded: (payload: ShowcasePayload) => v
     <div className="gate">
       <section className="gate-hero" aria-hidden="true">
         <div className="gate-hero-top">
-          <span className="brand-mark" />
-          <span className="gate-hero-brand">Collection</span>
+          <span className="gate-hero-brand">Loadout <em>Studio</em></span>
         </div>
         <div className="gate-hero-copy">
-          <span className="gate-eyebrow">VALORANT loadout showcase</span>
+          <span className="gate-eyebrow">Valorant Loadout Studio</span>
           <h1 className="gate-hero-title">
             YOUR ARSENAL.
             <br />
             <em>ONE IMAGE.</em>
           </h1>
           <p className="gate-hero-sub">
-            Turn every skin, card and rank on your account into a single 2560 × 1440 PNG that looks
-            like the in-game Collection screen.
+            Share your loadout: every skin, card and rank on your account in one 2560 × 2048 image
+            or a link anyone can open.
           </p>
         </div>
         <ol className="gate-hero-steps">
           <li><b>1</b><span>Sign in</span><small>Riot&apos;s own page</small></li>
           <li><b>2</b><span>Curate</span><small>Pick what to show</small></li>
-          <li><b>3</b><span>Export</span><small>1440p PNG</small></li>
+          <li><b>3</b><span>Export</span><small>2560 × 2048 PNG</small></li>
         </ol>
         <div className="gate-hero-wordmark">VALORANT</div>
       </section>
@@ -407,7 +406,7 @@ export function SignIn({ onLoaded }: { onLoaded: (payload: ShowcasePayload) => v
         <div className="gate-panel-inner">
           <header className="gate-head">
             <span className="gate-eyebrow">Sign in</span>
-            <h2>Load your collection</h2>
+            <h2>Load your loadout</h2>
           </header>
 
           {error && (
@@ -451,7 +450,7 @@ export function SignIn({ onLoaded }: { onLoaded: (payload: ShowcasePayload) => v
               </div>
             </div>
             <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
-              {loading === "url" ? "Loading…" : "Load collection"}
+              {loading === "url" ? "Loading…" : "Load my loadout"}
             </button>
             <p className="gate-fine">Region is detected automatically. Tokens live in request memory only and are never stored.</p>
           </form>

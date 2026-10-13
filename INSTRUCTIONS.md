@@ -8,7 +8,7 @@ This file = the short brief. If UI behavior and this file disagree, update both.
 ## What we are doing
 
 A web app that turns a VALORANT account's cosmetics into a **single downloadable
-2560×1440 (1440p) 16:9 PNG** that looks like the **official client's Collection /
+2560×2048 (5:4) PNG** that looks like the **official client's Collection /
 loadout screen** — for the account owner to attach to a listing or show off.
 Output is a PNG file, or a share link that shows the same showcase (with hover
 browsing) to anyone who opens it for 30 days. There is no public gallery.
@@ -41,7 +41,7 @@ never reach the PNG or share links.
 3. **Curation** — user toggles what appears in the library (search,
    All/Selected/Equipped filter, weapon-class chips); the preview updates live.
 4. **Export** — *Download image* (or *Download N images* when paginated),
-   showing phases: `Preparing assets…` → `Rendering 2560 × 1440…` /
+   showing phases: `Preparing assets…` → `Rendering 2560 × 2048…` /
    `Rendering i of n…` → `Downloaded`. File: `showcase-<riotid>-p1.png`…
 
 ---
@@ -62,7 +62,7 @@ px tokens), no heavy borders. Controls follow a strict three-level hierarchy:
 with count pills** (library sections, sign-in methods) → **pill chips**
 (weapon classes).
 
-- **Nav bar:** V mark + `COLLECTION` wordmark, a segmented switch with icons
+- **Nav bar:** `LOADOUT STUDIO` wordmark ("Studio" in accent, no logo mark), a segmented switch with icons
   **Showcase / Store / Profile** (Store only when the storefront has offers,
   Profile only when the account has ranked or match data), VP/RP
   wallet pill, account block (equipped-card avatar, `Name#TAG` over
@@ -87,12 +87,12 @@ with count pills** (library sections, sign-in methods) → **pill chips**
     (`src/skinArt.tsx` → `img.skin-art`).
 - **Stage (center):** bar with *Preview* + hint *"Hover a weapon to reorder,
   recolor or remove its skins"*, a *Fit / 100%* switch and a fullscreen icon
-  button; the live 1280×720 showcase is fitted to both axes in a rounded
+  button; the live 1280×1024 showcase is fitted to both axes in a rounded
   frame on a dotted backdrop (editor-only — export geometry never
   changes).
 - **Inspector (right pane):** primary **Download image** button (download
   icon; *Download N images* when paginated) with export phases,
-  `PNG · 2560 × 1440` (`· N pages`), pager `‹ i/N ›` when multi-page;
+  `PNG · 2560 × 2048` (`· N pages`), pager `‹ i/N ›` when multi-page;
   **Summary** (lead *Collection value* in large display digits + `VP`,
   `≈ $n USD`, then a 4-up stat row: skins x/y, premium, melee, buddies);
   **Quick select** *Premium+ / Everything / Clear* + the auto-pick
@@ -131,8 +131,8 @@ SIDEARMS column (full height)            │ player card (tall art, dominant)
 SMGS over SMGs, then SHOTGUNS            │ MAIN AGENT tile (only when picked)
 RIFLES column                            │ STATS: SKINS │ PREMIUM │ MELEE │ BUDDIES
 SNIPERS over snipers, then HEAVIES       │        VALUE n VP ~$n (full row)
-── MELEE strip (cols 2–4, ~108px) ──     │ RANK: PEAK + CURRENT medallions
-                                         │ VP / RP wallet (one row)
+── MELEE plane (cols 2–4, ~150px) ──    │          VP / RP wallet + FM badge
+                                         │ RANK: PEAK + CURRENT medallions
 ```
 
 Must be visible / true:
@@ -142,10 +142,12 @@ Must be visible / true:
 - **All 19 official guns always present**, even empty (dimmed default-weapon
   render, no border, no `+`/labels); empty MELEE strip always shown. Unknown
   guns → OTHER column.
-- **Skin stacks**: multiple skins per gun layered in one cell as a **two-axis
-  cascade** — front skin centered, rest recede diagonally (left columns
-  down-right, right columns down-left), spread bounded so nothing escapes the
-  cell; front order = manual "show in front" → equipped → rarity/price →
+- **Skin stacks**: multiple skins per gun layered in one cell as a **peek
+  stack** — the group is centred; the front skin is fully visible and each
+  skin behind it sits higher so its top edge shows. The reveal is a share of
+  the art's own height: big for 2–3 skins, smaller as the stack grows (max 9
+  drawn; the spread lists all). Hovering a
+  skin on the canvas gives it a bright white outline; front order = manual "show in front" → equipped → rarity/price →
   original. **Outline = white** (tight multi-`drop-shadow`; rarity lives on
   the tile's bottom edge), hover opens an unscaled spread with individually hoverable skins.
 - **Hover a weapon stack → nearby skin spread**: no click required. Every skin
@@ -155,8 +157,16 @@ Must be visible / true:
   and removal are available directly on each row; no inspector or edit mode.
   Keyboard focus also opens the spread, Escape dismisses it; touch can tap.
   The spread is outside the scaled canvas and never included in PNG exports.
-- **Melee/knives** on their own full-width bottom strip (lighter plane than
-  gun cells), never in the gun grid.
+- **Melee/knives** share one bottom plane (lighter than gun cells), never in
+  the gun grid. Each row is a horizontal peek stack (the gun stack turned
+  sideways): foremost knife on the right, each knife behind it one step
+  left, neighbours always overlapping a little (20%, up to ~30% when the row
+  is full). ≤7 knives in one row (big for few), 8–16 in 2 rows, 17+ in 3.
+- **Buddies** are all checked by default (Riot gives no buddy prices).
+- **FM / hidden name**: an `FM: ✓` badge (owner toggle: the owner has the
+  first mail) sits beside the VP/RP chips; *Hide Riot ID* shows "RIOT ID
+  HIDDEN" on the card instead of the name, and keeps the name out of the
+  filename and share link (not stored).
 - **Main agent tile**: when an agent is picked (Agents tab, radio select;
   defaults to the most-played owned agent — most-played carries a "Most
   played" badge and sorts first), the right rail shows a compact tile under
@@ -204,18 +214,18 @@ Must NOT be visible:
 
 ### Export guarantees
 
-- PNG is **2560×1440** (1280×720 × 2), fonts + images fully loaded before
+- PNG is **2560×2048** (1280×1024 × 2), fonts + images fully loaded before
   capture (a failed image load aborts with a visible error), no menus/popovers
   in the PNG (export instance has no click handlers).
 - Export button walks through phases: `Preparing assets…` →
-  `Rendering 2560 × 1440…` / `Rendering i of n…` → `Downloaded`.
+  `Rendering 2560 × 2048…` / `Rendering i of n…` → `Downloaded`.
 - Multi-page only when unknown guns overflow (≤3 pages, `1/N` indicator).
 
 ---
 
 ## Ground rules
 
-- Canvas is **fixed 1280×720** — never make the showcase responsive.
+- Canvas is **fixed 1280×1024** — never make the showcase responsive.
 - Tokens/credentials: request memory only, never stored, never logged, never
   committed. Repo must stay free of secrets. Share links store only the
   trimmed showcase snapshot (no PUUID, no tokens).

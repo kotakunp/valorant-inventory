@@ -237,13 +237,26 @@ export interface SharePicks {
   buddies: string[];
   /** The one agent shown as "main" on the showcase (null = no agent tile). */
   agent: string | null;
+  /** Owner's display options (absent on links made before they existed). */
+  options?: ShowcaseOptions;
 }
+
+/** Owner-set showcase display options (export image and share links). */
+export interface ShowcaseOptions {
+  /** Owner states the account is on its first (original) email: shows an FM badge. */
+  fm: boolean;
+  /** Leave the Riot ID out of the image and the link (the link stores no name at all). */
+  hideName: boolean;
+}
+
+export const DEFAULT_OPTIONS: ShowcaseOptions = { fm: false, hideName: false };
 
 /** A stored share: a trimmed payload holding only the shown items. */
 export interface SharedShowcase {
   showcase: ShowcasePayload;
   chromaSel: ChromaSelection;
   bringToFront: Record<string, string>;
+  options?: ShowcaseOptions;
   createdAt: string;
   expiresAt: string;
 }

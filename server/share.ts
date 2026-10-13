@@ -62,6 +62,7 @@ export function parsePicks(raw: any): SharePicks {
     title: isId(raw.title) ? lc(raw.title) : null,
     buddies,
     agent: isId(raw.agent) ? lc(raw.agent) : null,
+    options: { fm: raw.options?.fm === true, hideName: raw.options?.hideName === true },
   };
 }
 
@@ -141,11 +142,13 @@ export function buildSnapshot(
     agents.push(agentItemFromCatalog(picks.agent, a));
   }
 
+  const options = { fm: picks.options?.fm === true, hideName: picks.options?.hideName === true };
   return {
     showcase: {
       puuid: "",
-      gameName: m.gameName,
-      tagLine: m.tagLine,
+      // A hidden name is never stored, so the link can't leak it.
+      gameName: options.hideName ? "" : m.gameName,
+      tagLine: options.hideName ? "" : m.tagLine,
       region: m.region,
       accountLevel: m.accountLevel,
       ranks: {
@@ -167,9 +170,16 @@ export function buildSnapshot(
     },
     chromaSel,
     bringToFront,
+    options,
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + SHARE_TTL_MS).toISOString(),
   };
+}
+
+/** "Name#TAG", or a neutral label when the owner hid their Riot ID. */
+export function shareOwnerLabel(gameName: string, tagLine: string): string {
+  if (!gameName) return "A player";
+  return tagLine ? `${gameName}#${tagLine}` : gameName;
 }
 
 const escapeHtml = (s: string) =>
@@ -178,16 +188,16 @@ const escapeHtml = (s: string) =>
 /** Swap the SPA's generic <title>/description for link-preview tags. */
 export function injectShareMeta(html: string, share: SharedShowcase, origin: string, id: string, hasPreview: boolean): string {
   const p = share.showcase;
-  const who = p.tagLine ? `${p.gameName}#${p.tagLine}` : p.gameName;
+  const who = shareOwnerLabel(p.gameName, p.tagLine);
   const value = [...p.skins, ...p.cards, ...p.titles, ...p.buddies].reduce((n, i) => n + (i.price ?? 0), 0);
-  const title = `${who} · VALORANT collection`;
+  const title = `${who}'s loadout · Valorant Loadout Studio`;
   const parts = [`${p.skins.length} ${p.skins.length === 1 ? "skin" : "skins"}`];
   if (value > 0) parts.push(`${value.toLocaleString("en-US")} VP`);
   const description = `${parts.join(" · ")}. Hover any weapon to see every skin.`;
   const url = `${origin}/s/${id}`;
   const tags = [
     `<meta property="og:type" content="website" />`,
-    `<meta property="og:site_name" content="VALORANT Collection" />`,
+    `<meta property="og:site_name" content="Valorant Loadout Studio" />`,
     `<meta property="og:title" content="${escapeHtml(title)}" />`,
     `<meta property="og:description" content="${escapeHtml(description)}" />`,
     `<meta property="og:url" content="${escapeHtml(url)}" />`,
@@ -195,8 +205,8 @@ export function injectShareMeta(html: string, share: SharedShowcase, origin: str
     ...(hasPreview
       ? [
           `<meta property="og:image" content="${escapeHtml(`${url}/preview.jpg`)}" />`,
-          `<meta property="og:image:width" content="1200" />`,
-          `<meta property="og:image:height" content="675" />`,
+          `<meta property="og:image:width" content="1000" />`,
+          `<meta property="og:image:height" content="800" />`,
           `<meta name="twitter:card" content="summary_large_image" />`,
           `<meta name="twitter:image" content="${escapeHtml(`${url}/preview.jpg`)}" />`,
         ]

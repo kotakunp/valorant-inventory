@@ -1,6 +1,7 @@
-# VALORANT Account Showcase Generator
+# Valorant Loadout Studio
 
-Generates a **2560×1440 (1440p) 16:9 PNG** of a VALORANT account's premium
+Share your loadout. 
+Generates a **2560×2048 (5:4) PNG** of a VALORANT account's premium
 collection, downloadable as a PNG or shared as a 30-day link with a live, hoverable view.
 See `SPEC.md` for the full product/technical specification (§6–§8 = UI/layout source of truth).
 
@@ -32,11 +33,11 @@ src/                      # React frontend (Vite + TS)
   Library.tsx             # left pane: skins / cards / titles / buddies selection
   Inspector.tsx           # right pane: download, share link, summary, quick select, profile, variants
   SharedView.tsx          # read-only /s/:id page (main.tsx routes there by path)
-  useFitScale.ts          # fits the 1280×720 canvas into a stage (studio + shared page)
-  Showcase.tsx            # the showcase renderer (layout, two-axis stack, hover spread, right rail, knife row)
-  logic.ts                # selection rules, rarityColor, WEAPON_CATEGORIES, paginate(), stack layout (stackLayers/orderStack)
+  useFitScale.ts          # fits the 1280×1024 canvas into a stage (studio + shared page)
+  Showcase.tsx            # the showcase renderer (layout, peek stacks, hover spread, right rail, knife row)
+  logic.ts                # selection rules, rarityColor, WEAPON_CATEGORIES, paginate(), stack layout (gunStack/knifeLayout/orderStack)
   logic.test.ts           # UI-logic tests
-  styles.css              # all styles; fixed 1280×720 `.sc-root` canvas
+  styles.css              # all styles; fixed 1280×1024 `.sc-root` canvas
   types.ts                # SkinItem, ShowcasePayload, …
   rso.ts, captcha.ts, StorePanel.tsx (Store view)
 server/                   # Express (tsx, no build step)
@@ -52,13 +53,13 @@ SPEC.md                   # product + technical spec (UI sections must stay in s
 
 ### UI invariants (easy to break — read before touching `Showcase.tsx`)
 
-- Export canvas is **fixed 1280×720** — `.sc-root` must never become responsive; preview zoom (Fit/100%/Fullscreen) only scales the editor preview.
+- Export canvas is **fixed 1280×1024** — `.sc-root` must never become responsive; preview zoom (Fit/100%/Fullscreen) only scales the editor preview.
 - Hovering a preview stack opens its skins in a nearby scrollable spread with separate, stable hover targets (variants, front ordering, and removal remain available), they do not toggle selection; toggling lives in the library pane.
 - `paginate(allSkins, selection)` always emits all 19 official gun slots + the knife row; empty guns render as empty cells (dimmed default-weapon render from `payload.defaultIcons`, no border).
-- Stacks are two-axis: front-first order (`orderStack`: manual front → equipped → tier score → stable) with inline `translate/scale` per layer (`stackLayers`), cascade direction per column (`stackDirectionForColumn`), spread bounded by `STACK_SPREAD` — never CSS-fan transforms.
+- Stacks are peek stacks: front-first order (`orderStack`: manual front → equipped → tier score → stable); `gunStack` keeps the group centered and shifts each back skin up by a share of its own art height (top edges visible; more reveal for fewer skins), `knifeLayout` sizes knives by count in one shared melee plane (a sideways peek stack per row: front knife rightmost, neighbours slightly overlapping, smaller and in up to 3 rows for many). Positions are inline per item from `peekStack`, always inside the area — never CSS-fan transforms.
 - Rarity outline color comes from `--rarity` set per stack item (`rarityColor()` in `logic.ts`).
 - Images load through `/img` proxy (allowlist `media.valorant-api.com`) so the PNG export doesn't taint the canvas; failed image loads abort the export.
-- Small UI art (agent busts, map icons) uses `thumb(url, w)` from `src/thumb.ts` → `/img/…?w=64|128|256`, a WebP thumbnail resized server-side with `sharp` (`server/thumbnail.ts`, 48 MB in-memory LRU). The raw agent PNGs are 1024 px / ~400 KB each, so never render them at icon size without `thumb()`.
+- Small UI art (agent busts, map icons, library player cards) uses `thumb(url, w)` from `src/thumb.ts` → `/img/…?w=64|128|256`, a WebP thumbnail resized server-side with `sharp` (`server/thumbnail.ts`, 48 MB in-memory LRU). The raw agent PNGs are 1024 px / ~400 KB each, so never render them at icon size without `thumb()`.
 
 ## Deploy
 

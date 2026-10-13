@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { toJpeg, toPng } from "html-to-image";
-import type { ChromaSelection, ItemKind, Selection, SharePicks, ShowcasePayload, SkinItem } from "./types";
-import { isSingleSlot, selKey } from "./types";
+import type { ChromaSelection, ItemKind, Selection, SharePicks, ShowcaseOptions, ShowcasePayload, SkinItem } from "./types";
+import { DEFAULT_OPTIONS, isSingleSlot, selKey } from "./types";
 import { buildSelection, isPremiumSkin, paginate, pickSingleSlot } from "./logic";
 import type { AnyItem } from "./logic";
 import { Showcase, CANVAS_W, CANVAS_H } from "./Showcase";
@@ -59,15 +59,15 @@ async function waitForImages(selector: string): Promise<string[]> {
   return failed;
 }
 
-/** 1200×675 JPEG of the first export page for link previews; null if it can't be made small enough. */
+/** 1000×800 (canvas-shaped 5:4) JPEG of the first export page for link previews; null if it can't be made small enough. */
 async function capturePreview(node: HTMLElement): Promise<string | null> {
   for (const quality of [0.82, 0.65, 0.5]) {
     const url = await toJpeg(node, {
       quality,
       width: CANVAS_W,
       height: CANVAS_H,
-      canvasWidth: 1200,
-      canvasHeight: 675,
+      canvasWidth: 1000,
+      canvasHeight: 800,
       pixelRatio: 1,
       backgroundColor: "#0f1923",
     });
@@ -91,6 +91,7 @@ export default function App() {
   const [selection, setSelection] = useState<Selection>({});
   const [chromaSel, setChromaSel] = useState<ChromaSelection>({});
   const [bringToFront, setBringToFront] = useState<Record<string, string>>({});
+  const [options, setOptions] = useState<ShowcaseOptions>(DEFAULT_OPTIONS);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [view, setView] = useState<View>("showcase");
@@ -103,7 +104,7 @@ export default function App() {
   const [share, setShare] = useState<ShareUi>({ phase: "idle" });
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // Export canvas stays fixed 1280×720; only the preview scales.
+  // Export canvas stays fixed 1280×1024; only the preview scales.
   const fitScale = useFitScale(stageRef, [data, view]);
 
   useEffect(() => {
@@ -122,7 +123,7 @@ export default function App() {
   // A link is a snapshot: once the selection moves on, flag it as outdated.
   useEffect(() => {
     setShare((s) => (s.phase === "ready" && !s.stale ? { ...s, stale: true } : s));
-  }, [selection, chromaSel, bringToFront]);
+  }, [selection, chromaSel, bringToFront, options]);
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -192,7 +193,9 @@ export default function App() {
               ? false
               : kind === "skin"
                 ? isPremiumSkin(it as SkinItem)
-                : it.price != null;
+                : kind === "buddy"
+                  ? true // buddies carry no price data, see defaultChecked
+                  : it.price != null;
       }
       return next;
     });
@@ -213,9 +216,9 @@ export default function App() {
       if (failed.length) {
         throw new Error(`${failed.length} artwork image(s) failed to load — check your connection and try again.`);
       }
-      const slug = `${data.gameName}_${data.tagLine}`.replace(/[^\w-]+/g, "") || "account";
+      const slug = options.hideName ? "account" : `${data.gameName}_${data.tagLine}`.replace(/[^\w-]+/g, "") || "account";
       for (let i = 0; i < nodes.length; i++) {
-        setExportPhase(nodes.length > 1 ? `Rendering ${i + 1} of ${nodes.length}…` : "Rendering 2560 × 1440…");
+        setExportPhase(nodes.length > 1 ? `Rendering ${i + 1} of ${nodes.length}…` : "Rendering 2560 × 2048…");
         const url = await toPng(nodes[i], { pixelRatio: 2, backgroundColor: "#0f1923", width: CANVAS_W, height: CANVAS_H });
         const a = document.createElement("a");
         a.href = url;
@@ -254,6 +257,7 @@ export default function App() {
         buddies: data.buddies.filter((b) => on("buddy", b.id)).map((b) => b.id),
         // The single "main agent" slot (radio-style selection).
         agent: (data.agents ?? []).find((a) => on("agent", a.id))?.id ?? null,
+        options,
       };
       let preview: string | null = null;
       const node = document.querySelector<HTMLElement>("[data-export-page]");
@@ -287,6 +291,7 @@ export default function App() {
     setSelection({});
     setChromaSel({});
     setBringToFront({});
+    setOptions(DEFAULT_OPTIONS);
     setError(null);
     setPage(0);
     setView("showcase");
@@ -323,8 +328,7 @@ export default function App() {
     <div className="studio">
       <header className="nav">
         <div className="nav-brand">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="nav-brand-name">Collection</span>
+          <span className="nav-brand-name">Loadout <em>Studio</em></span>
         </div>
         <nav className="switch nav-switch" aria-label="Views">
           <button type="button" className={view === "showcase" ? "on" : ""} aria-current={view === "showcase" ? "page" : undefined} onClick={() => setView("showcase")}>
@@ -436,6 +440,7 @@ export default function App() {
                     onRemoveSkin={removeSkin}
                     onBringToFront={bringSkinToFront}
                     onPickChroma={pickChroma}
+                    options={options}
                   />
                 </div>
               </div>
@@ -457,6 +462,8 @@ export default function App() {
             onOpenTab={setLibTab}
             share={shareEnabled ? share : null}
             onShare={createShareLink}
+            options={options}
+            onOptions={setOptions}
           />
         </div>
       ) : view === "store" ? (
@@ -485,6 +492,7 @@ export default function App() {
               selection={selection}
               chromaSel={chromaSel}
               bringToFront={bringToFront}
+              options={options}
             />
           </div>
         ))}

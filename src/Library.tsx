@@ -158,10 +158,7 @@ export function Library({ data, tab, onTab, selection, chromaSel, onToggle, onSe
         ) : (
           <div className="lib-bulk">
             {tab === "buddy" ? (
-              <>
-                <button type="button" className="btn-sm" onClick={() => onSection("buddy", "all")}>Select all</button>
-                <button type="button" className="btn-sm" onClick={() => onSection("buddy", "premium")}>Paid only</button>
-              </>
+              <button type="button" className="btn-sm" onClick={() => onSection("buddy", "all")}>Select all</button>
             ) : (
               <span className="lib-bulk-note">One {tab} appears on the showcase</span>
             )}
@@ -208,7 +205,7 @@ export function Library({ data, tab, onTab, selection, chromaSel, onToggle, onSe
                   aria-pressed={on}
                   title={c.name}
                 >
-                  {c.icon ? <img src={img(c.icon)} alt="" loading="lazy" /> : <span className="lib-card-fb">{c.name}</span>}
+                  {c.icon ? <img src={thumb(c.icon, 256)} alt="" loading="lazy" decoding="async" /> : <span className="lib-card-fb">{c.name}</span>}
                   <span className="lib-check" aria-hidden="true" />
                   {c.equipped && <span className="lib-eq">Equipped</span>}
                   <span className="lib-card-name">{c.name}</span>

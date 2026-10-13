@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import type { ChromaSelection, SkinItem } from "./types";
 import { rarityColor } from "./logic";
 import { SkinArt } from "./skinArt";
@@ -9,6 +9,8 @@ interface Props {
   items: SkinItem[];
   rect: DOMRect;
   chromas: ChromaSelection;
+  /** Skin under the pointer on the canvas: highlighted and scrolled into view. */
+  hot?: string | null;
   onEnter: () => void;
   onLeave: () => void;
   onFront?: (gun: string, id: string) => void;
@@ -19,7 +21,13 @@ interface Props {
 const image = (url: string) => `/img/${encodeURIComponent(url)}`;
 
 /** Unscaled hover spread: each skin has its own fixed, generous pointer target. */
-export function HoverSkins({ gun, items, rect, chromas, onEnter, onLeave, onFront, onRemove, onChroma }: Props) {
+export function HoverSkins({ gun, items, rect, chromas, hot, onEnter, onLeave, onFront, onRemove, onChroma }: Props) {
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!hot || !list.current) return;
+    const row = list.current.querySelector<HTMLElement>(`[data-skin="${CSS.escape(hot)}"]`);
+    row?.scrollIntoView({ block: "nearest" });
+  }, [hot]);
   if (!items.length) return null;
   const width = Math.min(360, window.innerWidth - 24);
   const height = Math.min(48 + items.length * 176, window.innerHeight * 0.75);
@@ -36,15 +44,15 @@ export function HoverSkins({ gun, items, rect, chromas, onEnter, onLeave, onFron
         if (!event.currentTarget.contains(event.relatedTarget)) onLeave();
       }}>
       <header><strong>{gun}</strong><span>{items.length} {items.length === 1 ? "skin" : "skins"}</span></header>
-      <div className="skin-hover-list">
+      <div className="skin-hover-list" ref={list}>
         {items.map((skin, index) => {
           const active = skin.chromas.find(c => c.id === (chromas[skin.id] ?? skin.defaultChromaId)) ?? skin.chromas[0];
           const icon = active?.icon ?? skin.icon;
           return (
-            <article key={skin.id} className="skin-hover-row" tabIndex={0}
+            <article key={skin.id} data-skin={skin.id} className={`skin-hover-row${hot === skin.id ? " is-hot" : ""}`} tabIndex={0}
               aria-label={skin.name}
               style={{ "--rarity": rarityColor(skin.price, skin.levelCount, skin.contentTierRank) } as CSSProperties}>
-              <div className="skin-hover-name"><strong>{skin.name}</strong><span>{index === 0 && gun !== "MELEE" ? "FRONT" : skin.equipped ? "EQUIPPED" : ""}</span></div>
+              <div className="skin-hover-name"><strong>{skin.name}</strong><span>{index === 0 && items.length > 1 ? "FRONT" : skin.equipped ? "EQUIPPED" : ""}</span></div>
               <div className="skin-hover-art">{icon && <SkinArt src={image(icon)} alt={skin.name} weaponName={skin.weaponName} isKnife={skin.isKnife} />}</div>
               <div className="skin-hover-actions">
                 <div className="skin-hover-variants" role="group" aria-label={`${skin.name} variants`}>
@@ -64,7 +72,7 @@ export function HoverSkins({ gun, items, rect, chromas, onEnter, onLeave, onFron
                     );
                   })}
                 </div>
-                {onFront && gun !== "MELEE" && <button disabled={index === 0} onClick={() => onFront(gun, skin.id)}>To front</button>}
+                {onFront && <button disabled={index === 0} onClick={() => onFront(gun, skin.id)}>To front</button>}
                 {onRemove && <button onClick={() => onRemove(skin.id)} aria-label={`Remove ${skin.name}`}>Remove</button>}
               </div>
             </article>

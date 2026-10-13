@@ -19,7 +19,7 @@ import { gunLabel } from "./logic";
  * off Riot's official weapon renders at their shared pixel scale — content
  * widths 161px (Frenzy) … 503px (Phantom/Guardian/Marshal). A small gun can
  * never render larger than a long one, on any surface. MELEE is set to the
- * share that fits the 68px melee strip at full art height without the height
+ * share that fits a narrow melee box at full art height without the height
  * cap letterboxing it, since knives span no fixed length.
  */
 

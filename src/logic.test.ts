@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, favoriteAgent, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, matchDuration, orderStack, paginate, peekPosition, pickSingleSlot, rarityColor, rarityLabel, relTime, skinTierScore, stackDirectionForColumn, stackLayers, stackSteps, STACK_SPREAD, tierInfo, vpToUsd, winratePct, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
+import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, favoriteAgent, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, matchDuration, orderStack, paginate, peekPosition, pickSingleSlot, rarityColor, rarityLabel, relTime, skinTierScore, gunStack, GUN_STACK_MAX, knifeLayout, peekStack, tierInfo, vpToUsd, winratePct, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
 import type { AnyItem } from "./logic";
 import type { AgentItem, CardItem, ProfileStats, ShowcasePayload, SkinItem, TitleItem } from "./types";
 import { isSingleSlot, selKey } from "./types";
@@ -85,6 +85,14 @@ describe("buildSelection single-slot defaults", () => {
       ["card:c3", true],
       ["title:t2", true],
     ]);
+  });
+
+  it("checks every owned buddy by default (Riot sends no buddy price or equip state)", () => {
+    const sel = buildSelection({
+      ...payload([], []),
+      buddies: [{ id: "b1", name: "B1", icon: null, price: null, equipped: false }],
+    } as ShowcasePayload);
+    expect(sel["buddy:b1"]).toBe(true);
   });
 
   it("picks the first qualifying card when none is equipped", () => {
@@ -328,50 +336,64 @@ describe("groupByGun", () => {
 });
 
 describe("stack layout", () => {
-  it("spread stays bounded for 1/2/5/10/15+ skins", () => {
-    for (const n of [1, 2, 5, 10, 15, 30, 80]) {
-      for (const dir of ["down-right", "down-left", "up-right", "up-left"] as const) {
-        const layers = stackLayers(n, dir);
-        expect(layers).toHaveLength(n);
-        for (const l of layers) {
-          expect(Math.abs(l.dx)).toBeLessThanOrEqual(STACK_SPREAD.x + 1e-9);
-          expect(Math.abs(l.dy)).toBeLessThanOrEqual(STACK_SPREAD.y + 1e-9);
-          expect(l.scale).toBeGreaterThan(0.5);
-          expect(l.scale).toBeLessThanOrEqual(1);
-        }
-        // front-first: layer 0 is dead center, deeper layers recede
-        expect(layers[0].dx).toBe(0);
-        expect(layers[0].dy).toBe(0);
-        expect(layers[0].scale).toBe(1);
-        if (n > 1) expect(layers[1].scale).toBeLessThan(1);
+  it("gun stacks stay centred and inside their cell for any count", () => {
+    for (const n of [1, 2, 3, 5, 8, 9, 15, 80]) {
+      const st = gunStack(n);
+      expect(st.visible + st.hidden).toBe(n);
+      expect(st.visible).toBeLessThanOrEqual(GUN_STACK_MAX);
+      // centred: shifts are symmetric around 0
+      const sum = st.shifts.reduce((x, y) => x + y, 0);
+      expect(sum).toBeCloseTo(0, 10);
+      // group height (in fit-box units) never exceeds the cell
+      expect(st.box * (1 + (st.visible - 1) * st.peek)).toBeLessThanOrEqual(1 + 1e-9);
+      // front-first: each back skin sits exactly one peek higher
+      for (let i = 1; i < st.shifts.length; i++) expect(st.shifts[i - 1] - st.shifts[i]).toBeCloseTo(st.peek, 10);
+    }
+  });
+
+  it("single gun skin is centred at full size", () => {
+    expect(gunStack(1)).toEqual({ visible: 1, hidden: 0, peek: 0, box: 1, shifts: [0] });
+  });
+
+  it("small stacks reveal more of each back skin than big ones", () => {
+    expect(gunStack(2).peek).toBeGreaterThan(gunStack(3).peek);
+    expect(gunStack(3).peek).toBeGreaterThan(gunStack(5).peek);
+    expect(gunStack(5).peek).toBeGreaterThan(gunStack(8).peek);
+    expect(gunStack(3).peek).toBeGreaterThanOrEqual(0.4);
+    expect(gunStack(20).hidden).toBe(20 - GUN_STACK_MAX);
+  });
+
+  it("melee band places every knife inside the band in size tiers", () => {
+    for (const n of [0, 1, 3, 5, 8, 9, 14, 16, 17, 24, 40]) {
+      const l = knifeLayout(n);
+      expect(l.slots).toHaveLength(n);
+      for (const s of l.slots) {
+        expect(s.row).toBeLessThan(l.rows);
+        expect(s.left).toBeGreaterThanOrEqual(-1e-9);
+        expect(s.left + l.box).toBeLessThanOrEqual(1 + 1e-9);
       }
     }
-  });
-
-  it("single skin has zero step and no offset", () => {
-    expect(stackSteps(1)).toEqual({ x: 0, y: 0 });
-    expect(stackLayers(1, "down-right")).toEqual([{ dx: 0, dy: 0, scale: 1 }]);
-  });
-
-  it("left/right columns cascade in opposite directions", () => {
-    const left = stackDirectionForColumn(0, 4);
-    const right = stackDirectionForColumn(3, 4);
-    expect(left).toBe("down-right");
-    expect(right).toBe("down-left");
-    const a = stackLayers(5, left);
-    const b = stackLayers(5, right);
-    for (let i = 0; i < 5; i++) {
-      expect(b[i].dx).toBeCloseTo(-a[i].dx, 10);
-      expect(b[i].dy).toBeCloseTo(a[i].dy, 10);
-      expect(b[i].scale).toBeCloseTo(a[i].scale, 10);
+    expect(knifeLayout(3)).toMatchObject({ rows: 1 });
+    expect(knifeLayout(7)).toMatchObject({ rows: 1 });
+    expect(knifeLayout(14)).toMatchObject({ rows: 2 });
+    expect(knifeLayout(30)).toMatchObject({ rows: 3 });
+    // sizes step down: few knives are big, many are smaller
+    expect(knifeLayout(2).box).toBeGreaterThan(knifeLayout(7).box);
+    expect(knifeLayout(7).box).toBeGreaterThan(knifeLayout(12).box);
+    // horizontal stack: every knife in a row has its own spot, the front one rightmost,
+    // neighbours overlap slightly and always keep well over half a knife visible
+    for (const n of [2, 3, 5, 6, 7, 8, 10, 14, 16, 24, 27]) {
+      const l = knifeLayout(n);
+      for (let r = 0; r < l.rows; r++) {
+        const lefts = l.slots.filter((s) => s.row === r).map((s) => s.left);
+        for (let i = 1; i < lefts.length; i++) {
+          const step = (lefts[i - 1] - lefts[i]) / l.box;
+          expect(step).toBeGreaterThan(0.6);
+          expect(step).toBeLessThanOrEqual(0.8 + 1e-9);
+        }
+      }
     }
-    // deterministic halves for 4 and 5 columns
-    expect([0, 1, 2, 3].map((c) => stackDirectionForColumn(c, 4))).toEqual([
-      "down-right", "down-right", "down-left", "down-left",
-    ]);
-    expect([0, 1, 2, 3, 4].map((c) => stackDirectionForColumn(c, 5))).toEqual([
-      "down-right", "down-right", "down-right", "down-left", "down-left",
-    ]);
+    expect(peekStack(0, { box: 0.3, maxStep: 0.33, minStep: 0.03 }).offsets).toEqual([]);
   });
 
   it("orderStack: manual front override wins", () => {

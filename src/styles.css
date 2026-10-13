@@ -135,13 +135,6 @@ code {
 }
 .icon-btn:hover { background: var(--surface-3); color: var(--text); border-color: var(--border); }
 
-.brand-mark {
-  width: 22px;
-  height: 20px;
-  flex-shrink: 0;
-  background: var(--accent);
-  clip-path: polygon(0 0, 32% 0, 50% 58%, 68% 0, 100% 0, 50% 100%);
-}
 
 .error {
   display: flex;
@@ -509,7 +502,8 @@ img.skin-art {
   border-bottom: 1px solid var(--border);
 }
 .nav-brand { display: flex; align-items: center; gap: 10px; padding-right: 20px; border-right: 1px solid var(--border); height: 28px; }
-.nav-brand-name { font: 22px/1 var(--font-display); letter-spacing: 0.12em; text-transform: uppercase; padding-top: 2px; }
+.nav-brand-name { font: 22px/1 var(--font-display); letter-spacing: 0.12em; text-transform: uppercase; padding-top: 2px; white-space: nowrap; }
+.nav-brand-name em, .gate-hero-brand em { font-style: normal; color: var(--accent); }
 .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .nav-wallet {
   display: flex;
@@ -568,7 +562,7 @@ img.skin-art {
 /* ===== library (left) ===== */
 .tabs--pane { flex-shrink: 0; padding: 0 8px; gap: 0; overflow: hidden; }
 /* Five sections must fit the 300px minimum pane width. */
-.tabs--pane button { min-width: 0; gap: 4px; padding-inline: 2px; font-size: 12px; white-space: nowrap; }
+.tabs--pane button { flex: 1 1 auto; min-width: 0; gap: 4px; padding-inline: 2px; font-size: 12px; white-space: nowrap; }
 .tabs--pane button::after { left: 4px; right: 4px; }
 .tabs--pane .tab-count { min-width: 18px; padding: 2px 5px; }
 .lib-tools { flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
@@ -1029,8 +1023,8 @@ img.skin-art {
   .stage-wrap { order: -1; }
   .pane--library { order: 1; }
   .stage-hint { display: none; }
-  /* No viewport height to fit against: give the stage a 16:9 box to fit into. */
-  .stage { flex: none; aspect-ratio: 16 / 9; padding: 12px; }
+  /* No viewport height to fit against: give the stage a 5:4 box (canvas shape) to fit into. */
+  .stage { flex: none; aspect-ratio: 5 / 4; padding: 12px; }
   .pane--library .pane-scroll { max-height: 60vh; }
   .pane--library, .pane--inspector { border: none; border-top: 1px solid var(--border); }
 }
@@ -1353,10 +1347,10 @@ img.skin-art {
 .sstore-peek .sstore-owned { top: 10px; right: 10px; font-size: 11px; padding: 4px 8px; }
 
 
-/* ===== showcase card — VALORANT Collection look (fixed 1280×720, export-safe) ===== */
+/* ===== showcase card — in-client loadout look (fixed 1280×1024, export-safe) ===== */
 .sc-root {
   width: 1280px;
-  height: 720px;
+  height: 1024px;
   position: relative;
   overflow: hidden;
   background: #070b10;
@@ -1481,8 +1475,6 @@ img.skin-art {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* wallet as one horizontal row (§11) */
-.sc-wallet { display: flex; flex-direction: row; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
 .sc-chip {
   display: inline-flex;
   align-items: center;
@@ -1497,6 +1489,22 @@ img.skin-art {
   padding: 4px 8px;
   border-radius: 2px;
 }
+.insp-toggles { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.insp-toggle { position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 6px; cursor: pointer; }
+.insp-toggle:hover { background: var(--surface-2, rgba(255, 255, 255, 0.04)); }
+.insp-toggle-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.insp-toggle-label { font-size: 13px; font-weight: 500; color: var(--text); }
+.insp-toggle-hint { font-size: 11px; color: var(--muted); }
+.insp-toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.insp-toggle-track { position: relative; width: 32px; height: 18px; flex-shrink: 0; border-radius: 9px; background: rgba(236, 232, 225, 0.16); transition: background 0.15s ease; }
+.insp-toggle-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform 0.15s ease; }
+.insp-toggle input:checked + .insp-toggle-track { background: var(--accent); }
+.insp-toggle input:checked + .insp-toggle-track::after { transform: translateX(14px); }
+.insp-toggle input:focus-visible + .insp-toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sc-badge { font-family: var(--font-display); font-size: 14px; letter-spacing: 0.08em; padding: 3px 9px 2px; color: #fff; }
+.sc-badge--fm { gap: 5px; background: rgba(255, 70, 85, 0.16); border-color: rgba(255, 70, 85, 0.6); }
+.sc-badge svg { display: block; flex-shrink: 0; }
+.sc-card-user--hidden { font-size: 17px; letter-spacing: 0.1em; color: rgba(236, 232, 225, 0.62); }
 .sc-wallet-icon {
   width: 16px;
   height: 16px;
@@ -1657,7 +1665,7 @@ img.skin-art {
   flex-shrink: 0;
 }
 
-/* one cell per gun — skins transparent, two-axis stack via inline transform (§13) */
+/* one cell per gun — skins transparent, peek stack via inline position (§13) */
 .sc-stack {
   position: relative;
   flex: 1;
@@ -1678,6 +1686,10 @@ img.skin-art {
   pointer-events: none;
 }
 .sc-stack-item.clickable { cursor: pointer; }
+/* gun stacks: centred group, each back skin shifted up by a share of its own
+   art height (inline translateY); knives sit in fixed-size slots */
+.sc-stack-item--knife { padding: 3px 2px; }
+.sc-stack-item--knife img.skin-art { width: auto; height: auto; max-width: 100%; max-height: 100%; }
 
 
 /* Hitbox = the img itself (frame is display:contents — no extra box) */
@@ -1694,6 +1706,19 @@ img.skin-art {
     drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.85))
     drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7));
   transition: filter 0.12s ease, transform 0.12s ease;
+}
+.sc-stack-item.is-back .sc-stack-art {
+  filter: brightness(0.78)
+    drop-shadow(1px 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(-1px 0 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(0 3px 5px rgba(0, 0, 0, 0.75));
+}
+.sc-stack-item.is-hot .sc-stack-art {
+  filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff)
+    drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff)
+    drop-shadow(0 0 6px rgba(255, 255, 255, 0.55));
 }
 
 .sc-stack-item .sc-fallback {
@@ -1721,42 +1746,28 @@ img.skin-art {
   gap: 0;
   min-width: 0;
 }
-.sc-knife-strip {
-  display: flex;
-  gap: 6px;
-  height: 108px;
-  min-width: 0;
-}
 .sc-knife-row .sc-cat-head--sm {
   margin-bottom: 3px;
 }
 .sc-knife-row .sc-cat-name {
   font-size: 12px;
 }
-.sc-knife-cell {
+/* one shared melee plane: every knife overlaps inside it (§18) */
+.sc-knife-plane {
   position: relative;
-  flex: 1 1 0;
+  height: 150px;
   min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  /* lighter plane than gun cells — melee strip reads as a separate band (§18) */
-  background: rgba(236, 232, 225, 0.055);
+  /* lighter plane than gun cells — melee band reads as a separate band */
+  background:
+    linear-gradient(0deg, color-mix(in srgb, var(--rarity, transparent) 10%, transparent), transparent 70%),
+    rgba(236, 232, 225, 0.055);
   border: 1px solid rgba(236, 232, 225, 0.08);
+  border-bottom: 2px solid var(--rarity, rgba(236, 232, 225, 0.08));
   overflow: hidden;
 }
-.sc-knife-cell .sc-stack {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  background: transparent;
-  border: none;
-  clip-path: none;
-}
-
-.sc-knife-cell .sc-stack-art {
-  /* melee cells are narrow; the img.skin-art contract sizes the art */
+.sc-knife-plane > .sc-stack {
+  position: absolute;
+  inset: 8px 12px;
 }
 .sc-fallback { color: var(--muted); font-size: 11px; padding: 8px; text-align: center; }
 .sc-empty {
@@ -1805,7 +1816,7 @@ img.skin-art {
 
 /* right rail: player card dominates, then rank block, wallet, summary (§11) */
 .sc-right {
-  width: 184px;
+  width: 272px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1818,10 +1829,9 @@ img.skin-art {
   border: 2px solid rgba(255, 70, 85, 0.55);
   overflow: hidden;
   width: 100%;
-  /* Do not stretch — lock to official card art ratio so art is not cropped/squashed.
-     Shrinks only when the "main agent" tile below needs the space (art crops, never squashes). */
-  aspect-ratio: 268 / 640;
-  flex: 0 1 auto;
+  /* Fills whatever the rail leaves after the tiles below, so there is never a
+     gap under the rail; the art covers (crops a little, never squashes). */
+  flex: 1 1 0;
   min-height: 0;
   background: #0c141d;
   clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
@@ -1985,14 +1995,33 @@ img.skin-art {
   color: #ece8e1;
   white-space: nowrap;
 }
+/* VALUE: collection value on the first line, in-game wallet + FM chips under it */
 .sc-stats .sc-stat-value {
   grid-column: 1 / -1;
   flex-direction: row;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
-  padding: 8px 10px 7px;
+  row-gap: 0;
+  padding: 9px 10px 10px;
 }
 .sc-stat-value dd { color: #fff; }
+.sc-stats dd.sc-stat-extras {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(236, 232, 225, 0.1);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+.sc-stat-extras .sc-chip { padding: 3px 8px; }
+/* FM sits apart from the wallet, on the right edge */
+.sc-stat-extras .sc-badge--fm { margin-left: auto; }
+.sc-stat-extras .sc-badge { font-family: var(--font-display); font-size: 13px; padding: 2px 8px 1px; }
 .sc-stats dd small { font-size: 13px; color: #8b97a0; }
 .sc-stat-usd {
   margin-left: 6px;
@@ -2012,7 +2041,7 @@ img.skin-art {
 
 
 /* Hover opens the stack; art never steals the pointer from another layer. */
-.sc-cat, .sc-knife-cell { position: relative; }
+.sc-cat, .sc-knife-plane { position: relative; }
 .sc-stack { isolation: isolate; pointer-events: none; }
 .sc-stack-art, .sc-stack-item .sc-fallback { pointer-events: none; }
 .sc-hover-target { position: absolute; inset: 0; z-index: 1; border: 1px solid transparent; background: transparent; }
@@ -2025,6 +2054,7 @@ img.skin-art {
 .skin-hover-row { padding: 10px; border: 1px solid transparent; border-radius: 0; background: #0d151e; margin-bottom: 5px; min-height: 170px; }
 .skin-hover-row:last-child { margin-bottom: 0; }
 .skin-hover-row:hover, .skin-hover-row:focus-within { border-color: var(--rarity); background: #1b2937; }
+.skin-hover-row.is-hot { border-color: #fff; background: #1b2937; }
 .skin-hover-name { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .skin-hover-name strong { font-size: 12px; font-weight: 600; }
 .skin-hover-name > span { font-size: 9px; letter-spacing: .08em; color: var(--muted); }

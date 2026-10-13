@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { HoverSkins } from "./HoverSkins";
-import type { ChromaSelection, RankBadge, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
-import { selKey } from "./types";
-import type { GunGroup, Pages, StackDirection, StackLayer } from "./logic";
+import type { ChromaSelection, RankBadge, ShowcaseOptions, ShowcasePayload, Selection, SkinItem, ItemKind } from "./types";
+import { DEFAULT_OPTIONS, selKey } from "./types";
+import type { GunGroup, Pages } from "./logic";
 import { SkinArt, skinArtStyle } from "./skinArt";
 import { thumb } from "./thumb";
 import {
@@ -11,15 +11,15 @@ import {
   collectionValue,
   orderStack,
   rarityColor,
-  stackDirectionForColumn,
-  stackLayers,
+  gunStack,
+  knifeLayout,
   tierInfo,
   isPremiumSkin,
   vpToUsd,
 } from "./logic";
 
 export const CANVAS_W = 1280;
-export const CANVAS_H = 720;
+export const CANVAS_H = 1024;
 
 const imgUrl = (u: string | null) => (u ? `/img/${encodeURIComponent(u)}` : null);
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -37,6 +37,8 @@ interface Props {
   onPickChroma?: (skinId: string, chromaId: string) => void;
   /** Hover spread without editing (shared links); defaults to `!!onRemoveSkin`. */
   hoverable?: boolean;
+  /** FM badge / hidden Riot ID. */
+  options?: ShowcaseOptions;
 }
 
 function CatMark() {
@@ -129,22 +131,36 @@ export function Showcase({
   onBringToFront,
   onPickChroma,
   hoverable,
+  options = DEFAULT_OPTIONS,
 }: Props) {
   const interactive = hoverable ?? !!onRemoveSkin;
-  const [hovered, setHovered] = useState<{ gun: string; skin?: string; rect: DOMRect } | null>(null);
+  const [hovered, setHovered] = useState<{ gun: string; rect: DOMRect } | null>(null);
+  // Skin under the pointer inside a stack: outlined on the canvas and in the spread.
+  const [hot, setHot] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout>>();
   const keepOpen = () => clearTimeout(closeTimer.current);
   const closeSoon = () => {
     keepOpen();
     closeTimer.current = setTimeout(() => setHovered(null), 180);
   };
-  const openStack = (element: HTMLElement, gun: string, skin?: string) => {
+  const openStack = (element: HTMLElement, gun: string) => {
     keepOpen();
-    setHovered({ gun, skin, rect: element.getBoundingClientRect() });
+    setHovered((h) => (h?.gun === gun ? h : { gun, rect: element.getBoundingClientRect() }));
+  };
+  /** Front-most visible art under the pointer (layers are tagged front-first). */
+  const trackHot = (event: React.PointerEvent<HTMLElement>) => {
+    const host = event.currentTarget.parentElement;
+    const arts = host ? Array.from(host.querySelectorAll<HTMLElement>("[data-layer]")) : [];
+    arts.sort((a, b) => Number(a.dataset.layer) - Number(b.dataset.layer));
+    const hit = arts.find((el) => {
+      const r = (el.querySelector("img") ?? el).getBoundingClientRect();
+      return event.clientX >= r.left && event.clientX <= r.right && event.clientY >= r.top && event.clientY <= r.bottom;
+    });
+    setHot(hit?.dataset.skin ?? null);
   };
   useEffect(() => () => clearTimeout(closeTimer.current), []);
   useEffect(() => {
-    const close = () => setHovered(null);
+    const close = () => { setHovered(null); setHot(null); };
     const escape = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
     const scroll = (event: Event) => {
       if (!(event.target instanceof Element) || !event.target.closest(".skin-hover-spread")) close();
@@ -180,18 +196,15 @@ export function Showcase({
   /** Exactly 4 category columns (+ OTHER for unknown guns); section titles mid-column when merged. */
   const catColumns: {
     id: string;
-    dir: StackDirection;
     sections: { label: string; guns: GunGroup[] }[];
   }[] = (() => {
     const official = new Set(LOADOUT_GUNS.map((w) => w.toUpperCase()));
     const used = new Set<string>();
     const cols: {
       id: string;
-      dir: StackDirection;
       sections: { label: string; guns: GunGroup[] }[];
     }[] = WEAPON_CATEGORIES.map((cat) => ({
       id: cat.id,
-      dir: "down-right" as StackDirection,
       sections: cat.sections.map((sec) => {
         const ids = sec.guns.map((w) => w.toUpperCase());
         const guns = slots.filter((g) => {
@@ -207,11 +220,7 @@ export function Showcase({
       used.add(g.id);
       return true;
     });
-    if (other.length) cols.push({ id: "other", dir: "down-left", sections: [{ label: "OTHER", guns: other }] });
-    // Deterministic two-axis direction per column (§14): left half cascades down-right, right half down-left.
-    cols.forEach((c, i) => {
-      c.dir = stackDirectionForColumn(i, cols.length);
-    });
+    if (other.length) cols.push({ id: "other", sections: [{ label: "OTHER", guns: other }] });
     return cols;
   })();
 
@@ -222,35 +231,46 @@ export function Showcase({
 
   const tileIcon = (s: SkinItem) => activeChroma(s)?.icon ?? s.icon;
 
-  /** Artwork never changes its hit area or layer order on hover. */
-  const stackItem = (s: SkinItem, index: number, _gunId: string, layer: StackLayer, count: number) => (
-    <div key={s.id} className="sc-stack-item" style={{
-      zIndex: count - index + 1,
-      transform: `translate(${layer.dx * 100}%, ${layer.dy * 100}%) scale(${layer.scale})`,
-      ["--rarity" as string]: rarityColor(s.price, s.levelCount, s.contentTierRank ?? null),
-    }}>
-      {tileIcon(s) ? <span className="sc-stack-frame"><SkinArt className="sc-stack-art" src={imgUrl(tileIcon(s))!} alt="" weaponName={s.weaponName} isKnife={s.isKnife} /></span>
-        : <span className="sc-fallback">{s.weaponName}</span>}
+  const rarityOf = (s: SkinItem) => rarityColor(s.price, s.levelCount, s.contentTierRank ?? null);
+
+  const skinArt = (s: SkinItem, artStyle?: CSSProperties) =>
+    tileIcon(s) ? <span className="sc-stack-frame"><SkinArt className="sc-stack-art" src={imgUrl(tileIcon(s))!} alt="" weaponName={s.weaponName} isKnife={s.isKnife} style={artStyle} /></span>
+      : <span className="sc-fallback" style={artStyle}>{s.weaponName}</span>;
+
+  /**
+   * Artwork never changes its hit area or layer order on hover. `pos` places
+   * the skin inside its stack (inline, from `gunStack` / `knifeLayout`).
+   */
+  const stackItem = (s: SkinItem, index: number, pos: CSSProperties, z: number, variant?: "up" | "knife", artStyle?: CSSProperties) => (
+    <div key={s.id} data-layer={index} data-skin={s.id}
+      className={`sc-stack-item${variant ? ` sc-stack-item--${variant}` : ""}${index > 0 && variant === "up" ? " is-back" : ""}${hot === s.id ? " is-hot" : ""}`}
+      style={{ ...pos, zIndex: z, ["--rarity" as string]: rarityOf(s) }}>
+      {skinArt(s, artStyle)}
     </div>
   );
 
-  const gunSection = (gun: GunGroup, dir: StackDirection) => {
+  const hoverTarget = (gun: string, label: string) => interactive && (
+    <button className="sc-hover-target" aria-label={label}
+      onPointerEnter={e => { openStack(e.currentTarget, gun); trackHot(e); }}
+      onPointerMove={trackHot}
+      onPointerLeave={() => { setHot(null); closeSoon(); }}
+      onFocus={e => openStack(e.currentTarget, gun)} onBlur={closeSoon}
+      onClick={e => openStack(e.currentTarget, gun)} />
+  );
+
+  const gunSection = (gun: GunGroup) => {
     const items = orderStack(gun.items, bringToFront[gun.id]);
     const empty = items.length === 0;
-    const layers = stackLayers(items.length, dir);
+    const stack = gunStack(items.length);
+    const shown = items.slice(0, stack.visible);
     const front = items[0];
     return (
       <section
         className={`sc-cat${empty ? " sc-cat--empty" : ""}`}
         key={gun.id}
-        style={front ? ({ "--rarity": rarityColor(front.price, front.levelCount, front.contentTierRank ?? null) } as CSSProperties) : undefined}
+        style={front ? ({ "--rarity": rarityOf(front) } as CSSProperties) : undefined}
       >
-        {interactive && !empty && (
-          <button className="sc-hover-target" aria-label={`Browse ${gun.label}, ${items.length} skins`}
-            onPointerEnter={e => openStack(e.currentTarget, gun.id)} onPointerLeave={closeSoon}
-            onFocus={e => openStack(e.currentTarget, gun.id)} onBlur={closeSoon}
-            onClick={e => openStack(e.currentTarget, gun.id)} />
-        )}
+        {!empty && hoverTarget(gun.id, `Browse ${gun.label}, ${items.length} skins`)}
         <div className="sc-cat-head">
           <CatMark />
           <span className="sc-cat-name">{gun.label}</span>
@@ -265,11 +285,40 @@ export function Showcase({
               <EmptyGunArt icon={payload.defaultIcons?.[gun.id]} weaponName={gun.id === "MELEE" ? "Melee" : gun.label} />
             </div>
           ) : (
-            items.map((s, i) => stackItem(s, i, gun.id, layers[i], items.length))
+            shown.map((s, i) =>
+              items.length > 1
+                ? stackItem(
+                    s, i,
+                    { inset: "auto 0", top: `${((1 - stack.box) / 2) * 100}%`, height: `${stack.box * 100}%` },
+                    shown.length - i + 1, "up",
+                    // % in translate = the art's own height, so the reveal reads the same for every gun shape
+                    { transform: `translateY(${stack.shifts[i] * 100}%)` }
+                  )
+                : stackItem(s, i, {}, 1)
+            )
           )}
         </div>
       </section>
     );
+  };
+
+  const hasExtras = payload.wallet.vp != null || payload.wallet.rp != null || options.fm;
+
+  const knives = orderStack(knifeItems, bringToFront.MELEE);
+  const knifeGrid = knifeLayout(knives.length);
+  const knifePos = (i: number): CSSProperties => {
+    const { row, left } = knifeGrid.slots[i];
+    const rowH = 100 / knifeGrid.rows;
+    // Longhands only: React clears a dropped key to "", so a shorthand like `inset`
+    // would fall back to the stylesheet's `inset: 0` and pin every knife to one spot.
+    return {
+      top: `${row * rowH}%`,
+      left: `${left * 100}%`,
+      right: "auto",
+      bottom: "auto",
+      height: `${rowH}%`,
+      width: `${knifeGrid.box * 100}%`,
+    };
   };
 
   return (
@@ -277,8 +326,8 @@ export function Showcase({
       {interactive && hovered && (
         <HoverSkins
           gun={hovered.gun}
-          items={hovered.gun === "MELEE" ? knifeItems.filter(s => s.id === hovered.skin) : orderStack(slots.find(g => g.id === hovered.gun)?.items ?? [], bringToFront[hovered.gun])}
-          rect={hovered.rect} chromas={chromaSel}
+          items={hovered.gun === "MELEE" ? knives : orderStack(slots.find(g => g.id === hovered.gun)?.items ?? [], bringToFront[hovered.gun])}
+          rect={hovered.rect} chromas={chromaSel} hot={hot}
           onEnter={keepOpen} onLeave={closeSoon}
           onFront={onBringToFront} onRemove={onRemoveSkin} onChroma={onPickChroma}
         />
@@ -296,7 +345,7 @@ export function Showcase({
                       <span className="sc-cat-col-label">{sec.label}</span>
                       <span className="sc-cat-col-rule" aria-hidden="true" />
                     </div>
-                    <div className="sc-cat-sec-guns">{sec.guns.map((g) => gunSection(g, col.dir))}</div>
+                    <div className="sc-cat-sec-guns">{sec.guns.map((g) => gunSection(g))}</div>
                   </div>
                 ))}
               </div>
@@ -313,25 +362,17 @@ export function Showcase({
                 <span className="sc-cat-rule" aria-hidden="true" />
                 {knifeItems.length > 0 && <span className="sc-stack-count">{knifeItems.length}</span>}
               </div>
-              <div className="sc-knife-strip">
-                {knifeItems.length > 0 ? (
-                  knifeItems.map((s) => (
-                    <div className="sc-knife-cell" key={s.id}>
-                      {interactive && <button className="sc-hover-target" aria-label={`Browse ${s.name}`}
-                        onPointerEnter={e => openStack(e.currentTarget, "MELEE", s.id)} onPointerLeave={closeSoon}
-                        onFocus={e => openStack(e.currentTarget, "MELEE", s.id)} onBlur={closeSoon}
-                        onClick={e => openStack(e.currentTarget, "MELEE", s.id)} />}
-                      <div className="sc-stack">
-                        {stackItem(s, 0, "MELEE", { dx: 0, dy: 0, scale: 1 }, 1)}
-                      </div>
-                    </div>
-                  ))
+              <div className={`sc-knife-plane${knives.length ? "" : " sc-knife-plane--empty"}`}
+                style={knives[0] ? ({ "--rarity": rarityOf(knives[0]) } as CSSProperties) : undefined}>
+                {knives.length > 0 && hoverTarget("MELEE", `Browse melee, ${knives.length} skins`)}
+                {knives.length > 0 ? (
+                  <div className="sc-stack sc-knife-stack">
+                    {knives.map((s, i) => stackItem(s, i, knifePos(i), knives.length - i + 1, "knife"))}
+                  </div>
                 ) : (
-                  <div className="sc-knife-cell sc-knife-cell--empty">
-                    <div className="sc-stack sc-stack--empty">
-                      <div className="sc-empty-gun">
-                        <EmptyGunArt icon={payload.defaultIcons?.["MELEE"]} weaponName="Melee" />
-                      </div>
+                  <div className="sc-stack sc-stack--empty">
+                    <div className="sc-empty-gun">
+                      <EmptyGunArt icon={payload.defaultIcons?.["MELEE"]} weaponName="Melee" />
                     </div>
                   </div>
                 )}
@@ -347,10 +388,14 @@ export function Showcase({
               {/* VALORANT profile-style identity over the card art */}
               <div className="sc-card-identity">
                 {title && <div className="sc-card-title">{title.text}</div>}
-                <div className="sc-card-user">
-                  {payload.gameName}
-                  {payload.tagLine && <span className="sc-card-tag">#{payload.tagLine}</span>}
-                </div>
+                {options.hideName || !payload.gameName ? (
+                  <div className="sc-card-user sc-card-user--hidden">Riot ID hidden</div>
+                ) : (
+                  <div className="sc-card-user">
+                    {payload.gameName}
+                    {payload.tagLine && <span className="sc-card-tag">#{payload.tagLine}</span>}
+                  </div>
+                )}
                 {payload.accountLevel != null && (
                   <div className="sc-card-level">LV. {payload.accountLevel}</div>
                 )}
@@ -387,14 +432,41 @@ export function Showcase({
               <dt>BUDDIES</dt>
               <dd>{checkedBuddies.length}</dd>
             </div>
-            {totalVp > 0 && (
+            {(totalVp > 0 || hasExtras) && (
               <div className="sc-stat-value">
                 <dt>VALUE</dt>
-                <dd>
-                  {fmt(totalVp)}
-                  <small> VP</small>
-                  <span className="sc-stat-usd">~${fmt(vpToUsd(totalVp))}</span>
-                </dd>
+                {totalVp > 0 && (
+                  <dd>
+                    {fmt(totalVp)}
+                    <small> VP</small>
+                    <span className="sc-stat-usd">~${fmt(vpToUsd(totalVp))}</span>
+                  </dd>
+                )}
+                {hasExtras && (
+                  <dd className="sc-stat-extras">
+                    {payload.wallet.vp != null && (
+                      <span className="sc-chip">
+                        <CurrencyIcon src={VP_ICON} alt="VP" />
+                        {fmt(payload.wallet.vp)}
+                      </span>
+                    )}
+                    {payload.wallet.rp != null && (
+                      <span className="sc-chip">
+                        <CurrencyIcon src={RP_ICON} alt="RP" />
+                        {fmt(payload.wallet.rp)}
+                      </span>
+                    )}
+                    {options.fm && (
+                      <span className="sc-chip sc-badge sc-badge--fm" title="First mail">
+                        FM:
+                        <svg viewBox="0 0 16 16" width="13" height="13" aria-label="yes">
+                          <circle cx="8" cy="8" r="8" fill="#ff4655" />
+                          <path d="M4.6 8.3l2.2 2.2 4.6-4.8" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                    )}
+                  </dd>
+                )}
               </div>
             )}
           </dl>
@@ -402,22 +474,6 @@ export function Showcase({
             <Medallion label="PEAK" tier={payload.ranks.peak} badge={payload.ranks.peakBadge} />
             <Medallion label="CURRENT" tier={payload.ranks.current} badge={payload.ranks.currentBadge} />
           </div>
-          {(payload.wallet.vp != null || payload.wallet.rp != null) && (
-            <div className="sc-wallet">
-              {payload.wallet.vp != null && (
-                <span className="sc-chip">
-                  <CurrencyIcon src={VP_ICON} alt="VP" />
-                  {fmt(payload.wallet.vp)}
-                </span>
-              )}
-              {payload.wallet.rp != null && (
-                <span className="sc-chip">
-                  <CurrencyIcon src={RP_ICON} alt="RP" />
-                  {fmt(payload.wallet.rp)}
-                </span>
-              )}
-            </div>
-          )}
         </aside>
       </div>
     </div>

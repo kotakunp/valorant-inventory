@@ -179,6 +179,9 @@ export type AnyItem = SkinItem | CardItem | TitleItem | BuddyItem | AgentItem;
 export function defaultChecked(kind: ItemKind, item: AnyItem, pricesAvailable: boolean): boolean {
   void pricesAvailable; // price-map coverage is partial; null price always uses the level heuristic for skins
   if (kind === "agent") return false; // "main agent" defaults come from the profile, not pricing
+  // Riot reports neither price nor equip state for buddies, so a price/equip
+  // rule would start every account at 0 buddies.
+  if (kind === "buddy") return true;
   if (item.equipped) return true;
   if (kind === "skin") return isPremiumSkin(item as SkinItem);
   return item.price != null;
@@ -312,64 +315,126 @@ export function tierInfo(tier: number | null): { name: string; color: string } {
   return { name: `${b.name.toUpperCase()} ${tier - b.from + 1}`, color: b.color };
 }
 
-/* ===== Two-axis stack layout (§13–§16) ===== */
+/* ===== Peek stack layout (§13–§16) ===== */
 
-export type StackDirection = "down-right" | "down-left" | "up-right" | "up-left";
-
-/** Max spread of a stack inside one cell (fraction of cell size, per axis). */
-export const STACK_SPREAD = { x: 0.3, y: 0.24 } as const;
-
-const DIR_SIGNS: Record<StackDirection, { x: number; y: number }> = {
-  "down-right": { x: 1, y: 1 },
-  "down-left": { x: -1, y: 1 },
-  "up-right": { x: 1, y: -1 },
-  "up-left": { x: -1, y: -1 },
-};
-
-/**
- * Per-skin step for a stack of `count`, bounded so the whole cascade stays
- * inside STACK_SPREAD no matter how many skins share the cell.
- */
-export function stackSteps(count: number): { x: number; y: number } {
-  const n = Math.max(1, Math.floor(count));
-  if (n === 1) return { x: 0, y: 0 };
-  const baseX = n <= 2 ? 0.13 : n <= 4 ? 0.09 : n <= 7 ? 0.06 : 0.045;
-  const baseY = n <= 2 ? 0.07 : n <= 4 ? 0.05 : n <= 7 ? 0.035 : 0.026;
-  const room = 1 / (n - 1);
-  return { x: Math.min(baseX, STACK_SPREAD.x * room), y: Math.min(baseY, STACK_SPREAD.y * room) };
+export interface PeekOptions {
+  /** Size of one skin's box along the stack axis, as a fraction of the area. */
+  box: number;
+  /** Largest gap between neighbouring skins (fraction of the area). */
+  maxStep: number;
+  /** Smallest gap that still leaves a readable strip; deeper skins are dropped. */
+  minStep: number;
 }
 
-export interface StackLayer {
-  /** Offset from the cell origin as a fraction of cell size (×100 for %). */
-  dx: number;
-  dy: number;
-  scale: number;
+export interface PeekStack {
+  box: number;
+  /** Distance between neighbouring skins along the axis. */
+  step: number;
+  /** Front-first offsets from the front edge (index 0 = foremost, fully visible). */
+  offsets: number[];
+  /** Skins that did not fit (deepest first to go); the spread still lists them. */
+  hidden: number;
 }
 
 /**
- * Front-first layer list: index 0 = front (cell center), last = deepest behind.
- * Offsets cascade diagonally along `dir`, bounded by STACK_SPREAD; back layers
- * scale down slightly for depth.
+ * One-axis stack: the foremost skin sits at the front edge and every skin
+ * behind it is pushed one `step` further away, so each back skin shows the
+ * strip nearest that direction (gun cells: the top edge; melee band: the
+ * blade/head side). The group is centred and never leaves the area.
  */
-export function stackLayers(count: number, dir: StackDirection): StackLayer[] {
-  const n = Math.max(1, Math.floor(count));
-  const { x, y } = stackSteps(n);
-  const s = DIR_SIGNS[dir];
-  return Array.from({ length: n }, (_, i) => {
-    const dx = s.x * i * x;
-    const dy = s.y * i * y;
-    return {
-      dx: dx === 0 ? 0 : dx,
-      dy: dy === 0 ? 0 : dy,
-      scale: 1 - Math.min(0.04 * i, 0.16),
-    };
-  });
+export function peekStack(count: number, { box, maxStep, minStep }: PeekOptions): PeekStack {
+  const n = Math.max(0, Math.floor(count));
+  if (n === 0) return { box, step: 0, offsets: [], hidden: 0 };
+  const room = Math.max(0, 1 - box);
+  const visible = n === 1 ? 1 : Math.min(n, 1 + Math.floor(room / minStep + 1e-9));
+  const step = visible > 1 ? Math.min(maxStep, room / (visible - 1)) : 0;
+  const base = (1 - (box + (visible - 1) * step)) / 2;
+  return {
+    box,
+    step,
+    offsets: Array.from({ length: visible }, (_, i) => base + i * step),
+    hidden: n - visible,
+  };
 }
 
-/** Deterministic direction per grid column: left half cascades right, right half cascades left. */
-export function stackDirectionForColumn(col: number, cols: number): StackDirection {
-  const n = Math.max(1, Math.floor(cols));
-  return col < n / 2 ? "down-right" : "down-left";
+export interface GunStack {
+  /** Skins drawn (front-first); deeper ones are left to the hover spread. */
+  visible: number;
+  hidden: number;
+  /** How much of each back skin shows above the one in front, as a share of the art's own height. */
+  peek: number;
+  /** Height of each skin's fit box (fraction of the cell) so the whole group always fits. */
+  box: number;
+  /** Per skin, front-first: vertical shift as a share of the art's own height (+ = down). */
+  shifts: number[];
+}
+
+/** Most skins one gun cell draws; past this the strips get too thin to read. */
+export const GUN_STACK_MAX = 9;
+
+/**
+ * Gun cell: the group is centred in the cell. Each skin behind the front one
+ * sits one `peek` (a share of the art's own height, so it reads the same for
+ * every gun shape) higher, showing its top edge; the front skin moves down by
+ * the same amount, so the group stays centred. Few skins show a big slice of
+ * each back skin; the slice shrinks as the stack grows, and the fit box
+ * shrinks so the group never leaves its cell.
+ */
+export function gunStack(count: number): GunStack {
+  const n = Math.max(0, Math.floor(count));
+  const visible = Math.min(n, GUN_STACK_MAX);
+  const peek = visible <= 1 ? 0 : Math.max(0.14, 0.62 - 0.07 * visible);
+  const span = 1 + (visible - 1) * peek;
+  return {
+    visible,
+    hidden: n - visible,
+    peek,
+    box: visible <= 1 ? 1 : 1 / span,
+    shifts: Array.from({ length: visible }, (_, i) => ((visible - 1) / 2 - i) * peek),
+  };
+}
+
+export interface KnifeLayout {
+  rows: number;
+  /** Knife box width (fraction of the band width); height is one row. */
+  box: number;
+  /** Per knife, front-first: row and left edge (fraction of the band width). */
+  slots: { row: number; left: number }[];
+}
+
+/** Melee band tiers by knife count: rows and knife width (fraction of the band width). */
+const KNIFE_TIERS: { upTo: number; rows: number; box: number }[] = [
+  { upTo: 3, rows: 1, box: 0.32 },
+  { upTo: 5, rows: 1, box: 0.22 },
+  { upTo: 7, rows: 1, box: 0.19 },
+  { upTo: 16, rows: 2, box: 0.17 },
+  { upTo: Infinity, rows: 3, box: 0.14 },
+];
+
+/** Share of a knife's width its neighbour always covers when there is room (a slight overlap). */
+const KNIFE_OVERLAP = 0.2;
+
+/**
+ * Melee band: a horizontal peek stack per row, the gun stack turned sideways.
+ * The foremost knife sits on the right and each knife behind it is pushed one
+ * step left, showing its left part (knife renders put the blade/head on the
+ * left). Neighbours overlap slightly; the overlap only grows once the row is
+ * full. More knives shrink a tier and wrap into up to three rows. The group is
+ * centred and never leaves the band.
+ */
+export function knifeLayout(count: number): KnifeLayout {
+  const n = Math.max(0, Math.floor(count));
+  const { rows: maxRows, box } = KNIFE_TIERS.find((t) => n <= t.upTo)!;
+  const rows = Math.max(1, Math.min(maxRows, n));
+  const perRow = Math.max(1, Math.ceil(n / rows));
+  const slots: KnifeLayout["slots"] = [];
+  for (let r = 0; r < rows; r++) {
+    const inRow = Math.max(0, Math.min(perRow, n - r * perRow));
+    const st = peekStack(inRow, { box, maxStep: box * (1 - KNIFE_OVERLAP), minStep: 0.005 });
+    // peekStack offsets grow away from the front; mirror them so the front is rightmost
+    st.offsets.forEach((offset) => slots.push({ row: r, left: 1 - offset - box }));
+  }
+  return { rows, box, slots };
 }
 
 /** Rarity-ish score for deterministic stack ordering (higher = nearer the front). */

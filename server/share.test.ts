@@ -171,6 +171,17 @@ describe("share snapshot", () => {
     expect(() => buildSnapshot(m(), parsePicks({ ...picksAll, agent: "agent2" }), catalog())).toThrow(ShareError);
   });
 
+  it("never stores a hidden Riot ID and keeps the FM badge", () => {
+    const shown = buildSnapshot(m(), parsePicks({ ...picksAll, options: { fm: true } }), catalog());
+    expect(shown.showcase.gameName).not.toBe("");
+    expect(shown.options).toEqual({ fm: true, hideName: false });
+    const hidden = buildSnapshot(m(), parsePicks({ ...picksAll, options: { hideName: true } }), catalog());
+    expect(hidden.showcase.gameName).toBe("");
+    expect(hidden.showcase.tagLine).toBe("");
+    expect(hidden.options).toEqual({ fm: false, hideName: true });
+    expect(JSON.stringify(hidden)).not.toContain(m().gameName);
+  });
+
   it("validates pick shape", () => {
     expect(() => parsePicks(null)).toThrow(ShareError);
     expect(() => parsePicks({ skins: [{ id: 5 }] })).toThrow(ShareError);
@@ -178,6 +189,7 @@ describe("share snapshot", () => {
     expect(parsePicks({}).skins).toEqual([]);
     expect(parsePicks({ agent: "AGENT1" }).agent).toBe("agent1");
     expect(parsePicks({ agent: 7 }).agent).toBeNull();
+    expect(parsePicks({ options: { fm: "yes", hideName: 1 } }).options).toEqual({ fm: false, hideName: false });
   });
 });
 
@@ -209,10 +221,17 @@ describe("share ids, previews and meta", () => {
       "Abcdefgh",
       true
     );
-    expect(html).toContain("<title>&lt;b&gt;&quot;x&quot;#0001 · VALORANT collection</title>");
+    expect(html).toContain("<title>&lt;b&gt;&quot;x&quot;#0001&#39;s loadout · Valorant Loadout Studio</title>");
     expect(html).toContain('content="2 skins · 3,900 VP. Hover any weapon to see every skin."');
     expect(html).toContain('property="og:image" content="https://valorant.muur.app/s/Abcdefgh/preview.jpg"');
     expect(html).not.toContain("<b>");
+    expect(html).toContain('og:image:width" content="1000"');
+  });
+
+  it("uses a neutral title when the Riot ID is hidden", () => {
+    const snap = buildSnapshot(manifestFromPayload(payload()), parsePicks({ ...picksAll, options: { hideName: true } }), catalog());
+    const html = injectShareMeta(`<head><title>Old</title></head>`, snap, "https://x.app", "Abcdefgh", false);
+    expect(html).toContain("<title>A player&#39;s loadout · Valorant Loadout Studio</title>");
   });
 });
 

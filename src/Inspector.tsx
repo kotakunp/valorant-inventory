@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import type { ChromaSelection, ItemKind, Selection, ShowcasePayload, SkinItem } from "./types";
+import type { ChromaSelection, ItemKind, Selection, ShowcaseOptions, ShowcasePayload, SkinItem } from "./types";
 import { selKey } from "./types";
 import type { Pages } from "./logic";
 import { collectionValue, favoriteAgent, isPremiumSkin, vpToUsd } from "./logic";
@@ -133,6 +133,21 @@ interface Props {
   /** null when this server has no share storage. */
   share: ShareUi | null;
   onShare: () => void;
+  options: ShowcaseOptions;
+  onOptions: (options: ShowcaseOptions) => void;
+}
+
+function Toggle({ label, hint, on, onChange }: { label: string; hint: string; on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <label className="insp-toggle">
+      <span className="insp-toggle-text">
+        <span className="insp-toggle-label">{label}</span>
+        <span className="insp-toggle-hint">{hint}</span>
+      </span>
+      <input type="checkbox" role="switch" checked={on} onChange={(e) => onChange(e.currentTarget.checked)} />
+      <span className="insp-toggle-track" aria-hidden="true" />
+    </label>
+  );
 }
 
 export function Inspector({
@@ -150,6 +165,8 @@ export function Inspector({
   onOpenTab,
   share,
   onShare,
+  options,
+  onOptions,
 }: Props) {
   const isOn = (kind: ItemKind, id: string) => !!selection[selKey(kind, id)];
   const skins = data.skins.filter((s) => isOn("skin", s.id));
@@ -173,7 +190,7 @@ export function Inspector({
           {exportPhase ?? (pageCount > 1 ? `Download ${pageCount} images` : "Download image")}
         </button>
         <div className="insp-export-meta">
-          <span>PNG · 2560 × 1440{pageCount > 1 ? ` · ${pageCount} pages` : ""}</span>
+          <span>PNG · 2560 × 2048{pageCount > 1 ? ` · ${pageCount} pages` : ""}</span>
           {pageCount > 1 && (
             <span className="pager" aria-label="Preview page">
               <button type="button" onClick={() => onPage(Math.max(0, page - 1))} disabled={page === 0} aria-label="Previous page">‹</button>
@@ -273,6 +290,20 @@ export function Inspector({
             </span>
             <span className="insp-change">Change</span>
           </button>
+          <div className="insp-toggles">
+            <Toggle
+              label="First mail (FM)"
+              hint="Shows an FM badge next to your currency"
+              on={options.fm}
+              onChange={(fm) => onOptions({ ...options, fm })}
+            />
+            <Toggle
+              label="Hide Riot ID"
+              hint="Leaves your name out of the image and share link"
+              on={options.hideName}
+              onChange={(hideName) => onOptions({ ...options, hideName })}
+            />
+          </div>
         </section>
 
         {withChromas.length > 0 && (

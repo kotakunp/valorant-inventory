@@ -4,7 +4,7 @@ import { CANVAS_H, CANVAS_W } from "./Showcase";
 /** Breathing room between the stage edge and the scaled canvas. */
 export const STAGE_PAD = 24;
 
-/** Scale that fits the fixed 1280×720 canvas inside `ref` on both axes. */
+/** Scale that fits the fixed 1280×1024 canvas inside `ref` on both axes. */
 export function useFitScale(ref: RefObject<HTMLElement>, deps: unknown[], max = 1.5): number {
   const [scale, setScale] = useState(0.6);
   useEffect(() => {

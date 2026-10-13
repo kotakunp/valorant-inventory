@@ -40,10 +40,11 @@ export function SharedView({ id }: { id: string }) {
 
   const share = state.kind === "ready" ? state.share : null;
   const p = share?.showcase;
-  const who = p ? (p.tagLine ? `${p.gameName}#${p.tagLine}` : p.gameName) : "";
+  const hidden = !!p && (share?.options?.hideName || !p.gameName);
+  const who = p ? (hidden ? "A player" : p.tagLine ? `${p.gameName}#${p.tagLine}` : p.gameName) : "";
 
   useEffect(() => {
-    if (who) document.title = `${who} · VALORANT collection`;
+    if (who) document.title = `${who}'s loadout · Valorant Loadout Studio`;
   }, [who]);
 
   useEffect(() => {
@@ -78,9 +79,8 @@ export function SharedView({ id }: { id: string }) {
   return (
     <div className="studio shared">
       <header className="nav">
-        <a className="nav-brand" href="/" aria-label="VALORANT Collection home">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="nav-brand-name">Collection</span>
+        <a className="nav-brand" href="/" aria-label="Valorant Loadout Studio home">
+          <span className="nav-brand-name">Loadout <em>Studio</em></span>
         </a>
         {p && (
           <div className="shared-owner">
@@ -89,8 +89,8 @@ export function SharedView({ id }: { id: string }) {
             </span>
             <span className="nav-player">
               <span className="nav-player-name">
-                {p.gameName}
-                {p.tagLine && <span className="nav-player-tag">#{p.tagLine}</span>}
+                {hidden ? "Riot ID hidden" : p.gameName}
+                {!hidden && p.tagLine && <span className="nav-player-tag">#{p.tagLine}</span>}
               </span>
               <span className="nav-player-meta">
                 {p.accountLevel != null && <>Level {p.accountLevel} · </>}
@@ -127,7 +127,7 @@ export function SharedView({ id }: { id: string }) {
         <main className="stage-wrap">
           <div className="stage-bar">
             <div className="stage-title">
-              <span>Collection</span>
+              <span>Loadout</span>
               <span className="stage-hint">Hover a weapon to see every skin</span>
             </div>
             {pageCount > 1 && (
@@ -153,6 +153,7 @@ export function SharedView({ id }: { id: string }) {
                   selection={selection}
                   chromaSel={share!.chromaSel ?? {}}
                   bringToFront={share!.bringToFront}
+                  options={share!.options}
                   hoverable
                 />
               </div>
