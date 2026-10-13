@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Region, ShowcasePayload } from "./types";
 import { ACCESS_URL_LOGIN_LINK } from "./types";
 import { makeState, parseCallback, RSO_STATE_KEY, RSO_REGION_KEY } from "./rso";
+import heroShot from "./assets/hero-showcase.webp";
 import { SITEKEY, loadHcaptcha, widgetToken, resetCaptcha, renderCaptcha, fetchCaptchaChallenge } from "./captcha";
 
 type LoadKind = "cookies" | "password" | "mfa" | "auto" | "url" | "rso";
@@ -390,15 +391,12 @@ export function SignIn({ onLoaded }: { onLoaded: (payload: ShowcasePayload) => v
             <em>ONE IMAGE.</em>
           </h1>
           <p className="gate-hero-sub">
-            Share your loadout: every skin, card and rank on your account in one 2560 × 2048 image
-            or a link anyone can open.
+            Every skin, card and rank on your account in one image, or a link anyone can open.
           </p>
         </div>
-        <ol className="gate-hero-steps">
-          <li><b>1</b><span>Sign in</span><small>Riot&apos;s own page</small></li>
-          <li><b>2</b><span>Curate</span><small>Pick what to show</small></li>
-          <li><b>3</b><span>Export</span><small>2560 × 2048 PNG</small></li>
-        </ol>
+        <div className="gate-hero-shot">
+          <img src={heroShot} alt="" />
+        </div>
         <div className="gate-hero-wordmark">VALORANT</div>
       </section>
 

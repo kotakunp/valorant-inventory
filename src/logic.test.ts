@@ -173,7 +173,7 @@ describe("loadout categories", () => {
       "Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff",
       "Stinger", "Spectre",
       "Bucky", "Judge",
-      "Bulldog", "Guardian", "Phantom", "Vandal",
+      "Bulldog", "Guardian", "Phantom", "Vandal", "Warden",
       "Marshal", "Outlaw", "Operator",
       "Ares", "Odin",
     ]);
@@ -190,9 +190,14 @@ describe("loadout categories", () => {
       "snipers-heavies",
     ]);
     const smgShot = WEAPON_CATEGORIES[1].sections;
-    expect(smgShot.map((s) => s.label)).toEqual(["SMGS", "SHOTGUNS"]);
+    expect(smgShot.map((s) => s.label)).toEqual(["SMGS", "SHOTGUNS", "LIGHT RIFLES"]);
     expect(smgShot[0].guns).toEqual(["Stinger", "Spectre"]);
     expect(smgShot[1].guns).toEqual(["Bucky", "Judge"]);
+    expect(smgShot[2].guns).toEqual(["Bulldog", "Guardian"]);
+    // the big stacks share one column; Warden is official, so no OTHER column
+    expect(WEAPON_CATEGORIES[2].sections[0].guns).toEqual(["Phantom", "Vandal", "Warden"]);
+    const labels = WEAPON_CATEGORIES.flatMap((c) => c.sections.map((s) => s.label));
+    expect(new Set(labels).size).toBe(labels.length);
     const snipHeavy = WEAPON_CATEGORIES[3].sections;
     expect(snipHeavy.map((s) => s.label)).toEqual(["SNIPERS", "HEAVIES"]);
     expect(snipHeavy[0].guns).toEqual(["Marshal", "Outlaw", "Operator"]);

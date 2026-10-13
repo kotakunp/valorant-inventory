@@ -71,6 +71,7 @@ export const WEAPON_ORDER = [
   "Guardian",
   "Phantom",
   "Vandal",
+  "Warden",
   "Marshal",
   "Outlaw",
   "Operator",
@@ -79,9 +80,11 @@ export const WEAPON_ORDER = [
 ] as const;
 
 /**
- * Showcase column groups (exactly 4 + optional OTHER).
+ * Showcase column groups (exactly 4 + optional OTHER for guns we don't know).
  * Combined columns use section labels mid-column (SMGS then SHOTGUNS, etc.).
- * Flat gun list still follows official loadout order.
+ * Phantom / Vandal / Warden (the same buy tier, and where most collections
+ * pile up) get a column of their own; Bulldog / Guardian join SMGs + shotguns.
+ * Section labels are unique: they double as React keys and library chip ids.
  */
 export const WEAPON_CATEGORIES = [
   {
@@ -93,11 +96,12 @@ export const WEAPON_CATEGORIES = [
     sections: [
       { label: "SMGS", guns: ["Stinger", "Spectre"] },
       { label: "SHOTGUNS", guns: ["Bucky", "Judge"] },
+      { label: "LIGHT RIFLES", guns: ["Bulldog", "Guardian"] },
     ],
   },
   {
     id: "rifles",
-    sections: [{ label: "RIFLES", guns: ["Bulldog", "Guardian", "Phantom", "Vandal"] }],
+    sections: [{ label: "RIFLES", guns: ["Phantom", "Vandal", "Warden"] }],
   },
   {
     id: "snipers-heavies",

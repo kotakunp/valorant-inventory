@@ -55,7 +55,7 @@ SPEC.md                   # product + technical spec (UI sections must stay in s
 
 - Export canvas is **fixed 1280×1024** — `.sc-root` must never become responsive; preview zoom (Fit/100%/Fullscreen) only scales the editor preview.
 - Hovering a preview stack opens its skins in a nearby scrollable spread with separate, stable hover targets (variants, front ordering, and removal remain available), they do not toggle selection; toggling lives in the library pane.
-- `paginate(allSkins, selection)` always emits all 19 official gun slots + the knife row; empty guns render as empty cells (dimmed default-weapon render from `payload.defaultIcons`, no border).
+- `paginate(allSkins, selection)` always emits all 20 official gun slots + the knife row; empty guns render as empty cells (dimmed default-weapon render from `payload.defaultIcons`, no border).
 - Stacks are peek stacks: front-first order (`orderStack`: manual front → equipped → tier score → stable); `gunStack` keeps the group centered and shifts each back skin up by a share of its own art height (top edges visible; more reveal for fewer skins), `knifeLayout` sizes knives by count in one shared melee plane (a sideways peek stack per row: front knife rightmost, neighbours slightly overlapping, smaller and in up to 3 rows for many). Positions are inline per item from `peekStack`, always inside the area — never CSS-fan transforms.
 - Rarity outline color comes from `--rarity` set per stack item (`rarityColor()` in `logic.ts`).
 - Images load through `/img` proxy (allowlist `media.valorant-api.com`) so the PNG export doesn't taint the canvas; failed image loads abort the export.

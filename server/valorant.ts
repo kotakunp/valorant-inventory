@@ -128,17 +128,19 @@ export function buildPriceMapFromStorefront(sf: any): Map<string, number> {
   return map;
 }
 
-/** Standard VP price per content-tier rank (Select 875 → Ultra 2475). */
+/** Standard gun VP price per content-tier rank (Select 875 → Ultra 2475). */
 const TIER_VP: Record<number, number> = { 0: 875, 1: 1275, 2: 1775, 3: 2175, 4: 2475 };
 
 /**
  * Catalog-wide VP price: the storefront price when the skin is in today's
  * store, otherwise the standard price for its content tier. Without this,
  * only the ~10 items in today's offers would carry a price and any
- * collection-value total would read as 0.
+ * collection-value total would read as 0. Melee costs twice the gun price of
+ * its tier (Select 1750 → Ultra 4950).
  */
-export function tierVpPrice(rank: number | null): number | null {
-  return rank == null ? null : TIER_VP[rank] ?? null;
+export function tierVpPrice(rank: number | null, isKnife = false): number | null {
+  const gun = rank == null ? null : TIER_VP[rank] ?? null;
+  return gun != null && isKnife ? gun * 2 : gun;
 }
 
 /** Highest-level skin art: last level displayIcon → skin displayIcon. */
@@ -209,7 +211,14 @@ export function skinItemFromCatalog(
     name: entry.skin.displayName ?? "Unknown skin",
     weaponName: entry.weaponName,
     icon: activeChroma?.icon ?? baseIcon,
-    price: opts.price ?? tierVpPrice(contentTierRank),
+    // undefined = not in today's store → estimate; null = known to have no VP price.
+    // Contract rewards (battle pass, agent gear…) are earned, not bought: no price.
+    price:
+      opts.price !== undefined
+        ? opts.price
+        : catalog.rewardSkins?.has(skinUuid)
+          ? null
+          : tierVpPrice(contentTierRank, isKnife),
     levelCount: levels.length,
     variantCount: chromas.length,
     isKnife,
@@ -738,7 +747,8 @@ export async function buildShowcase(input: AccountInput): Promise<ShowcasePayloa
     bySkinUuid.set(
       skinUuid,
       skinItemFromCatalog(entry, catalog, {
-        price: priceMap?.get(skinUuid),
+        // store offers list level uuids, bundles the skin uuid
+        price: priceMap?.get(skinUuid) ?? priceMap?.get(rawId),
         equipped: equippedSkins.has(skinUuid),
         equippedChromaId: equippedChromaBySkin.get(skinUuid),
       })

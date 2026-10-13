@@ -28,8 +28,25 @@
   --radius-lg: 10px;
   --nav-h: 56px;
   --shadow-pop: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px rgba(0, 0, 0, 0.45);
-  --font-display: "Bebas Neue", "Inter", sans-serif;
+  /* VALORANT's own faces (Tungsten for display, DIN Next for UI) are commercial
+     licenses; Anton and Barlow are the closest open (OFL) matches. Editor
+     chrome keeps Inter for readability; the showcase and the sign-in hero
+     switch their UI text to the DIN-like Barlow. */
+  --font-display: "Anton", "Impact", sans-serif;
+  /* titles: "Valorant" fan font (Bryan T, dafont, free to use). Uppercase
+     input draws the logo's stylised A/V/M/N; small labels use
+     `text-transform: lowercase` to get the plain glyphs (still capitals). Digits
+     are wide and odd, so numbers stay on Anton. */
+  --font-title: "Valorant", "Anton", sans-serif;
+  --font-din: "Barlow", "Inter", sans-serif;
   --font-ui: "Inter", system-ui, sans-serif;
+}
+.sc-root, .gate-hero { --font-ui: var(--font-din); font-family: var(--font-din); }
+
+@font-face {
+  font-family: "Valorant";
+  src: url("./assets/fonts/valorant.woff2") format("woff2");
+  font-display: block;
 }
 
 * { box-sizing: border-box; }
@@ -309,7 +326,7 @@ img.skin-art {
 .gate {
   height: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(400px, 520px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   background: var(--void);
 }
 .gate-hero {
@@ -317,15 +334,37 @@ img.skin-art {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 40px 56px 48px;
+  gap: 36px;
+  padding: 40px 56px 0;
   background:
-    linear-gradient(115deg, transparent 0 58%, rgba(255, 70, 85, 0.07) 58% 72%, transparent 72%),
-    linear-gradient(115deg, transparent 0 64%, rgba(255, 70, 85, 0.05) 64% 66%, transparent 66%),
+    radial-gradient(90% 60% at 85% 100%, rgba(255, 70, 85, 0.22), transparent 70%),
+    linear-gradient(115deg, transparent 0 52%, rgba(255, 70, 85, 0.08) 52% 66%, transparent 66%),
+    linear-gradient(115deg, transparent 0 69%, rgba(255, 70, 85, 0.06) 69% 70.5%, transparent 70.5%),
     var(--bg);
 }
+/* product shot: a real export, tilted and bleeding off the bottom-right edge */
+.gate-hero-shot {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-right: -96px;
+  perspective: 1600px;
+}
+.gate-hero-shot img {
+  display: block;
+  width: min(100%, 760px);
+  aspect-ratio: 5 / 4;
+  object-fit: cover;
+  object-position: left top;
+  border: 1px solid rgba(236, 232, 225, 0.14);
+  border-radius: 8px 8px 0 0;
+  transform: rotateY(-14deg) rotateX(6deg) rotate(-2deg);
+  transform-origin: left center;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 6px rgba(255, 70, 85, 0.08), -24px 24px 0 -8px rgba(255, 70, 85, 0.5);
+}
 .gate-hero-top { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; }
-.gate-hero-brand { font: 22px/1 var(--font-display); letter-spacing: 0.12em; text-transform: uppercase; padding-top: 2px; }
+.gate-hero-brand { font: 20px/1 var(--font-title); letter-spacing: 0.06em; text-transform: uppercase; padding-top: 2px; }
 .gate-hero-copy { position: relative; z-index: 1; max-width: 640px; }
 .gate-eyebrow {
   display: inline-flex;
@@ -343,53 +382,18 @@ img.skin-art {
 }
 .gate-hero-title {
   margin: 18px 0 20px;
-  font-size: clamp(64px, 8.5vw, 132px);
-  line-height: 0.86;
+  font: clamp(34px, 3.7vw, 70px)/1.08 var(--font-title);
   letter-spacing: 0.01em;
+  text-transform: uppercase;
   color: var(--text);
 }
 .gate-hero-title em { font-style: normal; color: var(--accent); }
-.gate-hero-sub { margin: 0; max-width: 460px; color: var(--muted); font-size: 16px; line-height: 1.6; }
-.gate-hero-steps {
-  position: relative;
-  z-index: 1;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 180px));
-  gap: 12px;
-}
-.gate-hero-steps li {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  column-gap: 10px;
-  row-gap: 3px;
-  align-items: center;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: rgba(17, 23, 31, 0.72);
-  backdrop-filter: blur(6px);
-}
-.gate-hero-steps b {
-  grid-row: span 2;
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--accent-dim);
-  color: var(--accent);
-  font: 700 11px/1 var(--font-ui);
-}
-.gate-hero-steps span { font: 600 13px/1.2 var(--font-ui); color: var(--text); }
-.gate-hero-steps small { color: var(--faint); font-size: 12px; }
+.gate-hero-sub { margin: 0; max-width: 440px; color: var(--text-2); font: 500 18px/1.5 var(--font-ui); }
 .gate-hero-wordmark {
   position: absolute;
   right: -2vw;
   bottom: -3.2vw;
-  font: clamp(140px, 19vw, 300px)/0.8 var(--font-display);
+  font: clamp(90px, 11vw, 190px)/0.8 var(--font-title);
   letter-spacing: -0.01em;
   color: rgba(236, 232, 225, 0.025);
   pointer-events: none;
@@ -479,7 +483,8 @@ img.skin-art {
   .gate { grid-template-columns: 1fr; height: auto; min-height: 100%; }
   .gate-hero { padding: 28px 24px 32px; min-height: 0; gap: 32px; }
   .gate-hero-title { font-size: 64px; }
-  .gate-hero-steps { display: none; }
+  .gate-hero-shot { margin-right: -24px; }
+  .gate-hero-shot img { width: 100%; transform: none; }
   .gate-panel { border-left: none; border-top: 1px solid var(--line); }
   .gate-panel-inner { padding: 32px 20px 40px; }
 }
@@ -502,7 +507,7 @@ img.skin-art {
   border-bottom: 1px solid var(--border);
 }
 .nav-brand { display: flex; align-items: center; gap: 10px; padding-right: 20px; border-right: 1px solid var(--border); height: 28px; }
-.nav-brand-name { font: 22px/1 var(--font-display); letter-spacing: 0.12em; text-transform: uppercase; padding-top: 2px; white-space: nowrap; }
+.nav-brand-name { font: 19px/1 var(--font-title); letter-spacing: 0.06em; text-transform: uppercase; padding-top: 2px; white-space: nowrap; }
 .nav-brand-name em, .gate-hero-brand em { font-style: normal; color: var(--accent); }
 .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .nav-wallet {
@@ -1007,7 +1012,7 @@ img.skin-art {
 }
 .store-view > * { max-width: 1440px; margin-left: auto; margin-right: auto; }
 .page-head { margin-bottom: 28px; }
-.page-head h1 { font-size: 48px; line-height: 0.9; letter-spacing: 0.04em; text-transform: uppercase; }
+.page-head h1 { font: 44px/0.95 var(--font-title); letter-spacing: 0.02em; text-transform: uppercase; }
 .page-head p { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
 
 /* ===== small screens: stack panes and let the page scroll ===== */
@@ -1115,7 +1120,9 @@ img.skin-art {
 .sstore-head-line { flex: 1; height: 1px; background: var(--border); }
 .sstore-head-line:first-child { display: none; }
 .sstore-head-title {
-  font: 600 16px/1 var(--font-ui);
+  font: 17px/1 var(--font-title);
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
   color: var(--text);
   white-space: nowrap;
 }
@@ -1227,7 +1234,7 @@ img.skin-art {
   flex: 1;
   min-width: 0;
   /* One readable name scale across every store card row (daily, night market,
-     accessories) — the peek scales proportionally on top of it. Bebas Neue is
+     accessories) — the peek scales proportionally on top of it. the display face is
      condensed and reads small, so this is deliberately larger than the UI's
      body scale. */
   font: 600 13px/1.3 var(--font-ui);
@@ -1596,15 +1603,16 @@ img.skin-art {
   margin-top: 1px;
 }
 .sc-cat-col-label {
-  font-family: var(--font-display);
+  font-family: var(--font-title);
   font-size: 13px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
   color: #fff;
   white-space: nowrap;
 }
 .sc-cat-col-head--mid .sc-cat-col-label {
   font-size: 11px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 .sc-cat-col-rule {
@@ -1749,8 +1757,12 @@ img.skin-art {
 .sc-knife-row .sc-cat-head--sm {
   margin-bottom: 3px;
 }
+/* MELEE is a band title like the column labels, not a gun name */
 .sc-knife-row .sc-cat-name {
-  font-size: 12px;
+  font-family: var(--font-title);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
 }
 /* one shared melee plane: every knife overlaps inside it (§18) */
 .sc-knife-plane {

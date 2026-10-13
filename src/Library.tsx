@@ -20,14 +20,24 @@ const CLASS_LABEL: Record<string, string> = {
   HEAVIES: "Heavies",
 };
 
-/** Library class filter: one chip per showcase section, plus melee. */
-const CLASSES: { id: string; label: string; guns: readonly string[] | null }[] = [
-  { id: "all", label: "All", guns: null },
-  ...WEAPON_CATEGORIES.flatMap((c) =>
-    c.sections.map((s) => ({ id: s.label, label: CLASS_LABEL[s.label] ?? s.label, guns: s.guns.map((g) => g.toUpperCase()) }))
-  ),
-  { id: "MELEE", label: "Melee", guns: ["MELEE"] },
-];
+/** Showcase sections that share one library chip (Bulldog / Guardian are still rifles here). */
+const CLASS_OF: Record<string, string> = { "LIGHT RIFLES": "RIFLES" };
+
+/** Library class filter: one chip per weapon class (in-game buy menu order), plus melee. */
+const CLASSES: { id: string; label: string; guns: readonly string[] | null }[] = (() => {
+  const byClass = new Map<string, string[]>();
+  for (const s of WEAPON_CATEGORIES.flatMap((c): readonly { label: string; guns: readonly string[] }[] => c.sections)) {
+    const id = CLASS_OF[s.label] ?? s.label;
+    byClass.set(id, [...(byClass.get(id) ?? []), ...s.guns.map((g) => g.toUpperCase())]);
+  }
+  const order = ["SIDEARMS", "SMGS", "SHOTGUNS", "RIFLES", "SNIPERS", "HEAVIES"];
+  const ids = [...byClass.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  return [
+    { id: "all", label: "All", guns: null },
+    ...ids.map((id) => ({ id, label: CLASS_LABEL[id] ?? id, guns: byClass.get(id)! })),
+    { id: "MELEE", label: "Melee", guns: ["MELEE"] },
+  ];
+})();
 
 interface Props {
   data: ShowcasePayload;

@@ -25,9 +25,11 @@ never reach the PNG or share links.
 
 ## User journey (what happens, in order)
 
-1. **Sign-in gate** — split screen: a typographic hero on the left
-   ("YOUR ARSENAL. ONE IMAGE." + *Sign in / Curate / Export* step cards) and
-   the sign-in panel on the right. Primary path is two numbered steps: **1**
+1. **Sign-in gate** — 50/50 split screen: the hero on the left
+   ("YOUR ARSENAL. ONE IMAGE." + one-line pitch, then a real showcase export
+   (`src/assets/hero-showcase.webp`, Riot ID hidden) tilted in perspective and
+   bleeding off the bottom-right edge, red glow behind; no resolution or step
+   cards) and the sign-in panel on the right. Primary path is two numbered steps: **1**
    *Open Riot sign-in ↗* (Riot's real page, captcha + 2FA), **2** paste the
    whole `…opt_in#access_token=…` address-bar URL, then *Load collection*. Region +
    PUUID are **auto-detected** — there is **no server picker anywhere**.
@@ -54,7 +56,9 @@ stack (stage → inspector → library) and the page scrolls.
 
 Design language: modern editor chrome with the VALORANT palette (navy
 surfaces, off-white text, red reserved for the primary action and active
-state). UI text is Inter in sentence case; Bebas Neue appears only in display
+state). UI text is Inter in sentence case; the Valorant fan font (dafont, free to use) is used for titles
+(wordmark, hero, page titles, store section heads, showcase column labels);
+Anton (open stand-in for VALORANT's Tungsten) appears only in other display
 moments (logo, hero, store/page titles, big numbers). Rounded corners (4/6/10
 px tokens), no heavy borders. Controls follow a strict three-level hierarchy:
 **segmented switch** (nav views, Fit/100%, skin filter) → **underline tabs
@@ -130,8 +134,8 @@ with count pills** (library sections, sign-in methods) → **pill chips**
 (no header — the grid starts at the top edge)
 CENTER                                    │ RIGHT RAIL
 SIDEARMS column (full height)            │ player card (tall art, dominant)
-SMGS over SMGs, then SHOTGUNS            │ MAIN AGENT tile (only when picked)
-RIFLES column                            │ STATS: SKINS │ PREMIUM │ MELEE │ BUDDIES
+SMGS, SHOTGUNS, LIGHT RIFLES (Bulldog/Guardian) │ MAIN AGENT tile (only when picked)
+RIFLES: Phantom, Vandal, Warden          │ STATS: SKINS │ PREMIUM │ MELEE │ BUDDIES
 SNIPERS over snipers, then HEAVIES       │        VALUE n VP ~$n (full row)
 ── MELEE plane (cols 2–4, ~150px) ──    │          VP / RP wallet + FM badge
                                          │ RANK: PEAK + CURRENT medallions
@@ -140,8 +144,9 @@ SNIPERS over snipers, then HEAVIES       │        VALUE n VP ~$n (full row)
 Must be visible / true:
 
 - **Exactly 4 category columns**; combined columns show **section titles
-  mid-column** (SMGS above SMGs, SHOTGUNS above shotguns; SNIPERS then HEAVIES).
-- **All 19 official guns always present**, even empty (dimmed default-weapon
+  mid-column** (SMGS, SHOTGUNS, LIGHT RIFLES; SNIPERS then HEAVIES).
+  Phantom / Vandal / Warden share the RIFLES column on their own.
+- **All 20 official guns (incl. Warden) always present**, even empty (dimmed default-weapon
   render, no border, no `+`/labels); empty MELEE strip always shown. Unknown
   guns → OTHER column.
 - **Skin stacks**: multiple skins per gun layered in one cell as a **peek
@@ -181,7 +186,7 @@ Must be visible / true:
   no agent picked the rail is pixel-identical to before. The pick rides share
   links like the card/title.
 - Style (in-client look): `#0f1923` canvas with two hard-edged diagonal
-  bands, `#ff4655` top-right wedge + solid 4px left bar, Bebas Neue labels,
+  bands, `#ff4655` top-right wedge + solid 4px left bar, Anton labels + Barlow text,
   Inter body, **sharp** tiles (no clipped corners, no radial glows). Filled gun
   tiles carry the front skin's rarity color as a 2px bottom edge + low tint.
 

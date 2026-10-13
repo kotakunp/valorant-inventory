@@ -32,6 +32,11 @@ export interface Catalog {
   maps: Map<string, { name: string; icon: string | null }>;
   /** gamemode folder segment (from assetPath) → displayName — joins matchInfo.gameMode. */
   gameModes: Map<string, string>;
+  /**
+   * Skin uuids handed out by contracts (battle passes, event passes, agent
+   * gear, Premier): earned, never sold for VP, so they carry no price.
+   */
+  rewardSkins?: Set<string>;
   /** Playable agent uuid → name/bust/role (Agents tab + match-details characterId). */
   agents: Map<string, { name: string; icon: string | null; role: string | null; roleIcon: string | null; base?: boolean }>;
 }
@@ -84,9 +89,26 @@ function indexContentTiers(raw: any): Map<string, { rank: number; icon: string |
   return out;
 }
 
+/** Skin uuids rewarded by any contract tier (paid + free tracks), via the skin index. */
+export function contractRewardSkins(raw: any, skins: Map<string, SkinIndexEntry>): Set<string> {
+  const out = new Set<string>();
+  const add = (r: any) => {
+    if (r?.type !== "EquippableSkinLevel" || typeof r.uuid !== "string") return;
+    const uuid = skins.get(r.uuid.toLowerCase())?.skin?.uuid;
+    if (typeof uuid === "string") out.add(uuid.toLowerCase());
+  };
+  for (const c of raw?.data ?? []) {
+    for (const ch of c?.content?.chapters ?? []) {
+      for (const lv of ch?.levels ?? []) add(lv?.reward);
+      for (const r of ch?.freeRewards ?? []) add(r);
+    }
+  }
+  return out;
+}
+
 export async function getCatalog(): Promise<Catalog> {
   if (cache && Date.now() - cache.at < CATALOG_TTL_MS) return cache.data;
-  const [weapons, cards, titles, buddies, ranks, contentTiers, sprays, maps, gameModes, agents] = await Promise.all([
+  const [weapons, cards, titles, buddies, ranks, contentTiers, sprays, maps, gameModes, agents, contracts] = await Promise.all([
     getJson("https://valorant-api.com/v1/weapons"),
     getJson("https://valorant-api.com/v1/playercards"),
     getJson("https://valorant-api.com/v1/playertitles"),
@@ -97,6 +119,7 @@ export async function getCatalog(): Promise<Catalog> {
     getJson("https://valorant-api.com/v1/maps").catch(() => null),
     getJson("https://valorant-api.com/v1/gamemodes").catch(() => null),
     getJson("https://valorant-api.com/v1/agents").catch(() => null),
+    getJson("https://valorant-api.com/v1/contracts").catch(() => null),
   ]);
   const data: Catalog = {
     skins: new Map(),
@@ -139,6 +162,7 @@ export async function getCatalog(): Promise<Catalog> {
       }
     }
   }
+  data.rewardSkins = contractRewardSkins(contracts, data.skins);
   for (const c of cards.data ?? []) {
     const id = lc(c.uuid);
     if (id) {

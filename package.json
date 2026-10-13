@@ -12,7 +12,8 @@
     "start": "NODE_ENV=production tsx server/index.ts"
   },
   "dependencies": {
-    "@fontsource/bebas-neue": "^5.1.0",
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/barlow": "^5.3.0",
     "@fontsource/inter": "^5.1.0",
     "express": "^4.21.2",
     "html-to-image": "^1.11.11",

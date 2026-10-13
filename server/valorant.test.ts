@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { RecentMatch } from "../src/types";
-import { parseEntitlements, parseRanks, parseRankedStats, rankBadge, buildPriceMapFromStorefront, buildStoreSection, tierVpPrice, projectRecentMatch, computeMatchWindow, fetchRecentMatches, ownedAgents } from "./valorant";
+import { parseEntitlements, parseRanks, parseRankedStats, rankBadge, buildPriceMapFromStorefront, buildStoreSection, tierVpPrice, projectRecentMatch, computeMatchWindow, fetchRecentMatches, ownedAgents, skinItemFromCatalog } from "./valorant";
+import { contractRewardSkins, type Catalog } from "./catalog";
 
 const CARDS = "3f296c07-64c3-494c-923b-fe692a4fa1bd";
 
@@ -229,6 +230,44 @@ describe("tierVpPrice", () => {
   it("null / unknown rank → null (battlepass or free skins)", () => {
     expect(tierVpPrice(null)).toBeNull();
     expect(tierVpPrice(99)).toBeNull();
+  });
+
+  it("melee costs twice the gun price of its tier", () => {
+    expect(tierVpPrice(0, true)).toBe(1750);
+    expect(tierVpPrice(2, true)).toBe(3550);
+    expect(tierVpPrice(4, true)).toBe(4950);
+    expect(tierVpPrice(null, true)).toBeNull();
+  });
+});
+
+describe("contract reward skins carry no price", () => {
+  const entry = (uuid: string, weaponName = "Vandal", category = "EEquippableCategory::Rifle") => ({
+    weaponUuid: "w", weaponName, category, defaultSkinUuid: null,
+    skin: { uuid, displayName: uuid, contentTierUuid: "tier-select", levels: [{ uuid: uuid + "-l1" }], chromas: [] },
+  });
+  const skins = new Map<string, any>([
+    ["bp", entry("bp")], ["bp-l1", entry("bp")],
+    ["store", entry("store")], ["store-l1", entry("store")],
+    ["knife", entry("knife", "Melee", "EEquippableCategory::Melee")],
+  ]);
+  const contracts = {
+    data: [{ content: { chapters: [{ levels: [{ reward: { type: "EquippableSkinLevel", uuid: "BP-L1" } }], freeRewards: [{ type: "Spray", uuid: "x" }] }] } }],
+  };
+  const catalog = {
+    skins,
+    contentTiers: new Map([["tier-select", { rank: 0, icon: null }]]),
+    rewardSkins: contractRewardSkins(contracts, skins),
+  } as unknown as Catalog;
+
+  it("indexes skins from contract level uuids", () => {
+    expect([...catalog.rewardSkins!]).toEqual(["bp"]);
+  });
+  it("battle pass skin → null, store skin → tier estimate, knife → 2×, explicit null kept", () => {
+    expect(skinItemFromCatalog(skins.get("bp"), catalog).price).toBeNull();
+    expect(skinItemFromCatalog(skins.get("store"), catalog).price).toBe(875);
+    expect(skinItemFromCatalog(skins.get("knife"), catalog).price).toBe(1750);
+    expect(skinItemFromCatalog(skins.get("store"), catalog, { price: null }).price).toBeNull();
+    expect(skinItemFromCatalog(skins.get("bp"), catalog, { price: 1275 }).price).toBe(1275);
   });
 });
 
