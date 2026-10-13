@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { ChromaSelection, ItemKind, Selection, ShowcasePayload, SkinItem } from "./types";
 import { selKey } from "./types";
 import { favoriteAgent, groupByGun, rarityColor, rarityLabel, WEAPON_CATEGORIES } from "./logic";
@@ -43,7 +43,28 @@ export function Library({ data, tab, onTab, selection, chromaSel, onToggle, onSe
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<SkinFilter>("all");
   const [cls, setCls] = useState("all");
+  // Skins unselected while viewing "Selected" stay listed (unchecked) until the
+  // view changes, so the grid does not reflow under the pointer mid-cleanup.
+  const [kept, setKept] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => setKept(new Set()), [tab, filter, cls, query]);
+  const chipsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = chipsRef.current;
+    if (!el) return;
+    // Mouse wheels only scroll vertically; turn that into horizontal chip scrolling.
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [tab]);
   const isOn = (kind: ItemKind, id: string) => !!selection[selKey(kind, id)];
+  const toggleSkin = (id: string) => {
+    if (filter === "selected" && isOn("skin", id)) setKept((k) => new Set(k).add(id));
+    onToggle("skin", id);
+  };
 
   const counts = {
     skin: data.skins.filter((s) => isOn("skin", s.id)).length,
@@ -64,12 +85,12 @@ export function Library({ data, tab, onTab, selection, chromaSel, onToggle, onSe
   const skinGroups = useMemo(() => {
     let items = data.skins;
     if (q) items = items.filter((s) => s.name.toLowerCase().includes(q) || s.weaponName.toLowerCase().includes(q));
-    if (filter === "selected") items = items.filter((s) => selection[selKey("skin", s.id)]);
+    if (filter === "selected") items = items.filter((s) => selection[selKey("skin", s.id)] || kept.has(s.id));
     else if (filter === "equipped") items = items.filter((s) => s.equipped);
     const guns = CLASSES.find((c) => c.id === cls)?.guns;
     const groups = groupByGun(items);
     return guns ? groups.filter((g) => guns.includes(g.id)) : groups;
-  }, [data.skins, q, filter, cls, selection]);
+  }, [data.skins, q, filter, cls, selection, kept]);
 
   const match = (name: string) => !q || name.toLowerCase().includes(q);
 
@@ -85,7 +106,7 @@ export function Library({ data, tab, onTab, selection, chromaSel, onToggle, onSe
         type="button"
         className={`lib-skin${on ? " on" : ""}`}
         style={{ "--rarity": rarity } as CSSProperties}
-        onClick={() => onToggle("skin", s.id)}
+        onClick={() => toggleSkin(s.id)}
         aria-pressed={on}
         title={`${s.name} · ${tier}${s.price != null ? ` · ${fmt(s.price)} VP` : ""}${s.equipped ? " · equipped" : ""}`}
       >
@@ -147,7 +168,7 @@ export function Library({ data, tab, onTab, selection, chromaSel, onToggle, onSe
                 </button>
               ))}
             </div>
-            <div className="chips" role="group" aria-label="Weapon class">
+            <div className="chips" role="group" aria-label="Weapon class" ref={chipsRef}>
               {CLASSES.map((c) => (
                 <button key={c.id} type="button" className={cls === c.id ? "on" : ""} aria-pressed={cls === c.id} onClick={() => setCls(c.id)}>
                   {c.label}

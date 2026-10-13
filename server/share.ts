@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { AgentItem, BuddyItem, CardItem, ChromaSelection, SharedShowcase, SharePicks, SkinItem, TitleItem } from "../src/types";
+import { accountValue } from "../src/logic";
 import type { Catalog } from "./catalog";
 import type { ShareManifest } from "./shareManifest";
 import { agentItemFromCatalog, rankBadge, skinItemFromCatalog } from "./valorant";
@@ -164,6 +165,8 @@ export function buildSnapshot(
       buddies,
       agents,
       pricesAvailable: m.pricesAvailable,
+      // From the signed manifest, so the link shows the whole account's value, not just the picks.
+      accountValue: [...m.skins, ...m.cards, ...m.titles, ...m.buddies].reduce((n, i) => n + (i[1] ?? 0), 0),
       defaultIcons: Object.fromEntries(catalog.weaponIcons),
       store: null,
       generatedAt: now.toISOString(),
@@ -189,7 +192,7 @@ const escapeHtml = (s: string) =>
 export function injectShareMeta(html: string, share: SharedShowcase, origin: string, id: string, hasPreview: boolean): string {
   const p = share.showcase;
   const who = shareOwnerLabel(p.gameName, p.tagLine);
-  const value = [...p.skins, ...p.cards, ...p.titles, ...p.buddies].reduce((n, i) => n + (i.price ?? 0), 0);
+  const value = accountValue(p);
   const title = `${who}'s loadout · Valorant Loadout Studio`;
   const parts = [`${p.skins.length} ${p.skins.length === 1 ? "skin" : "skins"}`];
   if (value > 0) parts.push(`${value.toLocaleString("en-US")} VP`);

@@ -201,9 +201,6 @@ export default function App() {
     });
   };
 
-  const allSections = (mode: "all" | "none" | "premium") =>
-    (["skin", "card", "title", "buddy", "agent"] as ItemKind[]).forEach((k) => setSection(k, mode));
-
   async function exportImages() {
     if (!data || !pages) return;
     setExporting(true);
@@ -457,7 +454,6 @@ export default function App() {
             exportPhase={exportPhase}
             exporting={exporting}
             onExport={exportImages}
-            onPreset={allSections}
             onPickChroma={pickChroma}
             onOpenTab={setLibTab}
             share={shareEnabled ? share : null}

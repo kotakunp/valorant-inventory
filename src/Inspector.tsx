@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import type { ChromaSelection, ItemKind, Selection, ShowcaseOptions, ShowcasePayload, SkinItem } from "./types";
 import { selKey } from "./types";
 import type { Pages } from "./logic";
-import { collectionValue, favoriteAgent, isPremiumSkin, vpToUsd } from "./logic";
+import { accountValue, collectionValue, isPremiumSkin, vpToUsd } from "./logic";
 import type { LibraryTab } from "./Library";
 import { SkinArt } from "./skinArt";
 import { IconCheck, IconCopy, IconDownload, IconLink } from "./icons";
@@ -127,7 +127,6 @@ interface Props {
   exportPhase: string | null;
   exporting: boolean;
   onExport: () => void;
-  onPreset: (mode: "all" | "none" | "premium") => void;
   onPickChroma: (skinId: string, chromaId: string) => void;
   onOpenTab: (tab: LibraryTab) => void;
   /** null when this server has no share storage. */
@@ -160,7 +159,6 @@ export function Inspector({
   exportPhase,
   exporting,
   onExport,
-  onPreset,
   onPickChroma,
   onOpenTab,
   share,
@@ -176,8 +174,8 @@ export function Inspector({
   const card = data.cards.find((c) => isOn("card", c.id));
   const title = data.titles.find((t) => isOn("title", t.id));
   const agent = (data.agents ?? []).find((a) => isOn("agent", a.id));
-  const favAgent = favoriteAgent(data);
-  const vp = collectionValue(data, selection);
+  const vp = accountValue(data);
+  const selectedVp = collectionValue(data, selection);
   const pageCount = pages.gridPages.length;
   const withChromas = skins.filter((s): s is SkinItem => s.chromas.length > 1);
   const [hover, setHover] = useState<VariantHover | null>(null);
@@ -208,7 +206,7 @@ export function Inspector({
         <section className="insp-section">
           <h3 className="insp-head">Summary</h3>
           <div className="insp-value">
-            <span className="insp-value-label">Collection value</span>
+            <span className="insp-value-label">Account value</span>
             <span className="insp-value-num">
               {vp > 0 ? (
                 <>
@@ -219,7 +217,11 @@ export function Inspector({
                 "—"
               )}
             </span>
-            {vp > 0 && <span className="insp-usd">≈ ${fmt(vpToUsd(vp))} USD</span>}
+            {vp > 0 && (
+              <span className="insp-usd">
+                ≈ ${fmt(vpToUsd(vp))} USD · selected {fmt(selectedVp)} VP
+              </span>
+            )}
           </div>
           <dl className="insp-stats">
             <div className="insp-stat">
@@ -245,20 +247,9 @@ export function Inspector({
           {pages.truncated > 0 && (
             <p className="insp-note insp-warn">{pages.truncated} selected skins don&apos;t fit and are left out.</p>
           )}
-        </section>
-
-        <section className="insp-section">
-          <h3 className="insp-head">Quick select</h3>
-          <div className="insp-presets">
-            <button type="button" className="btn-sm" onClick={() => onPreset("premium")}>Premium+</button>
-            <button type="button" className="btn-sm" onClick={() => onPreset("all")}>Everything</button>
-            <button type="button" className="btn-sm" onClick={() => onPreset("none")}>Clear</button>
-          </div>
-          <p className="insp-note">
-            Premium+ and equipped items were picked for you.
-            {agent && favAgent && agent.id === favAgent.id && " Your most-played agent was picked for you."}
-            {!data.pricesAvailable && " Prices are unavailable, so premium is estimated from skin levels."}
-          </p>
+          {!data.pricesAvailable && (
+            <p className="insp-note">Prices are unavailable, so premium is estimated from skin levels.</p>
+          )}
         </section>
 
         <section className="insp-section">

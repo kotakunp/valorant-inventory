@@ -218,6 +218,11 @@ export interface ShowcasePayload {
   /** Editor-only ranked + recent-match stats (never part of the PNG). */
   profile?: ProfileStats | null;
   pricesAvailable: boolean;
+  /**
+   * List-price VP of everything the account owns. Only set on share snapshots,
+   * which hold just the shown items; otherwise `accountValue()` sums the payload.
+   */
+  accountValue?: number;
   /** Uppercase gun label → official default-weapon render (empty-slot art). */
   defaultIcons?: Record<string, string>;
   /** Daily store + night market (null when the storefront wasn't available). */

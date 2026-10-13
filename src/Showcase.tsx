@@ -8,7 +8,7 @@ import { thumb } from "./thumb";
 import {
   WEAPON_CATEGORIES,
   LOADOUT_GUNS,
-  collectionValue,
+  accountValue,
   orderStack,
   rarityColor,
   gunStack,
@@ -182,8 +182,8 @@ export function Showcase({
   // Shared premium rule (price / content tier / level fallback) — matches selection.
   const premCount = checkedSkins.filter((s) => isPremiumSkin(s)).length;
   const knifeCount = checkedSkins.filter((s) => s.isKnife).length;
-  // Collection value of the checked items (list prices; hidden when 0 / priceless).
-  const totalVp = collectionValue(payload, selection);
+  // Whole account's list-price value, selected or not (hidden when 0 / priceless).
+  const totalVp = accountValue(payload);
   const checkedCards = payload.cards.filter((c) => isOn("card", c.id));
   const checkedTitles = payload.titles.filter((t) => isOn("title", t.id));
   const checkedBuddies = payload.buddies.filter((b) => isOn("buddy", b.id));

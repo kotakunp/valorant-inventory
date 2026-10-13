@@ -242,6 +242,12 @@ export function collectionValue(payload: ShowcasePayload, sel: Selection): numbe
   return total;
 }
 
+/** List-price VP of every owned skin, card, title and buddy, selected or not. */
+export function accountValue(payload: ShowcasePayload): number {
+  if (payload.accountValue != null) return payload.accountValue;
+  return [...payload.skins, ...payload.cards, ...payload.titles, ...payload.buddies].reduce((n, i) => n + (i.price ?? 0), 0);
+}
+
 /** Estimate USD for VP at the base tier (1,000 VP = $9.99), whole dollars. */
 export function vpToUsd(vp: number): number {
   return Math.round(vp * 0.00999);

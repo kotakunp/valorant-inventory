@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLoadoutSlots, buildSelection, cellWeight, collectionValue, defaultChecked, favoriteAgent, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, matchDuration, orderStack, paginate, peekPosition, pickSingleSlot, rarityColor, rarityLabel, relTime, skinTierScore, gunStack, GUN_STACK_MAX, knifeLayout, peekStack, tierInfo, vpToUsd, winratePct, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
+import { accountValue, buildLoadoutSlots, buildSelection, cellWeight, collectionValue, defaultChecked, favoriteAgent, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, matchDuration, orderStack, paginate, peekPosition, pickSingleSlot, rarityColor, rarityLabel, relTime, skinTierScore, gunStack, GUN_STACK_MAX, knifeLayout, peekStack, tierInfo, vpToUsd, winratePct, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
 import type { AnyItem } from "./logic";
 import type { AgentItem, CardItem, ProfileStats, ShowcasePayload, SkinItem, TitleItem } from "./types";
 import { isSingleSlot, selKey } from "./types";
@@ -499,6 +499,9 @@ describe("presentation helpers", () => {
     expect(sel["skin:b"]).toBe(false);
     expect(sel["card:c"]).toBe(true);
     expect(collectionValue(payload, sel)).toBe(1775 + 375);
+    // account value ignores the selection; a share snapshot's stored value wins
+    expect(accountValue(payload)).toBe(1775 + 875 + 375);
+    expect(accountValue({ ...payload, accountValue: 99999 })).toBe(99999);
   });
 
   it("vpToUsd estimates dollars at the base tier (1000 VP = $9.99)", () => {

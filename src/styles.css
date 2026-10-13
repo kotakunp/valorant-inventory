@@ -903,8 +903,6 @@ img.skin-art {
 .insp-stat dt { font-size: 11px; color: var(--faint); }
 .insp-stat dd { margin: 6px 0 0; font-size: 16px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .insp-stat dd small { font-size: 11px; font-weight: 500; color: var(--faint); }
-.insp-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.insp-presets .btn-sm { padding: 9px 4px; overflow: hidden; text-overflow: ellipsis; }
 .insp-note { margin: 10px 0 0; color: var(--faint); font-size: 12px; line-height: 1.5; }
 .insp-warn { color: #ffb3ba; }
 .insp-profile {

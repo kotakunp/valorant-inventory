@@ -36,8 +36,7 @@ never reach the PNG or share links.
    Cookie failures show human-readable copy + **Try again**.
 2. **Workspace** loads with the account's inventory in a fixed-height,
    3-pane studio (library · stage · inspector). Defaults pre-check premium
-   skins (≥1775 VP / Premium+ tier) and everything equipped — noted in the
-   inspector.
+   skins (≥1775 VP / Premium+ tier) and everything equipped.
 3. **Curation** — user toggles what appears in the library (search,
    All/Selected/Equipped filter, weapon-class chips); the preview updates live.
 4. **Export** — *Download image* (or *Download N images* when paginated),
@@ -72,10 +71,13 @@ with count pills** (library sections, sign-in methods) → **pill chips**
   Agents*, each with a pill showing the selected count (tooltip `x of y
   selected`).
   - Skins: search, *All / Selected / Equipped* segmented filter, weapon-class
-    pill chips (scrollable, fading edge), per-gun groups with sticky headers
+    pill chips (scrollable, fading edge; the mouse wheel scrolls them
+    sideways), per-gun groups with sticky headers
     (default-gun icon + `NAME ── sel/total`), 2-column rounded tiles with a
     rarity-tinted glow: art + name + VP price + `Equipped` tag. Unselected art
     is dimmed/desaturated; selected = red-tinted border + round red check.
+    In *Selected*, an unchecked skin stays in place (unchecked) until the
+    tab, filter, class or search changes, so fast cleanup never reflows.
   - Cards: 3-column grid of full portraits (single-select, accent ring).
     Titles: radio list. Buddies: icon grid (multi-select, *Select all / Paid
     only / Clear*). Cards and titles are **single-select** — picking one
@@ -93,10 +95,10 @@ with count pills** (library sections, sign-in methods) → **pill chips**
 - **Inspector (right pane):** primary **Download image** button (download
   icon; *Download N images* when paginated) with export phases,
   `PNG · 2560 × 2048` (`· N pages`), pager `‹ i/N ›` when multi-page;
-  **Summary** (lead *Collection value* in large display digits + `VP`,
-  `≈ $n USD`, then a 4-up stat row: skins x/y, premium, melee, buddies);
-  **Quick select** *Premium+ / Everything / Clear* + the auto-pick
-  note (mentions the most-played agent pick while it's still checked);
+  **Summary** (lead *Account value*: every owned item's list price,
+  selected or not, in large display digits + `VP`, `≈ $n USD · selected n VP`,
+  then a 4-up stat row: skins x/y, premium, melee, buddies); no quick-select
+  presets;
   **Profile** (current card + title + main agent, *Change* jumps to that
   library tab); **Variants** (per selected skin: thumbnail, name, chroma swatches).
   Hovering or focusing a swatch opens an enlarged **variant peek** left of

@@ -151,6 +151,9 @@ describe("share snapshot", () => {
     expect(snap.showcase.cards[0].id).toBe("card1");
     expect(snap.showcase.titles[0].text).toBe("Potato");
     expect(snap.showcase.buddies[0].price).toBe(475);
+    // whole account value from the manifest, even when only one skin is shown
+    const one = buildSnapshot(m(), parsePicks({ ...picksAll, skins: [{ id: "s1", chroma: null }], buddies: [] }), catalog());
+    expect(one.showcase.accountValue).toBe(1775 + 1275 + 375 + 475);
   });
 
   it("stores only the picked agent (one slot), rebuilt from the catalog", () => {
