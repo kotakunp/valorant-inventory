@@ -157,6 +157,10 @@ Must be visible / true:
   and removal are available directly on each row; no inspector or edit mode.
   Keyboard focus also opens the spread, Escape dismisses it; touch can tap.
   The spread is outside the scaled canvas and never included in PNG exports.
+- **Cell heights** follow skin count within each column (`cellWeight`):
+  cells with 0–2 skins shrink so big stacks (e.g. Phantom / Vandal next to
+  a light Bulldog / Guardian) get more room, and a stack spreads out to fill
+  its cell's height (still overlapping) instead of bunching in the middle.
 - **Melee/knives** share one bottom plane (lighter than gun cells), never in
   the gun grid. Each row is a horizontal peek stack (the gun stack turned
   sideways): foremost knife on the right, each knife behind it one step

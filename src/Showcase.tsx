@@ -12,6 +12,8 @@ import {
   orderStack,
   rarityColor,
   gunStack,
+  GUN_SPREAD_MAX,
+  cellWeight,
   knifeLayout,
   tierInfo,
   isPremiumSkin,
@@ -258,6 +260,18 @@ export function Showcase({
       onClick={e => openStack(e.currentTarget, gun)} />
   );
 
+  /**
+   * Vertical distance between neighbouring skins. In translate, % is the art's
+   * own height and cqh is the cell (`.sc-stack` is a size container). Wide guns
+   * are width-limited, so in a tall cell `peek` × art height alone leaves the
+   * group bunched in the middle; the step therefore grows to spread the group
+   * over ~92% of the cell, capped so neighbours still overlap (≤ 75% revealed).
+   */
+  const spreadStep = (stack: ReturnType<typeof gunStack>) =>
+    stack.visible > 1
+      ? `clamp(${stack.peek * 100}%, (92cqh - 100%) / ${stack.visible - 1}, ${GUN_SPREAD_MAX * 100}%)`
+      : "0px";
+
   const gunSection = (gun: GunGroup) => {
     const items = orderStack(gun.items, bringToFront[gun.id]);
     const empty = items.length === 0;
@@ -268,7 +282,7 @@ export function Showcase({
       <section
         className={`sc-cat${empty ? " sc-cat--empty" : ""}`}
         key={gun.id}
-        style={front ? ({ "--rarity": rarityOf(front) } as CSSProperties) : undefined}
+        style={{ flexGrow: cellWeight(items.length), ...(front ? ({ "--rarity": rarityOf(front) } as CSSProperties) : {}) }}
       >
         {!empty && hoverTarget(gun.id, `Browse ${gun.label}, ${items.length} skins`)}
         <div className="sc-cat-head">
@@ -291,8 +305,7 @@ export function Showcase({
                     s, i,
                     { inset: "auto 0", top: `${((1 - stack.box) / 2) * 100}%`, height: `${stack.box * 100}%` },
                     shown.length - i + 1, "up",
-                    // % in translate = the art's own height, so the reveal reads the same for every gun shape
-                    { transform: `translateY(${stack.shifts[i] * 100}%)` }
+                    { transform: `translateY(calc(${(stack.visible - 1) / 2 - i} * ${spreadStep(stack)}))` }
                   )
                 : stackItem(s, i, {}, 1)
             )
@@ -340,7 +353,8 @@ export function Showcase({
             {catColumns.map((col) => (
               <div className="sc-cat-col" key={col.id}>
                 {col.sections.map((sec, si) => (
-                  <div className="sc-cat-sec" key={sec.label}>
+                  <div className="sc-cat-sec" key={sec.label}
+                    style={{ flexGrow: sec.guns.reduce((sum, g) => sum + cellWeight(g.items.length), 0) || 1 }}>
                     <div className={`sc-cat-col-head${si > 0 ? " sc-cat-col-head--mid" : ""}`}>
                       <span className="sc-cat-col-label">{sec.label}</span>
                       <span className="sc-cat-col-rule" aria-hidden="true" />

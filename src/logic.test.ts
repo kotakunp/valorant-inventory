@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLoadoutSlots, buildSelection, collectionValue, defaultChecked, favoriteAgent, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, matchDuration, orderStack, paginate, peekPosition, pickSingleSlot, rarityColor, rarityLabel, relTime, skinTierScore, gunStack, GUN_STACK_MAX, knifeLayout, peekStack, tierInfo, vpToUsd, winratePct, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
+import { buildLoadoutSlots, buildSelection, cellWeight, collectionValue, defaultChecked, favoriteAgent, groupByGun, gunLabel, isPremiumSkin, LOADOUT_GUNS, matchDuration, orderStack, paginate, peekPosition, pickSingleSlot, rarityColor, rarityLabel, relTime, skinTierScore, gunStack, GUN_STACK_MAX, knifeLayout, peekStack, tierInfo, vpToUsd, winratePct, WEAPON_CATEGORIES, WEAPON_ORDER } from "./logic";
 import type { AnyItem } from "./logic";
 import type { AgentItem, CardItem, ProfileStats, ShowcasePayload, SkinItem, TitleItem } from "./types";
 import { isSingleSlot, selKey } from "./types";
@@ -361,6 +361,16 @@ describe("stack layout", () => {
     expect(gunStack(5).peek).toBeGreaterThan(gunStack(8).peek);
     expect(gunStack(3).peek).toBeGreaterThanOrEqual(0.4);
     expect(gunStack(20).hidden).toBe(20 - GUN_STACK_MAX);
+  });
+
+  it("cellWeight: light cells give up height to big stacks, within bounds", () => {
+    expect(cellWeight(0)).toBeLessThan(cellWeight(1));
+    expect(cellWeight(1)).toBe(cellWeight(2));
+    expect(cellWeight(2)).toBeLessThan(cellWeight(3));
+    expect(cellWeight(3)).toBeLessThan(cellWeight(8));
+    expect(cellWeight(GUN_STACK_MAX)).toBe(cellWeight(40));
+    expect(cellWeight(40) / cellWeight(0)).toBeLessThanOrEqual(3);
+    expect(cellWeight(0)).toBeGreaterThanOrEqual(1);
   });
 
   it("melee band places every knife inside the band in size tiers", () => {

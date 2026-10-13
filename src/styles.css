@@ -1686,6 +1686,8 @@ img.skin-art {
   pointer-events: none;
 }
 .sc-stack-item.clickable { cursor: pointer; }
+/* gun cell = size container: the stack spread step is measured in cqh (Showcase spreadStep) */
+.sc-cat > .sc-stack { container-type: size; }
 /* gun stacks: centred group, each back skin shifted up by a share of its own
    art height (inline translateY); knives sit in fixed-size slots */
 .sc-stack-item--knife { padding: 3px 2px; }

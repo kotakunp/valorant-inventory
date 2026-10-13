@@ -369,6 +369,12 @@ export interface GunStack {
   shifts: number[];
 }
 
+/**
+ * Most of a back skin a gun stack may reveal when the cell has spare height
+ * (the stack spreads out to fill the cell but neighbours always overlap).
+ */
+export const GUN_SPREAD_MAX = 0.75;
+
 /** Most skins one gun cell draws; past this the strips get too thin to read. */
 export const GUN_STACK_MAX = 9;
 
@@ -392,6 +398,19 @@ export function gunStack(count: number): GunStack {
     box: visible <= 1 ? 1 : 1 / span,
     shifts: Array.from({ length: visible }, (_, i) => ((visible - 1) / 2 - i) * peek),
   };
+}
+
+/**
+ * Share of its column a gun cell claims (flex-grow), by how many skins it
+ * stacks: empty and light cells give up height so big stacks in the same
+ * column get taller (and their art can grow). Bounded so a light cell stays
+ * readable. Never below 1: a lone flex item with grow < 1 would not fill its column.
+ */
+export function cellWeight(count: number): number {
+  const n = Math.max(0, Math.floor(count));
+  if (n === 0) return 1;
+  if (n <= 2) return 1.25;
+  return Math.min(3, 1.25 + 0.25 * (Math.min(n, GUN_STACK_MAX) - 2));
 }
 
 export interface KnifeLayout {
